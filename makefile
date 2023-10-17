@@ -3,6 +3,10 @@
 
 # A generic build template for C/C++ programs
 
+# general flags
+compile = -c $<
+output = -o $@
+
 # executable name
 EXE = app
 
@@ -27,77 +31,77 @@ LDFLAGS =
 LDLIBS =
 
 # build directories
-BIN = bin
-OBJ = obj
-SRC = src
+BINDIR = bin
+OBJDIR = obj
+SRCDIR = src
 
-SOURCES := $(wildcard $(SRC)/*.c $(SRC)/*.cc $(SRC)/*.cpp $(SRC)/*.cxx)
+SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 
 OBJECTS := \
-	$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(wildcard $(SRC)/*.c)) \
-	$(patsubst $(SRC)/%.cc, $(OBJ)/%.o, $(wildcard $(SRC)/*.cc)) \
-	$(patsubst $(SRC)/%.cpp, $(OBJ)/%.o, $(wildcard $(SRC)/*.cpp)) \
-	$(patsubst $(SRC)/%.cxx, $(OBJ)/%.o, $(wildcard $(SRC)/*.cxx))
+	$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.c)) \
+	$(patsubst $(SRCDIR)/%.cc, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cc)) \
+	$(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cpp)) \
+	$(patsubst $(SRCDIR)/%.cxx, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cxx))
 
 # include compiler-generated dependency rules
 DEPENDS := $(OBJECTS:.o=.d)
 
 # compile C source
-COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) -c -o $@
+COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(compile) $(output)
 # compile C++ source
-COMPILE.cxx = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@
+COMPILE.cxx = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(compile) $(output)
 # link objects
-LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(OBJECTS) -o $@
+LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(OBJECTS) $(output)
 
 .DEFAULT_GOAL = all
 
 .PHONY: all
-all: $(BIN)/$(EXE)
+all: $(BINDIR)/$(EXE)
 
-$(BIN)/$(EXE): $(SRC) $(OBJ) $(BIN) $(OBJECTS)
+$(BINDIR)/$(EXE): $(SRCDIR) $(OBJDIR) $(BINDIR) $(OBJECTS)
 	$(LINK.o)
 
-$(SRC):
-	mkdir -p $(SRC)
+$(SRCDIR):
+	mkdir -p $(SRCDIR)
 
-$(OBJ):
-	mkdir -p $(OBJ)
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
 
-$(BIN):
-	mkdir -p $(BIN)
+$(BINDIR):
+	mkdir -p $(BINDIR)
 
-$(OBJ)/%.o:	$(SRC)/%.c
-	$(COMPILE.c) $<
+$(OBJDIR)/%.o:	$(SRCDIR)/%.c
+	$(COMPILE.c)
 
-$(OBJ)/%.o:	$(SRC)/%.cc
-	$(COMPILE.cxx) $<
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cc
+	$(COMPILE.cxx)
 
-$(OBJ)/%.o:	$(SRC)/%.cpp
-	$(COMPILE.cxx) $<
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp
+	$(COMPILE.cxx)
 
-$(OBJ)/%.o:	$(SRC)/%.cxx
-	$(COMPILE.cxx) $<
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx
+	$(COMPILE.cxx)
 
 # force rebuild
 .PHONY: remake
-remake:	clean $(BIN)/$(EXE)
+remake:	clean $(BINDIR)/$(EXE)
 
 # execute the program
 .PHONY: run
-run: $(BIN)/$(EXE)
-	./$(BIN)/$(EXE)
+run: $(BINDIR)/$(EXE)
+	./$(BINDIR)/$(EXE)
 
 # remove previous build and objects
 .PHONY: clean
 clean:
 	$(RM) $(OBJECTS)
 	$(RM) $(DEPENDS)
-	$(RM) $(BIN)/$(EXE)
+	$(RM) $(BINDIR)/$(EXE)
 
 # remove everything except source
 .PHONY: reset
 reset:
-	$(RM) -r $(OBJ)
-	$(RM) -r $(BIN)
+	$(RM) -r $(OBJDIR)
+	$(RM) -r $(BINDIR)
 
 -include $(DEPENDS)
