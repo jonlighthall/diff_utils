@@ -39,3 +39,13 @@ bin/
 
 # Git 
 *.~*~
+
+# CMake build files
+.cmake/
+CMakeFiles
+Testing
+*.cmake
+CMakeCache.txt
+Makefile
+compile_commands.json
+DartConfiguration.tcl
