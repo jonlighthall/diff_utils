@@ -3,6 +3,13 @@
 
 # A generic build template for C/C++ programs
 
+# C compiler
+CC = gcc
+# C++ compiler
+CXX = g++
+# linker
+LD = g++
+
 # general flags
 compile = -c $<
 output = -o $@
@@ -10,12 +17,6 @@ output = -o $@
 # executable name
 EXE = app
 
-# C compiler
-CC = gcc
-# C++ compiler
-CXX = g++
-# linker
-LD = g++
 
 # C flags
 CFLAGS =
@@ -33,7 +34,23 @@ LDLIBS =
 # build directories
 BINDIR = bin
 OBJDIR = obj
+
+#
+# source file lists
+
+# program files (executable)
+SRC.C = $(wildcard *.c)
+SRC.CPP = $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.cxx)
+
+# add SRCDIR if present
 SRCDIR = src
+
+ifneq ("$(strip $(wildcard $(SRCDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
+	SRC.C += $(wildcard $(SRCDIR)/*.c)
+	SRC.CPP += $(wildcard $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
+endif
+SRC = $(SRC.C) $(SRC.CPP)
 
 SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 
