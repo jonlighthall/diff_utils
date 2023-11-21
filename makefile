@@ -17,34 +17,43 @@ output = -o $@
 # executable name
 EXE = app
 
-
 # C flags
 CFLAGS =
 # C++ flags
 CXXFLAGS =
 # C/C++ flags
-CPPFLAGS = -Wall
+warnings = -Wall
+CPPFLAGS = $(warnings)
 # dependency-generation flags
 DEPFLAGS = -MMD -MP
+
+# compile C/C++ source
+COMPILE.cpp = $(DEPFLAGS) $(CPPFLAGS) $(compile) $(output)
+# compile C source
+COMPILE.c = $(CC)  $(CFLAGS) 
+# compile C++ source
+COMPILE.cxx = $(CXX) $(CXXFLAGS) $(COMPILE.cpp)
+
 # linker flags
 LDFLAGS =
 # library flags
 LDLIBS =
 
-# build directories
-BINDIR = bin
-OBJDIR = obj
+# link objects
+LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(output) $^
 
+# build directories
+BINDIR := bin
+OBJDIR := obj
 #
 # source file lists
-
+#
 # program files (executable)
 SRC.C = $(wildcard *.c)
 SRC.CPP = $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.cxx)
 
 # add SRCDIR if present
-SRCDIR = src
-
+SRCDIR := src
 ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
 	SRC.C += $(wildcard $(SRCDIR)/*.c)
@@ -62,42 +71,89 @@ OBJECTS := \
 
 # include compiler-generated dependency rules
 DEPENDS := $(OBJECTS:.o=.d)
-
-# compile C source
-COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(compile) $(output)
-# compile C++ source
-COMPILE.cxx = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(compile) $(output)
-# link objects
-LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(OBJECTS) $(output)
+-include $(DEPENDS)
 
 .DEFAULT_GOAL = all
 
 .PHONY: all
 all: $(BINDIR)/$(EXE)
 
-$(BINDIR)/$(EXE): $(SRCDIR) $(OBJDIR) $(BINDIR) $(OBJECTS)
+$(BINDIR)/$(EXE): $(OBJECTS) | $(BINDIR) 
 	$(LINK.o)
 
-$(SRCDIR):
-	mkdir -p $(SRCDIR)
-
-$(OBJDIR):
-	mkdir -p $(OBJDIR)
-
-$(BINDIR):
-	mkdir -p $(BINDIR)
-
-$(OBJDIR)/%.o:	$(SRCDIR)/%.c
+$(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
 	$(COMPILE.c)
 
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cc
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR)
 	$(COMPILE.cxx)
 
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
 	$(COMPILE.cxx)
 
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
 	$(COMPILE.cxx)
+
+#
+# define directory creation
+$(BINDIR):
+	@mkdir -v $(BINDIR)
+$(OBJDIR):
+	@mkdir -v $(OBJDIR)
+
+#
+# recipes without outputs
+.PHONY: mostlyclean clean force out realclean distclean reset
+#
+# clean up
+RM = @rm -vfrd
+mostlyclean:
+# remove compiled binaries
+	@echo "removing compiled binary files..."
+# remove build files
+	$(RM) $(OBJECTS)
+	$(RM) $(DEPENDS)
+# remove remaining binaries
+	$(RM) $(OBJDIR)/*.o
+	$(RM) $(OBJDIR)
+	$(RM) *.o *.obj
+	@echo "$(THISDIR) $@ done"
+clean: mostlyclean
+# remove binaries and executables
+	@echo "\nremoving compiled executable files..."
+# removue build files
+	$(RM) $(BINDIR)/$(EXE)
+# remove remaining binaries
+	$(RM) $(BINDIR)/*.exe
+	$(RM) $(BINDIR)
+	$(RM) *.exe
+	$(RM) *.out
+	@echo "$(THISDIR) $@ done"
+force: clean
+# force re-make
+	@$(MAKE) --no-print-directory
+out:
+# remove outputs produced by executables
+	@echo "\nremoving output files..."
+	@echo "$(THISDIR) $@ done"
+realclean: clean out
+# remove binaries and outputs
+
+distclean: realclean
+# remove binaries, outputs, and backups
+	@echo "\nremoving backup files..."
+# remove Git versions
+	$(RM) *.~*~
+# remove Emacs backup files
+	$(RM) *~ \#*\#
+# clean sub-programs
+	@echo "$(THISDIR) $@ done"
+reset: distclean
+# remove untracked files
+	@echo "\nresetting repository..."
+	git reset HEAD
+	git stash
+	git clean -f
+	@echo "$(THISDIR) $@ done"
 
 # force rebuild
 .PHONY: remake
@@ -108,17 +164,6 @@ remake:	clean $(BINDIR)/$(EXE)
 run: $(BINDIR)/$(EXE)
 	./$(BINDIR)/$(EXE)
 
-# remove previous build and objects
-.PHONY: clean
-clean:
-	$(RM) $(OBJECTS)
-	$(RM) $(DEPENDS)
-	$(RM) $(BINDIR)/$(EXE)
-
 # remove everything except source
 .PHONY: reset
-reset:
-	$(RM) -r $(OBJDIR)
-	$(RM) -r $(BINDIR)
-
--include $(DEPENDS)
+reset: realclean
