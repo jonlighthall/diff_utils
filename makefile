@@ -14,9 +14,6 @@ LD = g++
 compile = -c $<
 output = -o $@
 
-# executable name
-EXE = app
-
 # C flags
 CFLAGS =
 # C++ flags
@@ -63,6 +60,18 @@ SRC = $(SRC.C) $(SRC.CPP)
 
 SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 
+OBJS.C = $(SRC.C:.c=.o)
+OBJS.CPP = $(SRC.CPP:.cc=.o)
+OBJS.CPP = $(OBJ.CPP:.cpp=.o)
+OBJS.CPP := $(OBJ.CPP:.cxx=.o)
+# concatonate object lists
+OBJS.all = $(OBJS.C) $(OBJS.CPP)
+# strip source directory from object list
+# should be a list of .o files with no directory
+OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
+# add object directory
+OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
+
 OBJECTS := \
 	$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.c)) \
 	$(patsubst $(SRCDIR)/%.cc, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cc)) \
@@ -72,6 +81,12 @@ OBJECTS := \
 # include compiler-generated dependency rules
 DEPENDS := $(OBJECTS:.o=.d)
 -include $(DEPENDS)
+
+#
+# executables
+TARGET = 
+EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=.exe))
+EXE = app
 
 .DEFAULT_GOAL = all
 
@@ -92,14 +107,12 @@ $(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
 
 $(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
 	$(COMPILE.cxx)
-
 #
 # define directory creation
 $(BINDIR):
 	@mkdir -v $(BINDIR)
 $(OBJDIR):
 	@mkdir -v $(OBJDIR)
-
 #
 # recipes without outputs
 .PHONY: mostlyclean clean force out realclean distclean reset
