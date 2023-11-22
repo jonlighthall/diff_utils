@@ -56,27 +56,29 @@ ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 	SRC.C += $(wildcard $(SRCDIR)/*.c)
 	SRC.CPP += $(wildcard $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 endif
-SRC = $(SRC.C) $(SRC.CPP)
+SRC.CPP := $(strip $(SRC.CPP))
+SRC = $(strip $(SRC.C) $(SRC.CPP))
 
 SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 
 OBJS.C = $(SRC.C:.c=.o)
-OBJS.CPP = $(SRC.CPP:.cc=.o)
-OBJS.CPP = $(OBJ.CPP:.cpp=.o)
-OBJS.CPP := $(OBJ.CPP:.cxx=.o)
+OBJS.cc = $(SRC.CPP:.cc=.o)
+OBJS.cpp = $(OBJS.cc:.cpp=.o)
+OBJS.CPP = $(OBJS.cpp:.cxx=.o)
 # concatonate object lists
-OBJS.all = $(OBJS.C) $(OBJS.CPP)
+OBJS.all = $(strip $(OBJS.C) $(OBJS.CPP))
 # strip source directory from object list
 # should be a list of .o files with no directory
 OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
 # add object directory
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 
-OBJECTS := \
+OBJECTS = \
 	$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.c)) \
 	$(patsubst $(SRCDIR)/%.cc, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cc)) \
 	$(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cpp)) \
 	$(patsubst $(SRCDIR)/%.cxx, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cxx))
+OBJECTS := $(strip $(OBJECTS))
 
 # include compiler-generated dependency rules
 DEPENDS := $(OBJECTS:.o=.d)
@@ -93,6 +95,52 @@ EXE = app
 .PHONY: all
 all: $(BINDIR)/$(EXE)
 
+printvars:
+	@echo
+	@echo "printing variables..."
+	@echo "----------------------------------------------------"
+	@echo	
+	@echo "VPATH = '$(VPATH)'"
+
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+	
+	@echo "SRC.C   = $(SRC.C)"	
+	@echo "SRC.CPP = $(SRC.CPP)"	
+	@echo "SRC     = $(SRC)"	
+	@echo "SOURCES = $(SOURCES)"
+
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+	
+	@echo "OBJS.C   = $(OBJS.C)"
+	@echo "OBJS.CPP = $(OBJS.CPP)"
+	@echo "OBJS.all = $(OBJS.all)"
+	@echo "OBJS.o   = $(OBJS.o)"
+	@echo "OBJS     = $(OBJS)"
+	@echo "OBJECTS  = $(OBJECTS)"
+
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+		
+	@echo "DEPENDS = $(DEPENDS)"
+
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "EXE = $(EXE)"
+	@echo "TARGET = $(TARGET)"
+	@echo "EXES = $(EXES)"
+	
+	@echo
+	@echo "----------------------------------------------------"
+	@echo "$@ done"
+	@echo
+	
 $(BINDIR)/$(EXE): $(OBJECTS) | $(BINDIR) 
 	$(LINK.o)
 
