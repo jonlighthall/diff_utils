@@ -58,15 +58,11 @@ ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 endif
 SRC.CPP := $(strip $(SRC.CPP))
 SRC = $(strip $(SRC.C) $(SRC.CPP))
+SRC := $(filter-out $(wildcard *readme*), $(SRC))
 
 SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 
-OBJS.C = $(SRC.C:.c=.o)
-OBJS.cc = $(SRC.CPP:.cc=.o)
-OBJS.cpp = $(OBJS.cc:.cpp=.o)
-OBJS.CPP = $(OBJS.cpp:.cxx=.o)
-# concatonate object lists
-OBJS.all = $(strip $(OBJS.C) $(OBJS.CPP))
+OBJS.all = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(SRC)))))
 # strip source directory from object list
 # should be a list of .o files with no directory
 OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
@@ -86,14 +82,15 @@ DEPENDS := $(OBJECTS:.o=.d)
 
 #
 # executables
-TARGET = 
-EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=.exe))
 EXE = app
+TARGET = $(BINDIR)/$(EXE)
+EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=.exe))
 
 .DEFAULT_GOAL = all
-
+#
+# recipes
 .PHONY: all
-all: $(BINDIR)/$(EXE)
+all: $(TARGET) $(EXES)
 
 printvars:
 	@echo
@@ -105,55 +102,63 @@ printvars:
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	
 	@echo "SRC.C   = $(SRC.C)"	
 	@echo "SRC.CPP = $(SRC.CPP)"	
 	@echo "SRC     = $(SRC)"	
 	@echo "SOURCES = $(SOURCES)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	
-	@echo "OBJS.C   = $(OBJS.C)"
-	@echo "OBJS.CPP = $(OBJS.CPP)"
 	@echo "OBJS.all = $(OBJS.all)"
 	@echo "OBJS.o   = $(OBJS.o)"
 	@echo "OBJS     = $(OBJS)"
 	@echo "OBJECTS  = $(OBJECTS)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-		
 	@echo "DEPENDS = $(DEPENDS)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-
 	@echo "EXE = $(EXE)"
 	@echo "TARGET = $(TARGET)"
 	@echo "EXES = $(EXES)"
-	
 	@echo
 	@echo "----------------------------------------------------"
 	@echo "$@ done"
 	@echo
-	
-$(BINDIR)/$(EXE): $(OBJECTS) | $(BINDIR) 
-	$(LINK.o)
 
+#
+# specific recipes
+$(TARGET): $(OBJECTS) | $(BINDIR)
+	@echo "\nlinking TARGET executable $@..."
+	$(LINK.o)
+#
+# generic recipes
+$(BINDIR)/%.exe: $(OBJDIR)/%.o | $(BINDIR)
+	@echo "\nlinking generic executable $@..."
+	$(LINK.o)
 $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
+	@echo "\ncompiling generic C object $@..."
 	$(COMPILE.c)
+$(OBJDIR)/%.o: %.cc | $(OBJDIR)
+	@echo "\ncompiling generic C++ object (.cc) $@..."
+	$(COMPILE.cxx)
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	@echo "\ncompiling generic C++ object (.cpp) $@..."
+	$(COMPILE.cxx)
+$(OBJDIR)/%.o: %.cxx | $(OBJDIR)
+	@echo "\ncompiling generic C++ object (.cxx) $@..."
+	$(COMPILE.cxx)
 
 $(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR)
+	@echo "\ncompiling generic C++ object $@..."
 	$(COMPILE.cxx)
-
 $(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
+	@echo "\ncompiling generic C++ object $@..."
 	$(COMPILE.cxx)
-
 $(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
+	@echo "\ncompiling generic C++ object $@..."
 	$(COMPILE.cxx)
 #
 # define directory creation
@@ -222,8 +227,8 @@ remake:	clean $(BINDIR)/$(EXE)
 
 # execute the program
 .PHONY: run
-run: $(BINDIR)/$(EXE)
-	./$(BINDIR)/$(EXE)
+run: $(TARGET)
+	./$(TARGET)
 
 # remove everything except source
 .PHONY: reset
