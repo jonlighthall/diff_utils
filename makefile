@@ -21,11 +21,9 @@ CXXFLAGS =
 # C/C++ flags
 warnings = -Wall
 CPPFLAGS = $(warnings)
-# dependency-generation flags
-DEPFLAGS = -MMD -MP
 
 # compile C/C++ source
-COMPILE.cpp = $(DEPFLAGS) $(CPPFLAGS) $(compile) $(output)
+COMPILE.cpp = $(CPPFLAGS) $(compile) $(output)
 # compile C source
 COMPILE.c = $(CC)  $(CFLAGS) 
 # compile C++ source
@@ -68,22 +66,10 @@ OBJS.all = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsu
 OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
 # add object directory
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
-
-OBJECTS = \
-	$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.c)) \
-	$(patsubst $(SRCDIR)/%.cc, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cc)) \
-	$(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cpp)) \
-	$(patsubst $(SRCDIR)/%.cxx, $(OBJDIR)/%.o, $(wildcard $(SRCDIR)/*.cxx))
-OBJECTS := $(strip $(OBJECTS))
-
-# include compiler-generated dependency rules
-DEPENDS := $(OBJECTS:.o=.d)
--include $(DEPENDS)
-
 #
 # executables
-EXE = app
-TARGET = $(BINDIR)/$(EXE)
+EXE = sunset   
+TARGET = $(addprefix $(BINDIR)/,$(addsuffix .exe,$(EXE)))
 EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=.exe))
 
 .DEFAULT_GOAL = all
@@ -126,12 +112,6 @@ printvars:
 	@echo "----------------------------------------------------"
 	@echo "$@ done"
 	@echo
-
-#
-# specific recipes
-$(TARGET): $(OBJECTS) | $(BINDIR)
-	@echo "\nlinking TARGET executable $@..."
-	$(LINK.o)
 #
 # generic recipes
 $(BINDIR)/%.exe: $(OBJDIR)/%.o | $(BINDIR)
