@@ -98,7 +98,6 @@ printvars:
 	@echo "----------------------------------------------------"
 	@echo	
 	@echo "VPATH = '$(VPATH)'"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -111,7 +110,7 @@ printvars:
 	@echo
 	@echo "OBJS.all = $(OBJS.all)"
 	@echo "OBJS.o   = $(OBJS.o)"
-	@echo "OBJS     = $(OBJS)"
+	@echo "OBJS     = $(OBJS)"	
 	@echo "OBJECTS  = $(OBJECTS)"
 	@echo
 	@echo "----------------------------------------------------"
@@ -142,23 +141,13 @@ $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
 	@echo "\ncompiling generic C object $@..."
 	$(COMPILE.c)
 $(OBJDIR)/%.o: %.cc | $(OBJDIR)
-	@echo "\ncompiling generic C++ object (.cc) $@..."
+	@echo "\ncompiling generic C++ (.cc) object $@..."
 	$(COMPILE.cxx)
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
-	@echo "\ncompiling generic C++ object (.cpp) $@..."
+	@echo "\ncompiling generic C++ (.cpp) object $@..."
 	$(COMPILE.cxx)
 $(OBJDIR)/%.o: %.cxx | $(OBJDIR)
-	@echo "\ncompiling generic C++ object (.cxx) $@..."
-	$(COMPILE.cxx)
-
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR)
-	@echo "\ncompiling generic C++ object $@..."
-	$(COMPILE.cxx)
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
-	@echo "\ncompiling generic C++ object $@..."
-	$(COMPILE.cxx)
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
-	@echo "\ncompiling generic C++ object $@..."
+	@echo "\ncompiling generic C++ (.cxx) object $@..."
 	$(COMPILE.cxx)
 #
 # define directory creation
