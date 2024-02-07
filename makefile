@@ -115,19 +115,19 @@ printvars:
 #
 # generic recipes
 $(BINDIR)/%.exe: $(OBJDIR)/%.o | $(BINDIR)
-	@echo "\nlinking generic executable $@..."
+	@/bin/echo -e "\nlinking generic executable $@..."
 	$(LINK.o)
 $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
-	@echo "\ncompiling generic C object $@..."
+	@/bin/echo -e "\ncompiling generic C object $@..."
 	$(COMPILE.c)
 $(OBJDIR)/%.o: %.cc | $(OBJDIR)
-	@echo "\ncompiling generic C++ (.cc) object $@..."
+	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
 	$(COMPILE.cxx)
 $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
-	@echo "\ncompiling generic C++ (.cpp) object $@..."
+	@/bin/echo -e "\ncompiling generic C++ (.cpp) object $@..."
 	$(COMPILE.cxx)
 $(OBJDIR)/%.o: %.cxx | $(OBJDIR)
-	@echo "\ncompiling generic C++ (.cxx) object $@..."
+	@/bin/echo -e "\ncompiling generic C++ (.cxx) object $@..."
 	$(COMPILE.cxx)
 #
 # define directory creation
@@ -154,7 +154,7 @@ mostlyclean:
 	@echo "$(THISDIR) $@ done"
 clean: mostlyclean
 # remove binaries and executables
-	@echo "\nremoving compiled executable files..."
+	@/bin/echo -e "\nremoving compiled executable files..."
 # removue build files
 	$(RM) $(BINDIR)/$(EXE)
 # remove remaining binaries
@@ -168,14 +168,14 @@ force: clean
 	@$(MAKE) --no-print-directory
 out:
 # remove outputs produced by executables
-	@echo "\nremoving output files..."
+	@/bin/echo -e "\nremoving output files..."
 	@echo "$(THISDIR) $@ done"
 realclean: clean out
 # remove binaries and outputs
 
 distclean: realclean
 # remove binaries, outputs, and backups
-	@echo "\nremoving backup files..."
+	@/bin/echo -e "\nremoving backup files..."
 # remove Git versions
 	$(RM) *.~*~
 # remove Emacs backup files
@@ -184,7 +184,7 @@ distclean: realclean
 	@echo "$(THISDIR) $@ done"
 reset: distclean
 # remove untracked files
-	@echo "\nresetting repository..."
+	@/bin/echo -e "\nresetting repository..."
 	git reset HEAD
 	git stash
 	git clean -f
