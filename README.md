@@ -17,6 +17,8 @@ run `Makefile:Set launch`... and select target
 
 ## SonarLint for VS Code
 
+### Compilation Database
+
 1. you will get the error  SonarLint is unable to analyze C and C++ files(s) because there is no configured compilation database
    * button -> click on Configure compile commands
       * makes `.vscode/settings.json`
@@ -31,3 +33,24 @@ run `Makefile:Set launch`... and select target
       add the line
       `"makefile.compileCommandsPath": ".vscode/compile_commands.json"`
       to `.vscode/settings.json`
+
+### Node JS
+
+* download latest package from <https://nodejs.org/en/download/>
+* untar with sudo tar -C /usr/local --strip-components=1 -xJf
+* node-v20.11.1-linux-x64.tar.xz
+* then set execution directory to /usr/local/bin/node
+
+### Connected Mode
+
+#### Sonar Cloud
+
+Ctrl-Shift P
+SonarLint: Connect to SonarCloud
+Configure
+
+#### SonarQube
+
+* install sonarqube
+* run sonar console
+* open webpage
