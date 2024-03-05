@@ -27,9 +27,9 @@ run `Makefile:Set launch`... and select target
 2. No compilation databases were found in the workspace
    * link-> How to generate compile commands
 3. Generate a Compilation Database
-   1. CMake
-      settings
-   2. Makefile Tools
+   * CMake
+   * settings
+   * Makefile Tools
       add the line
       `"makefile.compileCommandsPath": ".vscode/compile_commands.json"`
       to `.vscode/settings.json`
@@ -37,9 +37,10 @@ run `Makefile:Set launch`... and select target
 ### Node JS
 
 * download latest package from <https://nodejs.org/en/download/>
-* untar with sudo tar -C /usr/local --strip-components=1 -xJf
-* node-v20.11.1-linux-x64.tar.xz
-* then set execution directory to /usr/local/bin/node
+  * Linux Binaries (x64)
+
+* untar with `sudo tar -C /usr/local --strip-components=1 -xJf node-v20.11.1-linux-x64.tar.xz`
+* then set execution directory to `/usr/local/bin/node`
 
 ### Connected Mode
 
