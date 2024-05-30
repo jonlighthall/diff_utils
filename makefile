@@ -69,8 +69,8 @@ OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 #
 # executables
 EXE = sunset   
-TARGET = $(addprefix $(BINDIR)/,$(addsuffix .exe,$(EXE)))
-EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=.exe))
+TARGET = $(addprefix $(BINDIR)/,$(EXE))
+EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=))
 
 .DEFAULT_GOAL = all
 #
@@ -114,7 +114,7 @@ printvars:
 	@echo
 #
 # generic recipes
-$(BINDIR)/%.exe: $(OBJDIR)/%.o | $(BINDIR)
+$(BINDIR)/%: $(OBJDIR)/%.o | $(BINDIR)
 	@/bin/echo -e "\nlinking generic executable $@..."
 	$(LINK.o)
 $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
