@@ -29,8 +29,8 @@ debug := $(debug) $(debug_new)
 FCFLAGS = $(includes) $(options) $(warnings) $(debug)
 F77.FLAGS = -fd-lines-as-comments
 F90.FLAGS =
-FC.COMPILE = $(FC) $(FCFLAGS) $(compile)
-FC.COMPILE.o = $(FC.COMPILE)  $(output) $(F77.FLAGS)
+FC.COMPILE = $(FC) $(compile) $(FCFLAGS) 
+FC.COMPILE.o = $(FC.COMPILE) $(output) $(F77.FLAGS)
 FC.COMPILE.o.f90 = $(FC.COMPILE) $(output) $(F90.FLAGS)
 FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
 #
@@ -41,7 +41,7 @@ FC.LINK = $(FC) $(FLFLAGS)
 # build directories
 BINDIR := bin
 OBJDIR := obj
-MODDIR := mod
+#
 # source file lists
 #
 # program files (executable)
@@ -50,7 +50,7 @@ SRC.F90 = $(wildcard *.f90)
 # add SRCDIR if present
 SRCDIR := src
 ifneq ("$(strip $(wildcard $(SRCDIR)))","")
-#	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
+	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
 	SRC.F77 += $(wildcard $(SRCDIR)/*.f)
 	SRC.F90 += $(wildcard $(SRCDIR)/*.f90)
 endif
@@ -60,35 +60,84 @@ SRC = $(SRC.F77) $(SRC.F90)
 INCDIR := inc
 # add INCDIR if present
 ifneq ("$(strip $(wildcard $(INCDIR)))","")
-	VPATH = $(subst $(subst ,, ),:,$(strip $(INCDIR)))
+	VPATH += $(subst $(subst ,, ),:,$(strip $(INCDIR)))
 	includes = $(patsubst %,-I %,$(INCDIR))
+	INCS.F77 = $(wildcard $(INCDIR)/*.f)
+	INCS.F90 = $(wildcard $(INCDIR)/*.f90)
+	INCS. +=  $(patsubst $(INCDIR)/%.f, %, $(INCS.F77)) \
+	$(patsubst $(INCDIR)/%.f90, %, $(INCS.F90))
 endif
 #
-# objects
-OBJS.F77 = $(SRC.F77:.f=.o)
-OBJS.F90 = $(SRC.F90:.f90=.o)
-OBJS.all = $(OBJS.F77) $(OBJS.F90)
-#
-# dependencies (non-executables)
-MODS. =
-SUBS. =
-FUNS. =
-DEPS. = $(MODS.) $(SUBS.) $(FUNS.)
-
+# module files
+# fortran module complier flags
+FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
+# build directory for compiled modules
+MODDIR := mod
+# source directory
+MODDIR.in := modules
+# add MODDIR.in if present
+ifneq ("$(strip $(wildcard $(MODDIR.in)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(MODDIR.in)))
+	MODS.F77 = $(wildcard $(MODDIR.in)/*.f)
+	MODS.F90 = $(wildcard $(MODDIR.in)/*.f90)
+	MODS. +=  $(patsubst $(MODDIR.in)/%.f, %, $(MODS.F77)) \
+	$(patsubst $(MODDIR.in)/%.f90, %, $(MODS.F90))
+endif
+# add additional modules
+MODS. +=
 # add MODDIR to includes if MODS. not empty
 ifneq ("$(MODS.)","")
 	includes:=$(includes) -J $(MODDIR)
 endif
-
-DEPS.o = $(addsuffix .o,$(DEPS.))
-OBJS.o = $(filter-out $(DEPS.o),$(OBJS.all))
+# build list of modules
 MODS.mod = $(addsuffix .mod,$(MODS.))
-
-DEPS := $(addprefix $(OBJDIR)/,$(DEPS.o))
-OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 MODS := $(addprefix $(MODDIR)/,$(MODS.mod))
 #
+# Add any external procudures below. Note: shared procedures should be included in a module
+# unless written in a different language.
+#
+# function files
+FUNDIR := functions
+# add FUNDIR if present
+ifneq ("$(strip $(wildcard $(FUNDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(FUNDIR)))
+	FUNS.F77 = $(wildcard $(FUNDIR)/*.f)
+	FUNS.F90 = $(wildcard $(FUNDIR)/*.f90)
+	FUNS. +=  $(patsubst $(FUNDIR)/%.f, %, $(FUNS.F77)) \
+	$(patsubst $(FUNDIR)/%.f90, %, $(FUNS.F90))
+endif
+# add additional fucntions
+FUNS. +=
+#
+# subroutine files
+SUBDIR := subroutines
+# add SUBDIR if present
+ifneq ("$(strip $(wildcard $(SUBDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(SUBDIR)))
+	SUBS.F77 = $(wildcard $(SUBDIR)/*.f)
+	SUBS.F90 = $(wildcard $(SUBDIR)/*.f90)
+	SUBS. +=  $(patsubst $(SUBDIR)/%.f, %, $(SUBS.F77)) \
+	$(patsubst $(SUBDIR)/%.f90, %, $(SUBS.F90))
+endif
+# add additional subroutines
+SUBS. +=
+#
+# concatonate procedure lists (non-executables)
+DEPS. = $(MODS.) $(SUBS.) $(FUNS.)
+#
+# build object lists
+OBJS.F77 = $(SRC.F77:.f=.o)
+OBJS.F90 = $(SRC.F90:.f90=.o)
+OBJS.all = $(OBJS.F77) $(OBJS.F90)
+OBJS.all := $(OBJS.all:$(SRCDIR)/%=%)
+#
+DEPS.o = $(addsuffix .o,$(DEPS.))
+OBJS.o = $(filter-out $(DEPS.o),$(OBJS.all))
+DEPS := $(addprefix $(OBJDIR)/,$(DEPS.o))
+OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
+#
 # executables
+TARGET = 
 EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=))
 #
 # sub-programs
@@ -130,6 +179,8 @@ printvars:
 	@echo "----------------------------------------------------"
 	@echo
 
+	@echo "INCS. = $(INCS.)"
+	@echo
 	@echo "MODS. = $(MODS.)"
 	@echo
 	@echo "SUBS. = $(SUBS.)"
@@ -201,7 +252,7 @@ endif
 .SECONDARY: $(DEPS) $(OBJS) $(MODS)
 #
 # recipes without outputs
-.PHONY: all $(SUBDIRS) mostlyclean clean out realclean distclean
+.PHONY: all $(SUBDIRS) mostlyclean clean force out realclean distclean reset
 #
 # clean up
 optSUBDIRS = $(addprefix $(MAKE) $@ --no-print-directory -C ,$(addsuffix ;,$(SUBDIRS)))
@@ -227,10 +278,12 @@ clean: mostlyclean
 	$(RM) *.out
 	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
+force: clean
+# force re-make
+	@$(MAKE) --no-print-directory
 out:
 # remove outputs produced by executables
 	@/bin/echo -e "\nremoving output files..."
-
 	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
 realclean: clean out
@@ -246,8 +299,15 @@ distclean: realclean
 # clean sub-programs
 	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
+reset: distclean
+# remove untracked files
+	@/bin/echo -e "\nresetting repository..."
+	git reset HEAD
+	git stash
+	git clean -f
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
 #
-# test
-test: distclean printvars all
 # test the makefile
+test: distclean printvars all
 	@echo "$(THISDIR) $@ done"
