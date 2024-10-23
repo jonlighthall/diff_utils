@@ -1,12 +1,46 @@
 program tldiff
   ! TL diff - calculate difference between two transmission loss files
   !
-  ! The files are assumed to be formatted with range in the first column and TL in the remaining
-  ! columns. First, the dimensions of the two files are compared. The number of lines and the
-  ! number of columns (delimiters) must match. Next, the ranges are compared (first column). Each
-  ! range value must match to withing the parameter rdiff. Then, the TL is compared, element by
-  ! element and summary is printed. If any elements (less than the maximum TL value) differ by
-  ! more than the sum of the parameters dtl_thresh and comp_diff, the program returns an error.
+  ! SYNTAX - tldiff FILE1_01.asc FILE2.tl DB_THRESH
+  !
+  ! ARGUMENTS 
+  !   FILE1 - test candidate, TL output: 01.asc, 02.asc, 03.asc
+  !   FILE2 - STD reference,  TL output:   .tl,    .rtl,   .ftl
+  !   DB_THRESH - acceptable error threshold in dB. Default value is 0.1dB, the
+  !   minimum possible difference.
+  ! 
+  ! REQUIREMENTS - The files are assumed to be formatted with range in the first
+  ! column and TL in the remaining columns.  
+  !
+  ! METHOD - First, the dimensions of the two files are compared. The number of
+  ! lines and the number of columns (delimiters) must match. Next, the ranges
+  ! are compared (first column). Each range value must match to withing the
+  ! parameter rdiff. Then, the TL is compared, element by element and a summary
+  ! is printed.
+  !
+  ! FUNCTION - If any elements (less than the maximum TL value) differ by more
+  ! than the sum of the parameters dtl_thresh and comp_diff, the program returns
+  ! an error.
+  !
+  ! OUTPUT - four errors are tallied. Here, "error" refers to any difference
+  ! between corresponding element values between the input two files. In the
+  ! .asc files, TL is formatted as f6.1, therefor the minimum error that can be
+  ! represented is 0.1dB. An error is defined as differences greater than
+  ! 0.05dB. The remaining errors are based on the dB threshold specified in the
+  ! command line argument. Errors greater than the dB threshold + 0.05dB are
+  ! tallied. Any errors which exceed the limits of machine precision---that is,
+  ! below 138dB---are ignored.
+  !
+  ! There are cases where small changes in TL occur at TL values less than
+  ! 138dB, but that do not accumulate in range. That is, small differences occur
+  ! near the TL nulls and disappear at lower TL values. To address these cases,
+  ! a second threshold, called tl_max_user is employed. The hard-wired value of
+  ! this threshold is 110dB. Errors in TL below this value will return an error.
+  !
+  !   NERR  - any errors > 0.05dB
+  !   NERR2 - >dtl_error, TL any value
+  !   NERR3 - >dtl_error, both TL less than hard-wired threshold 110dB
+  !   NERR4 - >dtl_error, both TL less than epsilon threshold 138dB
   !
   ! Aug 2022 JCL
   implicit none
