@@ -1,3 +1,4 @@
+# get name of this directory
 THISDIR=$(shell \pwd | sed 's%^.*/%%')
 
 # fortran compiler
@@ -9,8 +10,8 @@ output = -o $@
 #
 # options
 options = -fimplicit-none -std=f2008
-warnings = -Wall -Wsurprising -W -pedantic -Warray-temporaries -Wcharacter-truncation	\
--Wimplicit-interface -Wintrinsics-std -Waliasing -Wextra
+warnings = -W -Waliasing -Wall -Warray-temporaries -Wcharacter-truncation	-Wfatal-errors \
+-Wextra -Wimplicit-interface -Wintrinsics-std -Wsurprising -Wuninitialized -pedantic
 debug = -g -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
 #
 # additional options for gfortran v4.5 and later
@@ -22,7 +23,7 @@ debug_new = -fcheck=all
 # concatenate options
 options := $(options) $(options_new)
 warnings := $(warnings) $(warnings_new)
-debug:= $(debug) $(debug_new)
+debug := $(debug) $(debug_new)
 #
 # fortran compiler flags
 FCFLAGS = $(includes) $(options) $(warnings) $(debug)
@@ -37,22 +38,31 @@ FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
 FLFLAGS = $(output) $^
 FC.LINK = $(FC) $(FLFLAGS)
 #
-# define subdirectories
+# build directories
 BINDIR := bin
 OBJDIR := obj
 MODDIR := mod
+# source file lists
+#
+# program files (executable)
+SRC.F77 = $(wildcard *.f)
+SRC.F90 = $(wildcard *.f90)
+# add SRCDIR if present
+SRCDIR := src
+ifneq ("$(strip $(wildcard $(SRCDIR)))","")
+#	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
+	SRC.F77 += $(wildcard $(SRCDIR)/*.f)
+	SRC.F90 += $(wildcard $(SRCDIR)/*.f90)
+endif
+SRC = $(SRC.F77) $(SRC.F90)
+#
+# directory for "include" files (not executable, not compilable)
 INCDIR := inc
-
 # add INCDIR if present
 ifneq ("$(strip $(wildcard $(INCDIR)))","")
 	VPATH = $(subst $(subst ,, ),:,$(strip $(INCDIR)))
 	includes = $(patsubst %,-I %,$(INCDIR))
 endif
-#
-# source files
-SRC.F77 = $(wildcard *.f)
-SRC.F90 = $(wildcard *.f90)
-SRC = $(SRC.F77) $(SRC.F90)
 #
 # objects
 OBJS.F77 = $(SRC.F77:.f=.o)
