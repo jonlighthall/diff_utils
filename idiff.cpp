@@ -126,12 +126,13 @@ int main(int argc, char* argv[]) {
   } else {
     std::cout << "Using default file names:" << std::endl;
   }
-  std::cout << "File1: " << file1 << std::endl;
-  std::cout << "File2: " << file2 << std::endl;
 
   if (compareFiles(file1, file2)) {
-    std::cout << "Files are identical." << std::endl;
+    std::cout << "Files " << file1 << " and " << file2 << " are identical"
+              << std::endl;
   } else {
+    std::cout << "File1: " << file1 << std::endl;
+    std::cout << "File2: " << file2 << std::endl;
     std::cout << "Files are different." << std::endl;
   }
 
