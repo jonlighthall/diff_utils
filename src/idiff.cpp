@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#ifdef DEBUG2
+#ifdef DEBUG2 // print status of every line
 #ifndef DEBUG
 #define DEBUG
 #endif
@@ -108,7 +108,7 @@ bool compareFiles(const std::string& file1, const std::string& file2) {
                 << std::endl;
       return false;
     } else {
-#ifdef DEBUG
+#ifdef DEBUG2
       std::cout << "Line " << lineNumber << " has " << values1.size()
                 << " columns." << std::endl;
 #endif

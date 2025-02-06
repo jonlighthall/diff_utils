@@ -22,8 +22,11 @@ CXXFLAGS =
 warnings = -Wall
 CPPFLAGS = $(warnings)
 
+# define macros
+macros = -D DEBUG
+
 # compile C/C++ source
-COMPILE.cpp = $(CPPFLAGS) $(compile) $(output)
+COMPILE.cpp = $(CPPFLAGS) $(compile) $(output) $(macros)
 # compile C source
 COMPILE.c = $(CC)  $(CFLAGS) 
 # compile C++ source
@@ -202,3 +205,4 @@ run: $(TARGET)
 # remove everything except source
 .PHONY: reset
 reset: realclean
+
