@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#ifdef DEBUG2 // print status of every line
+#ifdef DEBUG2  // print status of every line
 #ifndef DEBUG
 #define DEBUG
 #endif
@@ -31,6 +31,7 @@ bool compareFiles(const std::string& file1, const std::string& file2) {
 
   std::string line1, line2;
   int lineNumber = 0;
+  int elemNumber = 0;
 
   // read the files line by line
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
@@ -123,10 +124,16 @@ bool compareFiles(const std::string& file1, const std::string& file2) {
           std::cout << "   First " << lineNumber - 1 << " lines match"
                     << std::endl;
         }
+        if (elemNumber > 0) {
+          std::cout << "   " << elemNumber << " element";
+          if (elemNumber > 1) std::cout << "s";
+          std::cout << " checked" << std::endl;
+        }
         std::cout << "   File1: " << values1[i] << std::endl;
         std::cout << "   File2: " << values2[i] << std::endl;
         return false;
       } else {
+        elemNumber++;
 #ifdef DEBUG2
         std::cout << "   Values at line " << lineNumber << ", column " << i + 1
                   << " are equal: " << values1[i] << std::endl;
@@ -147,6 +154,7 @@ bool compareFiles(const std::string& file1, const std::string& file2) {
               << std::endl;
     if (lineNumber != linesFile1 || lineNumber != linesFile2) {
       std::cout << "   First " << lineNumber << " lines match" << std::endl;
+      std::cout << "   " << elemNumber << " elements checked" << std::endl;
     }
     std::cerr << "   File1 has " << linesFile1 << " lines " << std::endl;
     std::cerr << "   File2 has " << linesFile2 << " lines " << std::endl;
@@ -155,6 +163,8 @@ bool compareFiles(const std::string& file1, const std::string& file2) {
   } else {
 #ifdef DEBUG
     std::cout << "Files have the same number of lines: " << linesFile1
+              << std::endl;
+    std::cout << "Files have the same number of elements: " << elemNumber
               << std::endl;
 #endif
   }
