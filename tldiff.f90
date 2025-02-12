@@ -53,8 +53,9 @@ program tldiff
   ! arguments
   integer :: ln1,ln2,ln3
   ! file parameters
-  integer :: io,ls,n1,n2,ns1,ns2,unit1,unit2
+  integer :: fstat,io,ls,n1,n2,ns1,ns2,unit1,unit2
   character(len=256) :: dummy,fname1,fname2,tlthresh
+  logical :: is_error=.false.
   ! counters
   integer :: i,j
   integer :: nerr=0,nerr2=0,nerr3=0,nerr4=0
@@ -164,9 +165,7 @@ program tldiff
      print *, 'file lengths do not match'
      print 102, 'length file 1 = ',n1
      print 102, 'length file 2 = ',n2
-     close(unit1)
-     close(unit2)
-     stop 1
+     goto 88
   endif
 
   if (ns1.eq.ns2) then
@@ -175,9 +174,7 @@ program tldiff
      print *, 'number of file delimiters do not match'
      print 102, 'delim file 1 = ',ns1
      print 102, 'delim file 2 = ',ns2
-     close(unit1)
-     close(unit2)
-     stop 1
+     goto 88
   endif
 
   ! read file 1
@@ -198,9 +195,7 @@ program tldiff
         print *, 'ranges do not match'
         print *, 'range ',i,' file 1 = ',i,r1(i)
         print *, 'range ',i,' file 2 = ',i,r2(i)
-        close(unit1)
-        close(unit2)
-        stop 1
+        goto 88
      endif
   end do
   close(unit2)
@@ -321,4 +316,19 @@ program tldiff
   else
      print *, ''//achar(27)//'[32mOK'//achar(27)//'[0m'
   endif
+  goto 77
+88 is_error=.true.
+  print*,'***ERROR***'
+77 write(*,'(1x,a)',advance='no') 'closing files... '
+  close(unit1,iostat=fstat,ERR=99)
+  close(unit2,iostat=fstat,ERR=99)
+  print*,'done'
+  if (is_error) then
+     print*,'stopping...'
+     stop
+  else
+     goto 66
+  endif
+99 print*,'error closing file: ',fstat
+66 print*,'goodbye'
 end program tldiff
