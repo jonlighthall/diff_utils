@@ -29,7 +29,7 @@ link_dir=$HOME/bin
 cbar "Start Making Links"
 # list of files to be linked
 ext=''
-for my_link in idiff sunset; do
+for my_link in idiff sunset uband_diff; do
 
     # define target (source)
     target=${target_dir}/${my_link}${ext}
