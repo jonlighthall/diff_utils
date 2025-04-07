@@ -19,15 +19,16 @@ run `Makefile:Set launch`... and select target
 
 ### Compilation Database
 
-1. you will get the error  SonarLint is unable to analyze C and C++ files(s) because there is no configured compilation database
-   * button -> click on Configure compile commands
-      * makes `.vscode/settings.json`
+1. you will get the error:
+   SonarLint is unable to analyze C and C++ files(s) because there is no configured compilation database
+   * click on the button `Configure compile commands`
+      * this will make the file `.vscode/settings.json`
       * then error
    * Ctrl-Shift-P SonarLint Configure the compilation...
-2. No compilation databases were found in the workspace
+3. No compilation databases were found in the workspace
    * link-> How to generate compile commands
-3. Generate a Compilation Database
-   * CMake
+4. Generate a Compilation Database   
+   * create a file named .vscode/compile_commands.json 
    * settings
    * Makefile Tools
       add the line
