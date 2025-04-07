@@ -161,7 +161,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
           if (elemNumber > 1) std::cout << "s";
           std::cout << " checked" << std::endl;
         }
-        std::cout << count << " with differnces between " << threshold
+        std::cout << count << " with differences between " << threshold
                   << " and " << hard_threshold << std::endl;
 
         std::cout << "   File1: " << std::setw(7) << values1[i] << std::endl;
