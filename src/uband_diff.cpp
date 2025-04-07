@@ -1,10 +1,10 @@
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <cmath>
 
 #ifdef DEBUG2  // print status of every line
 #ifndef DEBUG
@@ -39,9 +39,9 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   int count = 0;
   double max_diff = 0;
   double diff = 0;
-  bool is_same = true;
+  bool is_same = false;
 
-  const double max_TL = -20*log10(pow(2,-23));
+  const double max_TL = -20 * log10(pow(2, -23));
   std::cout << "Max TL: " << max_TL << std::endl;
 
   // read the files line by line
@@ -135,7 +135,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       }
       if (diff > threshold) {
         if (count == 0) {
-            is_same = false;
+          is_same = false;
           // print table header on first difference
           std::cout << " line col      tl1      tl2 |    diff" << std::endl;
         }
@@ -166,7 +166,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
         std::cout << "   File1: " << std::setw(7) << values1[i] << std::endl;
         std::cout << "   File2: " << std::setw(7) << values2[i] << std::endl;
-        std::cout << "    diff: \033[1;31m" << std::setw(7) << diff << "\033[0m" << std::endl;
+        std::cout << "    diff: \033[1;31m" << std::setw(7) << diff << "\033[0m"
+                  << std::endl;
         return false;
       } else {
         elemNumber++;
@@ -205,10 +206,13 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 #endif
   }
 
-  if(count > 0) {
-    std::cout << "Total differences: " << count << " less than " << hard_threshold << std::endl;
+  if (count > 0) {
+    std::cout << "Total differences: " << count << " less than "
+              << hard_threshold << std::endl;
+  } else {
+    is_same = true;
   }
-    std::cout << "Max difference: " << max_diff << std::endl;
+  std::cout << "Max difference: " << max_diff << std::endl;
 
   return is_same;
 }
