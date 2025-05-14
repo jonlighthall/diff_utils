@@ -3,14 +3,14 @@ program tldiff
   !
   ! SYNTAX - tldiff FILE1_01.asc FILE2.tl DB_THRESH
   !
-  ! ARGUMENTS 
+  ! ARGUMENTS
   !   FILE1 - test candidate, TL output: 01.asc, 02.asc, 03.asc
   !   FILE2 - STD reference,  TL output:   .tl,    .rtl,   .ftl
   !   DB_THRESH - acceptable error threshold in dB. Default value is 0.1dB, the
   !   minimum possible difference.
-  ! 
+  !
   ! REQUIREMENTS - The files are assumed to be formatted with range in the first
-  ! column and TL in the remaining columns.  
+  ! column and TL in the remaining columns.
   !
   ! METHOD - First, the dimensions of the two files are compared. The number of
   ! lines and the number of columns (delimiters) must match. Next, the ranges
@@ -110,8 +110,17 @@ program tldiff
   endif
 
   ! open files
-  open (newunit=unit1, file = fname1, status = 'old')
-  open (newunit=unit2, file = fname2, status = 'old')
+open (newunit=unit1, file = fname1, status = 'old', iostat=fstat)
+if (fstat /= 0) then
+     print *, 'Error opening file: ', trim(fname1)
+     stop 1
+endif
+
+open (newunit=unit2, file = fname2, status = 'old', iostat=fstat)
+if (fstat /= 0) then
+     print *, 'Error opening file: ', trim(fname2)
+     stop 1
+endif
 
   ! check file length
   n1=0  ! number of lines
