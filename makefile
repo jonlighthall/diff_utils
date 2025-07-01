@@ -23,12 +23,12 @@ warnings = -Wall
 CPPFLAGS = $(warnings)
 
 # define macros
-macros = -D DEBUG
+macros = -D DEBUG2
 
 # compile C/C++ source
 COMPILE.cpp = $(CPPFLAGS) $(compile) $(output) $(macros)
 # compile C source
-COMPILE.c = $(CC)  $(CFLAGS) 
+COMPILE.c = $(CC) $(CFLAGS)
 # compile C++ source
 COMPILE.cxx = $(CXX) $(CXXFLAGS) $(COMPILE.cpp)
 
@@ -71,7 +71,7 @@ OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 #
 # executables
-EXE = sunset   
+EXE = sunset
 TARGET = $(addprefix $(BINDIR)/,$(EXE))
 EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=))
 
@@ -85,21 +85,21 @@ printvars:
 	@echo
 	@echo "printing variables..."
 	@echo "----------------------------------------------------"
-	@echo	
+	@echo
 	@echo "VPATH = '$(VPATH)'"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "SRC.C   = $(SRC.C)"	
-	@echo "SRC.CPP = $(SRC.CPP)"	
-	@echo "SRC     = $(SRC)"	
+	@echo "SRC.C   = $(SRC.C)"
+	@echo "SRC.CPP = $(SRC.CPP)"
+	@echo "SRC     = $(SRC)"
 	@echo "SOURCES = $(SOURCES)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
 	@echo "OBJS.all = $(OBJS.all)"
 	@echo "OBJS.o   = $(OBJS.o)"
-	@echo "OBJS     = $(OBJS)"	
+	@echo "OBJS     = $(OBJS)"
 	@echo "OBJECTS  = $(OBJECTS)"
 	@echo
 	@echo "----------------------------------------------------"
@@ -158,7 +158,7 @@ mostlyclean:
 clean: mostlyclean
 # remove binaries and executables
 	@/bin/echo -e "\nremoving compiled executable files..."
-# removue build files
+# remove build files
 	$(RM) $(BINDIR)/$(EXE)
 # remove remaining binaries
 	$(RM) $(BINDIR)/*.exe
@@ -205,4 +205,3 @@ run: $(TARGET)
 # remove everything except source
 .PHONY: reset
 reset: realclean
-
