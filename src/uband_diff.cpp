@@ -142,7 +142,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
   // track if the file format has changed
   long unsigned int prev_n_col = 0;
-  // bool new_fmt = false;
+  std::vector<int> dp_per_col;
+  bool new_fmt = false;
 
   // track if the files are the same
   bool is_same = false;
@@ -170,7 +171,6 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
     // vector to store the number of decimal places
     std::vector<int> dp;
-    std::vector<int> dp_per_col;
 
     // read in values from file1
     while (stream1 >> ch) {
@@ -271,7 +271,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
     // print parsed file contents
 #ifdef DEBUG2
-    std::cout << "DEBUG2: Line " << lineNumber;
+    std::cout << "DEBUG2: Line " << lineNumber << std::endl;
+    std::cout << "   CONTENTS:";
     std::cout << " file1: ";
     for (size_t i = 0; i < n_col1; ++i) {
       std::cout << values1[i] << "(" << dp[i] << ") ";
@@ -296,17 +297,26 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       if (lineNumber == 1) {
         prev_n_col = n_col1;  // initialize prev_n_col on first line
 #ifdef DEBUG2
-        std::cout << "DEBUG2: Line " << lineNumber << " has " << n_col1
-                  << " columns in both files." << std::endl;
+        std::cout << "   FORMAT: " << n_col1
+                  << " columns (both files) - initialized" << std::endl;
 #endif
       }
       if (prev_n_col > 0 && n_col1 != prev_n_col) {
         std::cerr << "\033[1;31mNote: Number of columns changed at line "
                   << lineNumber << " (previous: " << prev_n_col
                   << ", current: " << n_col1 << ")\033[0m" << std::endl;
-        //  dp_per_col.clear();
-        //  new_fmt = true;  // set new_fmt to true if the number of columns
+        dp_per_col.clear();
+        new_fmt = true;  // set new_fmt to true if the number of columns
+        std::cout << "format has changed" << std::endl;
         // has changed
+      } else {
+        if (lineNumber > 1) {
+#ifdef DEBUG3
+          std::cout << "Line " << lineNumber << " same column format"
+                    << std::endl;
+#endif
+          new_fmt = false;
+        }
       }
       prev_n_col = n_col1;
     }  // end check number of columns
@@ -332,27 +342,73 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       // Calculate minimum difference
       int min_dp = std::min(dp1, dp2);
 
-      //   if (lineNumber == 1) {
-      //     // initialize the dp_per_col vector with the minimum decimal places
-      //     dp_per_col.push_back(min_dp);
-      //   }
-
-      //   else if (dp_per_col[i] != min_dp) {
-      //     // if the number of decimal places has changed, update the vector
-      //     dp_per_col[i] = min_dp;
-      //     new_fmt = true;  // set new_fmt to true if the number of decimal
-      //     places
-      //                      // has changed
-      //   }
+      if (lineNumber == 1) {
+        // initialize the dp_per_col vector with the minimum decimal places
+        dp_per_col.push_back(min_dp);
+#ifdef DEBUG3
+        std::cout << "dp_per_col: ";
+        for (const auto& d : dp_per_col) {
+          std::cout << d << " ";
+        }
+        std::cout << "initialized" << std::endl;
+        std::cout << "format initialized" << std::endl;
+#endif
+        new_fmt = true;  // set new_fmt to true if the number of columns
+      } else {
+#ifdef DEBUG3
+        std::cout << "not line 1" << std::endl;
+#endif
+        // vector size QAV
+        if (dp_per_col.size() != n_col1) {
+          std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
+                    << ") does not match number of columns (" << n_col1
+                    << ") at line " << lineNumber << std::endl;
+        }
+        // print values in dp_per_col
+#ifdef DEBUG3
+        for (size_t j = 0; j < dp_per_col.size(); ++j) {
+          std::cout << "minimum decimal places in column " << j + 1 << " = "
+                    << dp_per_col[j] << std::endl;
+        }
+#endif
+        // check if the minimum decimal places for this column has changed
+        if (dp_per_col[i] == min_dp) {
+// If the minimum decimal places for this column is the same as the
+// previous minimum decimal places, do nothing
+#ifdef DEBUG3
+          std::cout << "DEBUG3: same" << std::endl;
+#endif
+        } else {
+// If the minimum decimal places for this column is different from the
+// previous minimum decimal places, update it
+#ifdef DEBUG3
+          std::cout << "DEBUG3: different" << std::endl;
+          std::cout << "DEBUG3: format has changed" << std::endl;
+#endif
+          dp_per_col[i] = min_dp;
+          new_fmt = true;  // set new_fmt to true if the number of
+        }
+      }
 
       // check if the number of decimal places is the same
       if (dp1 != dp2) {
-#ifdef DEBUG
-        std::cout << "DEBUG : Line " << lineNumber << ", Column " << i + 1;
-        std::cout << " number of decimal places dp1: " << dp1
-                  << "  dp2: " << dp2 << std::endl;
+        if (new_fmt) {
+#ifdef DEBUG2
+          std::cout << "   NEW FORMAT" << std::endl;
 #endif
+// print the format
+#ifdef DEBUG
+          std::cout << "DEBUG : Line " << lineNumber << ", Column " << i + 1
+                    << std::endl;
+          std::cout << "   FORMAT: number of decimal places file1: " << dp1
+                    << ", file2: " << dp2 << std::endl;
+#endif
+        }
       }
+
+      // now that the minimum decimal places are determined, we can
+      // round the values to the minimum decimal places
+      // and compare them
 
       double rounded1 = round_to_decimals(values1[i], min_dp);
       double rounded2 = round_to_decimals(values2[i], min_dp);
@@ -365,17 +421,11 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       // determine the comparison threshold
       double dp_threshold = std::pow(10, -min_dp);
 
-      //   bool new_dp = false;
-
-      //   if (dp_per_col[i] == min_dp) {
-      //   } else {
-      //     std::cout << "Line " << lineNumber << ", Column " << i + 1
-      //               << " has a minimum difference of 10^(" << -min_dp
-      //               << ") = " << dp_threshold << std::endl;
-
-      //     dp_per_col[i] = min_dp;
-      //     new_dp = true;
-      //   }
+      if (new_fmt) {
+        std::cout << "Line " << lineNumber << ", Column " << i + 1
+                  << " has a minimum difference of 10^(" << -min_dp
+                  << ") = " << dp_threshold << std::endl;
+      }
 
       double ithreshold;
 
@@ -383,13 +433,12 @@ bool compareFiles(const std::string& file1, const std::string& file2,
         // If the threshold is less than the minimum difference, use the
         // minimum difference as the threshold
         ithreshold = dp_threshold;
-        // if (new_dp) {
-        //   std::cout << "\033[1;33mLine " << lineNumber << ", Column " << i +
-        //   1
-        //             << " has a minimum difference of " << dp_threshold
-        //             << " which is greater than the specified threshold: "
-        //             << threshold << "\033[0m" << std::endl;
-        // }
+        if (new_fmt) {
+          std::cout << "\033[1;33mLine " << lineNumber << ", Column " << i + 1
+                    << " has a minimum difference of " << dp_threshold
+                    << " which is greater than the specified threshold: "
+                    << threshold << "\033[0m" << std::endl;
+        }
       } else {
         // If the threshold is greater than the minimum difference, use the
         // threshold as the threshold
@@ -399,7 +448,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       if ((diff_rounded > hard_threshold) &&
           ((values1[i] <= max_TL) || (values2[i] <= max_TL))) {
         is_same = false;
-        std::cerr << "\033[1;31mDifference found at line " << lineNumber
+        std::cerr << "\033[1;31mLarge difference found at line " << lineNumber
                   << ", column " << i + 1 << "\033[0m" << std::endl;
 
         if (lineNumber > 0) {
@@ -422,8 +471,10 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       }
 
       if (diff_rounded > ithreshold) {
+#ifdef DEBUG2
         std::cout << "Line " << lineNumber << ", Column " << i + 1
                   << " exceeds threshold: " << ithreshold << std::endl;
+#endif
 
         if (count == 0) {
           is_same = false;
@@ -442,8 +493,10 @@ bool compareFiles(const std::string& file1, const std::string& file2,
         }
       } else {
         elemNumber++;
-        std::cout << "   Values at line " << lineNumber << ", column " << i + 1
-                  << " are equal: " << rounded1 << std::endl;
+#ifdef DEBUG2
+        std::cout << "   DIFF: Values at line " << lineNumber << ", column "
+                  << i + 1 << " are equal: " << rounded1 << std::endl;
+#endif
       }
 
     }  // end check values in line
