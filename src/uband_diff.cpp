@@ -100,26 +100,49 @@ auto round_to_decimals = [](double value, int precision) {
   return std::round(value * scale) / scale;
 };
 
-struct CountStats {
-  int lineNumber = 0; // number of lines read
-  int elemNumber = 0; // number of elements checked
+struct LineData {
+  std::vector<double> values;
+  std::vector<int> decimal_places;
+};
 
-    // number of differences found (where the difference is greater than
+struct CountStats {
+  int lineNumber = 0;  // number of lines read
+  int elemNumber = 0;  // number of elements checked
+
+  // number of differences found (where the difference is greater than
   // threshold, which is the minimum between the function argument
   // threshold and the minimum difference between the two files, based on format
   // precision)
 
-
-  int diff_print = 0; // count of differences printed
-  int diff_non_zero = 0; // count of non-zero differences
-  int diff_user = 0; // count of differences above user-defined threshold
-  int diff_prec = 0; // count of differences above the precision threshold
-  int diff_hard = 0;  // count of differences above the hard threshold
+  int diff_print = 0;     // count of differences printed
+  int diff_non_zero = 0;  // count of non-zero differences
+  int diff_user = 0;      // count of differences above user-defined threshold
+  int diff_prec = 0;      // count of differences above the precision threshold
+  int diff_hard = 0;      // count of differences above the hard threshold
 };
 
-bool compareFiles(const std::string& file1, const std::string& file2,
-                  double threshold, double hard_threshold) {
+class FileComparator {
+ private:
+  double threshold;
+  double hard_threshold;
+  const double max_TL = -20 * log10(pow(2, -23));
   CountStats counter;
+
+ public:
+  FileComparator(double thresh, double hard_thresh)
+      : threshold(thresh), hard_threshold(hard_thresh) {}
+  // the function parseLine() reads a line from the file and returns a LineData
+  // object
+  LineData parseLine(const std::string& line);
+
+  bool compareFiles(const std::string& file1, const std::string& file2);
+
+ private:
+
+};
+
+bool FileComparator::compareFiles(const std::string& file1,
+                                  const std::string& file2) {
   // assign files to input file streams
   std::ifstream infile1(file1);
   std::ifstream infile2(file2);
@@ -162,117 +185,13 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
     // increment the line number
     counter.lineNumber++;
-    // create a string stream for each line
-    std::istringstream stream1(line1);
-    std::istringstream stream2(line2);
 
-    // variables to store the values while reading from the stream
-    double value;
-    char ch;
-
-    // create vectors to store the numerical values in each line
-    std::vector<double> values1;
-    std::vector<double> values2;
-
-    // vector to store the number of decimal places
-    std::vector<int> dp;
-
-    // read in values from file1
-    while (stream1 >> ch) {
-      // check if the numbers are complex and read them accordingly
-      // check if string starts with '('
-      if (ch == '(') {
-        // read the complex number
-        auto [real, imag, dp_real, dp_imag] = readComplex(stream1);
-        values1.push_back(real);
-        values1.push_back(imag);
-        dp.push_back(dp_real);
-        dp.push_back(dp_imag);
-
-#ifdef DEBUG3
-        std::cout << "DEBUG3: Found complex number in file1 at line "
-                  << lineNumber << std::endl;
-        std::cout << "DEBUG3: Real part: " << real
-                  << ", Imaginary part: " << imag << std::endl;
-        std::cout << "DEBUG3: Decimal places - Real: " << dp_real
-                  << ", Imaginary: " << dp_imag << std::endl;
-#endif
-
-      } else {
-        // if the character is not '(', it is a number
-        // put the character back to the stream
-        stream1.putback(ch);
-
-        // count the number of decimal places
-        int dp1 = stream_countDecimalPlaces(stream1);
-
-        // store the number of decimal places
-        dp.push_back(dp1);
-#ifdef DEBUG3
-        std::cout << "DEBUG3: dp1 = " << dp1 << std::endl;
-        std::cout << "DEBUG3: dp vector: ";
-        for (const auto& d : dp) {
-          std::cout << d << " ";
-        }
-        std::cout << std::endl;
-#endif
-
-        // read the value
-        stream1 >> value;
-        // store the value in the vector
-        values1.push_back(value);
-      }  // end check complex 1
-    }  // end read in file 1
-
-    // read in values from file2
-    while (stream2 >> ch) {
-      // check if string starts with '('
-      if (ch == '(') {
-        auto [real, imag, dp_real, dp_imag] = readComplex(stream2);
-        values2.push_back(real);
-        values2.push_back(imag);
-        dp.push_back(dp_real);
-        dp.push_back(dp_imag);
-
-// DEBUG output
-#ifdef DEBUG3
-        std::cout << "DEBUG3: Found complex number in file2 at line "
-                  << lineNumber << std::endl;
-        std::cout << "DEBUG3: Real part: " << real
-                  << ", Imaginary part: " << imag << std::endl;
-        std::cout << "DEBUG3: Decimal places - Real: " << dp_real
-                  << ", Imaginary: " << dp_imag << std::endl;
-#endif
-
-      } else {
-        // put the character back to the stream
-        stream2.putback(ch);
-
-        // count the number of decimal places
-        int dp2 = stream_countDecimalPlaces(stream2);
-
-        // store the number of decimal places
-        dp.push_back(dp2);
-
-#ifdef DEBUG3
-        std::cout << "DEBUG3: dp2 = " << dp2 << std::endl;
-        std::cout << "DEBUG3: dp vector: ";
-        for (const auto& d : dp) {
-          std::cout << d << " ";
-        }
-        std::cout << std::endl;
-#endif
-
-        // read the value
-        stream2 >> value;
-        // store the value in the vector
-        values2.push_back(value);
-      }
-    }  // end check complex 2
+    LineData data1 = parseLine(line1);
+    LineData data2 = parseLine(line2);
 
     // get the numbers of columns in each file
-    long unsigned int n_col1 = values1.size();
-    long unsigned int n_col2 = values2.size();
+    long unsigned int n_col1 = data1.values.size();
+    long unsigned int n_col2 = data2.values.size();
 
     // print parsed file contents
 #ifdef DEBUG2
@@ -280,12 +199,12 @@ bool compareFiles(const std::string& file1, const std::string& file2,
     std::cout << "   CONTENTS:";
     std::cout << " file1: ";
     for (size_t i = 0; i < n_col1; ++i) {
-      std::cout << values1[i] << "(" << dp[i] << ") ";
+      std::cout << data1.values[i] << "(" << data1.decimal_places[i] << ") ";
     }
 
     std::cout << ", file2: ";
     for (size_t i = 0; i < n_col2; ++i) {
-      std::cout << values2[i] << "(" << dp[n_col1 + i] << ") ";
+      std::cout << data2.values[i] << "(" << data2.decimal_places[i] << ") ";
     }
     std::cout << std::endl;
 #endif
@@ -329,14 +248,14 @@ bool compareFiles(const std::string& file1, const std::string& file2,
     // loop over columns
     for (size_t i = 0; i < n_col1; ++i) {
       // compare values (without rounding)
-      double diff = std::abs(values1[i] - values2[i]);
+      double diff = std::abs(data1.values[i] - data2.values[i]);
       if (diff > max_diff) {
         max_diff = diff;
       }
 
       // get the number of decimal places for each column
-      int dp1 = dp[i];
-      int dp2 = dp[n_col1 + i];
+      int dp1 = data1.decimal_places[i];
+      int dp2 = data2.decimal_places[i];
       if (dp1 < 0 || dp2 < 0) {
         std::cerr << "Line " << counter.lineNumber
                   << " has negative number of decimal places!" << std::endl;
@@ -415,8 +334,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       // round the values to the minimum decimal places
       // and compare them
 
-      double rounded1 = round_to_decimals(values1[i], min_dp);
-      double rounded2 = round_to_decimals(values2[i], min_dp);
+      double rounded1 = round_to_decimals(data1.values[i], min_dp);
+      double rounded2 = round_to_decimals(data2.values[i], min_dp);
 
       double diff_rounded = std::abs(rounded1 - rounded2);
       if (diff_rounded > max_diff_rounded) {
@@ -541,7 +460,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
         // range (first value in the line)
         std::cout << std::fixed << std::setprecision(2) << std::setw(val_width)
-                  << values1[0] << " ";
+                  << data1.values[0] << " ";
         // values in file1
 
         if (rounded1 > max_TL) {
@@ -595,7 +514,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       }
 
       if ((diff_rounded > hard_threshold) &&
-          ((values1[i] <= max_TL) && (values2[i] <= max_TL))) {
+          ((data1.values[i] <= max_TL) && (data2.values[i] <= max_TL))) {
         counter.diff_hard++;
         is_same = false;
         // #ifdef DEBUG
@@ -612,8 +531,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
           if (counter.elemNumber > 1) std::cout << "s";
           std::cout << " checked" << std::endl;
         }
-        std::cout << counter.diff_print << " with differences between " << threshold
-                  << " and " << hard_threshold << std::endl;
+        std::cout << counter.diff_print << " with differences between "
+                  << threshold << " and " << hard_threshold << std::endl;
 
         std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
         std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
@@ -666,6 +585,44 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   std::cout << "Max difference: " << max_diff << std::endl;
 
   return is_same;
+}
+
+LineData FileComparator::parseLine(const std::string& line) {
+  LineData result;
+  std::istringstream stream(line);
+  char ch;
+
+  while (stream >> ch) {
+    // check if the numbers are complex and read them accordingly
+    // check if string starts with '('
+    if (ch == '(') {
+      // read the complex number
+      auto [real, imag, dp_real, dp_imag] = readComplex(stream);
+      result.values.push_back(real);
+      result.values.push_back(imag);
+      result.decimal_places.push_back(dp_real);
+      result.decimal_places.push_back(dp_imag);
+    } else {
+      // if the character is not '(', it is a number
+      stream.putback(ch);  // put back the character to the stream
+      int dp = stream_countDecimalPlaces(stream);  // count the number of decimal places
+
+
+      if (dp < 0) {
+        std::cerr << "Error: Negative number of decimal places found in line: "
+                  << line << std::endl;
+        isERROR = true;
+        return result;  // return empty result
+      }
+
+      result.decimal_places.push_back(dp);  // store the number of decimal places
+
+      double value;
+      stream >> value;
+      result.values.push_back(value);
+    }
+  }
+  return result;
 }
 
 int main(int argc, char* argv[]) {
@@ -737,7 +694,8 @@ int main(int argc, char* argv[]) {
   }
 
   isERROR = false;
-  if (compareFiles(file1, file2, count_level, hard_level)) {
+  FileComparator comparator(count_level, hard_level);
+  if (comparator.compareFiles(file1, file2)) {
     std::cout << "Files " << file1 << " and " << file2 << " are identical"
               << std::endl;
   } else {
