@@ -131,6 +131,7 @@ class FileComparator {
  private:
   double threshold;
   double hard_threshold;
+  bool new_fmt = false;
   // define the maximum valid value for TL (Transmission Loss)
   const double max_TL = -20 * log10(pow(2, -23));
   DiffStats differ;
@@ -146,6 +147,7 @@ class FileComparator {
   bool compareFiles(const std::string& file1, const std::string& file2);
 
  private:
+  double calculateThreshold(int decimal_places) const;
 };
 
 bool FileComparator::compareFiles(const std::string& file1,
@@ -175,7 +177,6 @@ bool FileComparator::compareFiles(const std::string& file1,
   // track if the file format has changed
   long unsigned int prev_n_col = 0;
   std::vector<int> dp_per_col;
-  bool new_fmt = false;
 
   // track if the files are the same
   bool is_same = false;
@@ -357,35 +358,7 @@ bool FileComparator::compareFiles(const std::string& file1,
         counter.diff_user++;
       }
 
-      // determine the comparison threshold
-      double dp_threshold = std::pow(10, -min_dp);
-
-      if (new_fmt) {
-#ifdef DEBUG
-        std::cout << "   PRECISION: " << min_dp << " decimal places or 10^("
-                  << -min_dp << ") = " << dp_threshold << std::endl;
-#endif
-      }
-
-      double ithreshold;
-
-      if (threshold < dp_threshold) {
-        // If the threshold is less than the minimum difference, use the
-        // minimum difference as the threshold
-        ithreshold = dp_threshold;
-#ifdef DEBUG
-        if (new_fmt) {
-          std::cout << "   \033[1;33mNOTE: " << dp_threshold
-                    << " is greater than the specified threshold: " << threshold
-                    << "\033[0m" << std::endl;
-        }
-#endif
-      } else {
-        // If the threshold is greater than the minimum difference, use the
-        // threshold as the threshold
-        ithreshold = threshold;
-      }
-
+      double ithreshold = calculateThreshold(min_dp);
       double ieps = ithreshold * 0.1;
       double thresh_prec = (ithreshold + ieps);
 
@@ -625,6 +598,29 @@ LineData FileComparator::parseLine(const std::string& line) {
     }
   }
   return result;
+}
+
+double FileComparator::calculateThreshold(int ndp) const {
+  // determine the comparison threshold
+  double dp_threshold = std::pow(10, -ndp);
+
+  if (new_fmt) {
+#ifdef DEBUG
+    std::cout << "   PRECISION: " << ndp << " decimal places or 10^(" << -ndp
+              << ") = " << dp_threshold << std::endl;
+#endif
+  }
+  if (threshold < dp_threshold) {
+#ifdef DEBUG
+    if (new_fmt) {
+      std::cout << "   \033[1;33mNOTE: " << dp_threshold
+                << " is greater than the specified threshold: " << threshold
+                << "\033[0m" << std::endl;
+    }
+#endif
+    return dp_threshold;
+  }
+  return threshold;
 }
 
 int main(int argc, char* argv[]) {
