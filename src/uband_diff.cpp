@@ -56,8 +56,7 @@ auto stream_countDecimalPlaces = [](std::istringstream& stream) {
 // or (1.0, 2.0) without spaces
 // or (1.0,2.0)  with no spaces at all
 
-auto readComplex =
-    [](std::istringstream& stream) -> std::tuple<double, double, int, int> {
+std::tuple<double, double, int, int> readComplex(std::istringstream& stream) {
   // values
   double real;
   double imag;
@@ -89,14 +88,12 @@ auto readComplex =
     std::istringstream imag_stream(imag_token);
     int imag_dp = stream_countDecimalPlaces(imag_stream);
 
-    // Optionally, you can use real_dp and imag_dp as needed here
-
     return {real, imag, real_dp, imag_dp};
   } else {
     std::cerr << "Error reading complex number";
     std::exit(EXIT_FAILURE);
   }
-};
+}
 
 auto round_to_decimals = [](double value, int precision) {
   double scale = std::pow(10.0, precision);
