@@ -139,9 +139,6 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   std::string line1;
   std::string line2;
 
-  // number of elements checked
-  int elemNumber = 0;
-
   // number of differences found (where the difference is greater than
   // threshold, which is the minimum between the function argument
   // threshold and the minimum difference between the two files, based on format
@@ -597,7 +594,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
         std::cout << std::endl;
       } else {
-        elemNumber++;
+        counter.elemNumber++;
 #ifdef DEBUG2
         std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
                   << i + 1 << " are equal: " << rounded1 << std::endl;
@@ -616,9 +613,9 @@ bool compareFiles(const std::string& file1, const std::string& file2,
           std::cout << "   First " << counter.lineNumber - 1 << " lines match"
                     << std::endl;
         }
-        if (elemNumber > 0) {
-          std::cout << "   " << elemNumber << " element";
-          if (elemNumber > 1) std::cout << "s";
+        if (counter.elemNumber > 0) {
+          std::cout << "   " << counter.elemNumber << " element";
+          if (counter.elemNumber > 1) std::cout << "s";
           std::cout << " checked" << std::endl;
         }
         std::cout << count << " with differences between " << threshold
@@ -649,7 +646,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
               << std::endl;
     if (counter.lineNumber != linesFile1 || counter.lineNumber != linesFile2) {
       std::cout << "   First " << counter.lineNumber << " lines match" << std::endl;
-      std::cout << "   " << elemNumber << " elements checked" << std::endl;
+      std::cout << "   " << counter.elemNumber << " elements checked" << std::endl;
     }
     std::cerr << "   File1 has " << linesFile1 << " lines " << std::endl;
     std::cerr << "   File2 has " << linesFile2 << " lines " << std::endl;
@@ -659,7 +656,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 #ifdef DEBUG
     std::cout << "Files have the same number of lines: " << linesFile1
               << std::endl;
-    std::cout << "Files have the same number of elements: " << elemNumber
+    std::cout << "Files have the same number of elements: " << counter.elemNumber
               << std::endl;
 #endif
   }
