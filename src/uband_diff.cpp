@@ -101,17 +101,20 @@ auto round_to_decimals = [](double value, int precision) {
 };
 
 struct CountStats {
-  // number of lines read
-  int lineNumber = 0;
+  int lineNumber = 0; // number of lines read
+  int elemNumber = 0; // number of elements checked
 
-  // number of elements checked
-  int elemNumber = 0;
+    // number of differences found (where the difference is greater than
+  // threshold, which is the minimum between the function argument
+  // threshold and the minimum difference between the two files, based on format
+  // precision)
 
-  int diff_count = 0;
-  int diff_non_zero = 0;
-  int diff_user = 0;
-  int diff_prec = 0;
-  int diff_hard = 0;
+
+  int diff_print = 0; // count of differences printed
+  int diff_non_zero = 0; // count of non-zero differences
+  int diff_user = 0; // count of differences above user-defined threshold
+  int diff_prec = 0; // count of differences above the precision threshold
+  int diff_hard = 0;  // count of differences above the hard threshold
 };
 
 bool compareFiles(const std::string& file1, const std::string& file2,
@@ -138,17 +141,6 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   // individual line conents
   std::string line1;
   std::string line2;
-
-  // number of differences found (where the difference is greater than
-  // threshold, which is the minimum between the function argument
-  // threshold and the minimum difference between the two files, based on format
-  // precision)
-  int count = 0;
-  int count_diff_non_zero = 0;  // count of non-zero differences
-  int count_diff_user = 0;  // count of differences above user-defined threshold
-  int count_diff_prec =
-      0;  // count of differences above the precision threshold
-  int count_diff_hard = 0;  // count of differences above the hard threshold
 
   // track the maximum difference found
   double max_diff = 0;
@@ -300,8 +292,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
     // check if both lines have the same number of columns
     if (n_col1 != n_col2) {
-      std::cerr << "Line " << counter.lineNumber << " has different number of columns!"
-                << std::endl;
+      std::cerr << "Line " << counter.lineNumber
+                << " has different number of columns!" << std::endl;
       return false;
     } else {
       // check if the number of columns has changed
@@ -411,8 +403,8 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 #endif
 // print the format
 #ifdef DEBUG
-          std::cout << "DEBUG : Line " << counter.lineNumber << ", Column " << i + 1
-                    << std::endl;
+          std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
+                    << i + 1 << std::endl;
           std::cout << "   FORMAT: number of decimal places file1: " << dp1
                     << ", file2: " << dp2 << std::endl;
 #endif
@@ -433,7 +425,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       // define epsilon when threshold is zero
       double eps_zero = pow(2, -23);  // equal to single precision epsilon
       if (diff_rounded > eps_zero) {
-        count_diff_non_zero++;
+        counter.diff_non_zero++;
       }
 
       // define epsilon for user-defined threshold
@@ -442,7 +434,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
         eps_user = eps_zero;
       }
       if (diff_rounded > (threshold + eps_user)) {
-        count_diff_user++;
+        counter.diff_user++;
       }
 
       // determine the comparison threshold
@@ -479,7 +471,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
       // check if the difference is greater than the threshold
       if (diff_rounded > thresh_prec) {
-        count_diff_prec++;
+        counter.diff_prec++;
       }
 
       double thresh_plot = 0;
@@ -531,7 +523,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
                  std::string(padRight, ' ');
         };
 
-        if (count == 0) {
+        if (counter.diff_print == 0) {
           is_same = false;
           // print table header on first difference
           std::cout << " line  col    range " << padLeft("tl1", val_width)
@@ -540,7 +532,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
           std::cout << "----------------------------------------+-------+------"
                     << std::endl;
         }
-        count++;
+        counter.diff_print++;
         /* PRINT DIFF TABLE ENTRY */
         // line
         std::cout << std::setw(5) << counter.lineNumber;
@@ -596,18 +588,20 @@ bool compareFiles(const std::string& file1, const std::string& file2,
       } else {
         counter.elemNumber++;
 #ifdef DEBUG2
-        std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
-                  << i + 1 << " are equal: " << rounded1 << std::endl;
+        std::cout << "   DIFF: Values at line " << counter.lineNumber
+                  << ", column " << i + 1 << " are equal: " << rounded1
+                  << std::endl;
 #endif
       }
 
       if ((diff_rounded > hard_threshold) &&
           ((values1[i] <= max_TL) && (values2[i] <= max_TL))) {
-        count_diff_hard++;
+        counter.diff_hard++;
         is_same = false;
         // #ifdef DEBUG
-        std::cerr << "\033[1;31mLarge difference found at line " << counter.lineNumber
-                  << ", column " << i + 1 << "\033[0m" << std::endl;
+        std::cerr << "\033[1;31mLarge difference found at line "
+                  << counter.lineNumber << ", column " << i + 1 << "\033[0m"
+                  << std::endl;
 
         if (counter.lineNumber > 0) {
           std::cout << "   First " << counter.lineNumber - 1 << " lines match"
@@ -618,7 +612,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
           if (counter.elemNumber > 1) std::cout << "s";
           std::cout << " checked" << std::endl;
         }
-        std::cout << count << " with differences between " << threshold
+        std::cout << counter.diff_print << " with differences between " << threshold
                   << " and " << hard_threshold << std::endl;
 
         std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
@@ -645,8 +639,10 @@ bool compareFiles(const std::string& file1, const std::string& file2,
     std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
               << std::endl;
     if (counter.lineNumber != linesFile1 || counter.lineNumber != linesFile2) {
-      std::cout << "   First " << counter.lineNumber << " lines match" << std::endl;
-      std::cout << "   " << counter.elemNumber << " elements checked" << std::endl;
+      std::cout << "   First " << counter.lineNumber << " lines match"
+                << std::endl;
+      std::cout << "   " << counter.elemNumber << " elements checked"
+                << std::endl;
     }
     std::cerr << "   File1 has " << linesFile1 << " lines " << std::endl;
     std::cerr << "   File2 has " << linesFile2 << " lines " << std::endl;
@@ -656,13 +652,13 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 #ifdef DEBUG
     std::cout << "Files have the same number of lines: " << linesFile1
               << std::endl;
-    std::cout << "Files have the same number of elements: " << counter.elemNumber
-              << std::endl;
+    std::cout << "Files have the same number of elements: "
+              << counter.elemNumber << std::endl;
 #endif
   }
 
-  if (count > 0) {
-    std::cout << "Total differences: " << count << " less than "
+  if (counter.diff_print > 0) {
+    std::cout << "Total differences: " << counter.diff_print << " less than "
               << hard_threshold << std::endl;
   } else {
     is_same = true;
