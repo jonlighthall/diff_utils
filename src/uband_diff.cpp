@@ -136,6 +136,12 @@ bool compareFiles(const std::string& file1, const std::string& file2,
   // threshold and the minimum difference between the two files, based on format
   // precision)
   int count = 0;
+  int count_diff_non_zero = 0;  // count of non-zero differences
+  int count_diff_user = 0;  // count of differences above user-defined threshold
+  int count_diff_prec =
+      0;  // count of differences above the precision threshold
+  int count_diff_hard = 0;  // count of differences above the hard threshold
+
   // track the maximum difference found
   double max_diff = 0;
   double max_diff_rounded = 0;
@@ -150,7 +156,7 @@ bool compareFiles(const std::string& file1, const std::string& file2,
 
   // define the maximum valid value for TL (Transmission Loss)
   const double max_TL = -20 * log10(pow(2, -23));
-std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
+  std::cout << "   Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
 
   // read the files line by line
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
@@ -417,6 +423,20 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
       if (diff_rounded > max_diff_rounded) {
         max_diff_rounded = diff_rounded;
       }
+      // define epsilon when threshold is zero
+      double eps_zero = pow(2, -23);  // equal to single precision epsilon
+      if (diff_rounded > eps_zero) {
+        count_diff_non_zero++;
+      }
+
+      // define epsilon for user-defined threshold
+      double eps_user = threshold * 0.1;
+      if (threshold == 0) {
+        eps_user = eps_zero;
+      }
+      if (diff_rounded > (threshold + eps_user)) {
+        count_diff_user++;
+      }
 
       // determine the comparison threshold
       double dp_threshold = std::pow(10, -min_dp);
@@ -448,38 +468,16 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
       }
 
       double ieps = ithreshold * 0.1;
+      double thresh_prec = (ithreshold + ieps);
 
-      if ((diff_rounded > hard_threshold) &&
-          ((values1[i] <= max_TL) || (values2[i] <= max_TL))) {
-        is_same = false;
-#ifdef DEBUG
-        std::cerr << "\033[1;31mLarge difference found at line " << lineNumber
-                  << ", column " << i + 1 << "\033[0m" << std::endl;
-
-        if (lineNumber > 0) {
-          std::cout << "   First " << lineNumber - 1 << " lines match"
-                    << std::endl;
-        }
-        if (elemNumber > 0) {
-          std::cout << "   " << elemNumber << " element";
-          if (elemNumber > 1) std::cout << "s";
-          std::cout << " checked" << std::endl;
-        }
-        std::cout << count << " with differences between " << threshold
-                  << " and " << hard_threshold << std::endl;
-
-        std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
-        std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
-        std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
-                  << "\033[0m" << std::endl;
-#endif
-        // return false;
+      // check if the difference is greater than the threshold
+      if (diff_rounded > thresh_prec) {
+        count_diff_prec++;
       }
 
-      double prec_thresh = (ithreshold + ieps);
-      double plot_thresh = 0;
+      double thresh_plot = 0;
 
-      if (diff_rounded > plot_thresh) {
+      if (diff_rounded > thresh_plot) {
         // if the difference is greater than the threshold, print the
         // difference
 #ifdef DEBUG2
@@ -487,13 +485,13 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
                   << " exceeds threshold: " << ithreshold << std::endl;
 #endif
 
-        int mxint = 3;  // maximum integer width for range
-        int mxdec = 5;  // maximum decimal places for range
+        int mxint = 3;                      // maximum integer width for range
+        int mxdec = 5;                      // maximum decimal places for range
         int val_width = mxint + mxdec + 1;  // total width for value columns
 
         auto padLeft = [](const std::string& str, int width) -> std::string {
-            if (static_cast<int>(str.length()) >= width) return str;
-            return std::string(width - str.length(), ' ') + str;
+          if (static_cast<int>(str.length()) >= width) return str;
+          return std::string(width - str.length(), ' ') + str;
         };
 
         auto formatNumber = [&](double value, int prec, int maxIntegerWidth,
@@ -526,11 +524,11 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
                  std::string(padRight, ' ');
         };
 
-
         if (count == 0) {
           is_same = false;
           // print table header on first difference
-          std::cout << " line  col    range " << padLeft("tl1", val_width) << " " << padLeft("tl2", val_width) << " | thres | diff"
+          std::cout << " line  col    range " << padLeft("tl1", val_width)
+                    << " " << padLeft("tl2", val_width) << " | thres | diff"
                     << std::endl;
           std::cout << "----------------------------------------+-------+------"
                     << std::endl;
@@ -571,7 +569,7 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
         // difference
         if (rounded1 > max_TL || rounded2 > max_TL) {
           std::cout << "\033[1;34m";
-        } else if (diff_rounded > threshold && diff_rounded < prec_thresh) {
+        } else if (diff_rounded > threshold && diff_rounded < thresh_prec) {
           std::cout << "\033[1;33m";
         } else if (diff_rounded > hard_threshold) {
           std::cout << "\033[1;31m";
@@ -582,8 +580,10 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
 
         std::cout << std::setw(4) << diff_rounded << "\033[0m";
 
-        // std::cout << " > " << ithreshold << " : " << (diff_rounded - ithreshold)
-        //           << " -> " << fabs(diff_rounded - ithreshold) << " > " << ieps;
+        // std::cout << " > " << ithreshold << " : " << (diff_rounded -
+        // ithreshold)
+        //           << " -> " << fabs(diff_rounded - ithreshold) << " > " <<
+        //           ieps;
 
         std::cout << std::endl;
       } else {
@@ -592,6 +592,34 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
         std::cout << "   DIFF: Values at line " << lineNumber << ", column "
                   << i + 1 << " are equal: " << rounded1 << std::endl;
 #endif
+      }
+
+      if ((diff_rounded > hard_threshold) &&
+          ((values1[i] <= max_TL) && (values2[i] <= max_TL))) {
+        count_diff_hard++;
+        is_same = false;
+        // #ifdef DEBUG
+        std::cerr << "\033[1;31mLarge difference found at line " << lineNumber
+                  << ", column " << i + 1 << "\033[0m" << std::endl;
+
+        if (lineNumber > 0) {
+          std::cout << "   First " << lineNumber - 1 << " lines match"
+                    << std::endl;
+        }
+        if (elemNumber > 0) {
+          std::cout << "   " << elemNumber << " element";
+          if (elemNumber > 1) std::cout << "s";
+          std::cout << " checked" << std::endl;
+        }
+        std::cout << count << " with differences between " << threshold
+                  << " and " << hard_threshold << std::endl;
+
+        std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
+        std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
+        std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
+                  << "\033[0m" << std::endl;
+        // #endif
+        return false;
       }
 
     }  // end check values in line
@@ -638,8 +666,20 @@ std::cout << "Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
+  /* ARGUMENTS */
+  // argv[0] is the program name
+  // argv[1] is the first file name
+  // argv[2] is the second file name
+  // argv[3] is the threshold for differences (default: 0.05)
+  // argv[4] is the hard threshold for differences (default: 1.0)
+  //
+
+  /* DEFAULTS */
   std::string file1 = "file1.txt";
   std::string file2 = "file2.txt";
+  float count_level = 0.05;
+  float hard_level = 10;
+  float print_level = 1;  // print level for differences
 
 #ifdef DEBUG2
   std::cout << "Debug mode 2 is ON" << std::endl;
@@ -647,39 +687,50 @@ int main(int argc, char* argv[]) {
 
 #ifdef DEBUG
   std::cout << "Debug mode is ON" << std::endl;
-  std::cout << "argc: " << argc << std::endl;
+  std::cout << "ARGUMENTS: " << std::endl;
+  std::cout << "   argc   : " << argc << std::endl;
   for (int i = 0; i < argc; i++) {
-    std::cout << "argv[" << i << "]: " << argv[i] << std::endl;
-
-    /* code */
+    std::cout << "   argv[" << i << "]: " << argv[i] << std::endl;
   }
 #endif
 
+  std::cout << "SETTINGS: " << std::endl;
+  // Check if the user provided file names as arguments
   if (argc >= 3) {
-    file1 = argv[1];
-    file2 = argv[2];
+    file1 = argv[1];  // first file name
+    file2 = argv[2];  // second file name
   } else {
-    std::cout << "Using default file names:" << std::endl;
+    std::cout << "   Using default file names:" << std::endl;
   }
-  float count_level = 0;
-  float hard_level = 1;
+  std::cout << "   File1: " << file1 << std::endl;
+  std::cout << "   File2: " << file2 << std::endl;
 
-  std::cout << "Diff threshold: ";
+  std::cout << "   Diff threshold : " << std::fixed << std::setprecision(3)
+            << std::setw(7) << std::right;
+
   if (argc >= 4) {
     count_level = std::stof(argv[3]);
     std::cout << count_level << std::endl;
   } else {
-    count_level = static_cast<float>(0.05);
     std::cout << count_level << " (default)" << std::endl;
   }
 
-  std::cout << "High threshold: \033[1;31m";
-  if (argc == 5) {
+  std::cout << "   High threshold : \033[1;31m" << std::fixed
+            << std::setprecision(3) << std::setw(7) << std::right;
+  if (argc >= 5) {
     hard_level = std::stof(argv[4]);
     std::cout << hard_level << "\033[0m" << std::endl;
   } else {
-    hard_level = 1;
     std::cout << hard_level << "\033[0m (default)" << std::endl;
+  }
+
+  std::cout << "   Print threshold: " << std::fixed << std::setprecision(3)
+            << std::setw(7) << std::right;
+  if (argc >= 6) {
+    print_level = std::stof(argv[5]);
+    std::cout << print_level << "\033[0m" << std::endl;
+  } else {
+    std::cout << print_level << "\033[0m (default)" << std::endl;
   }
 
   isERROR = false;
