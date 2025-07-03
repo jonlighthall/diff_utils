@@ -105,6 +105,12 @@ struct LineData {
   std::vector<int> decimal_places;
 };
 
+struct DiffStats {
+  // track the maximum difference found
+  double max = 0;
+  double max_rounded = 0;
+};
+
 struct CountStats {
   int lineNumber = 0;  // number of lines read
   int elemNumber = 0;  // number of elements checked
@@ -125,7 +131,9 @@ class FileComparator {
  private:
   double threshold;
   double hard_threshold;
+  // define the maximum valid value for TL (Transmission Loss)
   const double max_TL = -20 * log10(pow(2, -23));
+  DiffStats differ;
   CountStats counter;
 
  public:
@@ -138,7 +146,6 @@ class FileComparator {
   bool compareFiles(const std::string& file1, const std::string& file2);
 
  private:
-
 };
 
 bool FileComparator::compareFiles(const std::string& file1,
@@ -165,10 +172,6 @@ bool FileComparator::compareFiles(const std::string& file1,
   std::string line1;
   std::string line2;
 
-  // track the maximum difference found
-  double max_diff = 0;
-  double max_diff_rounded = 0;
-
   // track if the file format has changed
   long unsigned int prev_n_col = 0;
   std::vector<int> dp_per_col;
@@ -177,8 +180,6 @@ bool FileComparator::compareFiles(const std::string& file1,
   // track if the files are the same
   bool is_same = false;
 
-  // define the maximum valid value for TL (Transmission Loss)
-  const double max_TL = -20 * log10(pow(2, -23));
   std::cout << "   Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
 
   // read the files line by line
@@ -249,8 +250,8 @@ bool FileComparator::compareFiles(const std::string& file1,
     for (size_t i = 0; i < n_col1; ++i) {
       // compare values (without rounding)
       double diff = std::abs(data1.values[i] - data2.values[i]);
-      if (diff > max_diff) {
-        max_diff = diff;
+      if (diff > differ.max) {
+        differ.max = diff;
       }
 
       // get the number of decimal places for each column
@@ -338,8 +339,8 @@ bool FileComparator::compareFiles(const std::string& file1,
       double rounded2 = round_to_decimals(data2.values[i], min_dp);
 
       double diff_rounded = std::abs(rounded1 - rounded2);
-      if (diff_rounded > max_diff_rounded) {
-        max_diff_rounded = diff_rounded;
+      if (diff_rounded > differ.max_rounded) {
+        differ.max_rounded = diff_rounded;
       }
       // define epsilon when threshold is zero
       double eps_zero = pow(2, -23);  // equal to single precision epsilon
@@ -582,7 +583,7 @@ bool FileComparator::compareFiles(const std::string& file1,
   } else {
     is_same = true;
   }
-  std::cout << "Max difference: " << max_diff << std::endl;
+  std::cout << "Max difference: " << differ.max << std::endl;
 
   return is_same;
 }
@@ -605,8 +606,8 @@ LineData FileComparator::parseLine(const std::string& line) {
     } else {
       // if the character is not '(', it is a number
       stream.putback(ch);  // put back the character to the stream
-      int dp = stream_countDecimalPlaces(stream);  // count the number of decimal places
-
+      int dp = stream_countDecimalPlaces(
+          stream);  // count the number of decimal places
 
       if (dp < 0) {
         std::cerr << "Error: Negative number of decimal places found in line: "
@@ -615,7 +616,8 @@ LineData FileComparator::parseLine(const std::string& line) {
         return result;  // return empty result
       }
 
-      result.decimal_places.push_back(dp);  // store the number of decimal places
+      result.decimal_places.push_back(
+          dp);  // store the number of decimal places
 
       double value;
       stream >> value;
