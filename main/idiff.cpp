@@ -1,16 +1,11 @@
+
+#include "uband_diff.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#ifdef DEBUG2  // print status of every line
-#ifndef DEBUG
-#define DEBUG
-#endif
-#endif
-
-bool isERROR = false;
 
 bool compareFiles(const std::string& file1, const std::string& file2) {
   std::ifstream infile1(file1);
