@@ -13,24 +13,29 @@ LD = g++
 # general flags
 compile = -c $<
 output = -o $@
+warnings = -Wall
+debug = -g
+
+
+# define macros
+macros = -D DEBUG
+
+# include directories
+# include directories for C/C++ source files
+includes = -I include -I src
+
+# universal flags
+UFLAGS = $(warnings) $(debug) $(macros) $(includes) $(output)
 
 # C flags
 CFLAGS =
 # C++ flags
 CXXFLAGS =
-# C/C++ flags
-warnings = -Wall
-CPPFLAGS = $(warnings)
-
-# define macros
-macros = -D DEBUG2
-
-# compile C/C++ source
-COMPILE.cpp = $(CPPFLAGS) $(compile) $(output) $(macros)
 # compile C source
-COMPILE.c = $(CC) $(CFLAGS)
+COMPILE.c = $(CC) $(CFLAGS) $(UFLAGS) $(compile)
 # compile C++ source
-COMPILE.cxx = $(CXX) $(CXXFLAGS) $(COMPILE.cpp)
+COMPILE.cxx = $(CXX) $(CXXFLAGS) $(UFLAGS) $(compile)
+
 
 # linker flags
 LDFLAGS =
@@ -38,7 +43,7 @@ LDFLAGS =
 LDLIBS =
 
 # link objects
-LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(output) $^
+LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 
 # build directories
 BINDIR := bin
@@ -46,40 +51,58 @@ OBJDIR := obj
 #
 # source file lists
 #
-# program files (executable)
-SRC.C = $(wildcard *.c)
-SRC.CPP = $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.cxx)
+# program driver files (executable)
+MAINS.C = $(wildcard *.c)
+MAINS.CPP = $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.cxx)
 
-# add SRCDIR if present
+# add driver directory, if present
+MAIN_DIR := main
+ifneq ("$(strip $(wildcard $(MAIN_DIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(MAIN_DIR)))
+	MAINS.C += $(wildcard $(MAIN_DIR)/*.c)
+	MAINS.CPP += $(wildcard $(MAIN_DIR)/*.cc $(MAIN_DIR)/*.cpp $(MAIN_DIR)/*.cxx)
+endif
+MAINS.CPP := $(strip $(MAINS.CPP))
+MAINS = $(strip $(MAINS.C) $(MAINS.CPP))
+# exclude readme files from the main list
+#MAINS := $(filter-out $(wildcard *readme*), $(MAINS))
+
+# add source directory, if present
 SRCDIR := src
 ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
-	SRC.C += $(wildcard $(SRCDIR)/*.c)
-	SRC.CPP += $(wildcard $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
+	SRCS.C += $(wildcard $(SRCDIR)/*.c)
+	SRCS.CPP += $(wildcard $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 endif
-SRC.CPP := $(strip $(SRC.CPP))
-SRC = $(strip $(SRC.C) $(SRC.CPP))
-SRC := $(filter-out $(wildcard *readme*), $(SRC))
+SRCS.CPP := $(strip $(SRCS.CPP))
+SRCS = $(strip $(SRCS.C) $(SRCS.CPP))
 
-SOURCES := $(wildcard $(SRCDIR)/*.c $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
-
-OBJS.all = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(SRC)))))
+# replace source file extensions with object file extensions
+OBJS.src = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(SRCS)))))
 # strip source directory from object list
 # should be a list of .o files with no directory
-OBJS.o := $(OBJS.all:$(SRCDIR)/%=%)
+OBJS.o := $(OBJS.src:$(SRCDIR)/%=%)
 # add object directory
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 #
 # executables
 EXE = sunset
 TARGET = $(addprefix $(BINDIR)/,$(EXE))
-EXES = $(addprefix $(BINDIR)/,$(OBJS.o:.o=))
+
+# strip file extensions from main files
+EXECS.main = $(patsubst %.cxx,%,$(patsubst %.cpp,%,$(patsubst %.cc,%,$(patsubst %.c,%,$(MAINS)))))
+EXECS.main := $(strip $(EXECS.main))
+# strip main directory from executable list
+# should be a list of executables with no directory
+EXECS.list := $(EXECS.main:$(MAIN_DIR)/%=%)
+# add executable directory
+EXECS := $(addprefix $(BINDIR)/,$(EXECS.list))
 
 .DEFAULT_GOAL = all
 #
 # recipes
 .PHONY: all
-all: $(TARGET) $(EXES)
+all: $(OBJDIR) $(BINDIR) $(EXECS)
 
 printvars:
 	@echo
@@ -90,21 +113,31 @@ printvars:
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "SRC.C   = $(SRC.C)"
-	@echo "SRC.CPP = $(SRC.CPP)"
-	@echo "SRC     = $(SRC)"
+	@echo "MAIN_DIR = $(MAIN_DIR)"
+	@echo "MAINS.C   = $(MAINS.C)"
+	@echo "MAINS.CPP = $(MAINS.CPP)"
+	@echo "MAINS     = $(MAINS)"
+	@echo "----------------------------------------------------"
+	@echo
+	@echo "SRCDIR  = $(SRCDIR)"
+	@echo "SRCS.C   = $(SRCS.C)"
+	@echo "SRCS.CPP = $(SRCS.CPP)"
+	@echo "SRCS     = $(SRCS)"
+	@echo "----------------------------------------------------"
+	@echo
 	@echo "SOURCES = $(SOURCES)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "OBJS.all = $(OBJS.all)"
+	@echo "OBJS.src = $(OBJS.src)"
 	@echo "OBJS.o   = $(OBJS.o)"
 	@echo "OBJS     = $(OBJS)"
-	@echo "OBJECTS  = $(OBJECTS)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "DEPENDS = $(DEPENDS)"
+	@echo "EXECS.main = $(EXECS.main)"
+	@echo "EXECS.list = $(EXECS.list)"
+	@echo "EXECS      = $(EXECS)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -117,11 +150,39 @@ printvars:
 	@echo
 #
 # generic recipes
-$(BINDIR)/%: $(OBJDIR)/%.o | $(BINDIR)
-	@/bin/echo -e "\nlinking generic executable $@..."
+# Rules to build (link) each executable
+# Executables in the root directory
+$(BINDIR)/%: %.c $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C (.c) executable $@..."
 	$(LINK.o)
+$(BINDIR)/%: %.cc $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cc) executable $@..."
+	$(LINK.o)
+$(BINDIR)/%: %.cpp $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cpp) executable $@..."
+	$(LINK.o)
+$(BINDIR)/%: %.cxx $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cxx) executable $@..."
+	$(LINK.o)
+
+# Executables in the main directory
+$(BINDIR)/%: $(MAIN_DIR)/%.c $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C (.c) executable $@..."
+	$(LINK.o)
+$(BINDIR)/%: $(MAIN_DIR)/%.cc $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cc) executable $@..."
+	$(LINK.o)
+$(BINDIR)/%: $(MAIN_DIR)/%.cpp $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cpp) executable $@..."
+	$(LINK.o)
+$(BINDIR)/%: $(MAIN_DIR)/%.cxx $(OBJS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic C++ (.cxx) executable $@..."
+	$(LINK.o)
+
+# Rules to compile source files into object files
+
 $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
-	@/bin/echo -e "\ncompiling generic C object $@..."
+	@/bin/echo -e "\ncompiling generic C (.c) object $@..."
 	$(COMPILE.c)
 $(OBJDIR)/%.o: %.cc | $(OBJDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
@@ -148,8 +209,7 @@ mostlyclean:
 # remove compiled binaries
 	@echo "removing compiled binary files..."
 # remove build files
-	$(RM) $(OBJECTS)
-	$(RM) $(DEPENDS)
+	$(RM) $(OBJS)
 # remove remaining binaries
 	$(RM) $(OBJDIR)/*.o
 	$(RM) $(OBJDIR)
