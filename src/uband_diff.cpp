@@ -112,19 +112,22 @@ struct DiffStats {
 };
 
 struct CountStats {
-  int lineNumber = 0;  // number of lines read
-  int elemNumber = 0;  // number of elements checked
+  long unsigned int lineNumber = 0;  // number of lines read
+  long unsigned int elemNumber = 0;  // number of elements checked
 
   // number of differences found (where the difference is greater than
   // threshold, which is the minimum between the function argument
   // threshold and the minimum difference between the two files, based on format
   // precision)
 
-  int diff_print = 0;     // count of differences printed
-  int diff_non_zero = 0;  // count of non-zero differences
-  int diff_user = 0;      // count of differences above user-defined threshold
-  int diff_prec = 0;      // count of differences above the precision threshold
-  int diff_hard = 0;      // count of differences above the hard threshold
+  long unsigned int diff_print = 0;     // count of differences printed
+  long unsigned int diff_non_zero = 0;  // count of non-zero differences
+  long unsigned int diff_user =
+      0;  // count of differences above user-defined threshold
+  long unsigned int diff_prec =
+      0;  // count of differences above the precision threshold
+  long unsigned int diff_hard =
+      0;  // count of differences above the hard threshold
 };
 
 class FileComparator {
@@ -148,8 +151,9 @@ class FileComparator {
 
  private:
   double calculateThreshold(int decimal_places) const;
-
-    void updateCounters(double diff_rounded);
+  void updateCounters(double diff_rounded);
+  long unsigned int getFileLength(const std::string& file);
+  bool compareFileLengths(const std::string& file1, const std::string& file2);
 };
 
 bool FileComparator::compareFiles(const std::string& file1,
@@ -193,10 +197,6 @@ bool FileComparator::compareFiles(const std::string& file1,
     LineData data1 = parseLine(line1);
     LineData data2 = parseLine(line2);
 
-    // get the numbers of columns in each file
-    long unsigned int n_col1 = data1.values.size();
-    long unsigned int n_col2 = data2.values.size();
-
     // print parsed file contents
 #ifdef DEBUG2
     std::cout << "DEBUG2: Line " << counter.lineNumber << std::endl;
@@ -212,6 +212,10 @@ bool FileComparator::compareFiles(const std::string& file1,
     }
     std::cout << std::endl;
 #endif
+
+    // get the numbers of columns in each file
+    long unsigned int n_col1 = data1.values.size();
+    long unsigned int n_col2 = data2.values.size();
 
     // check if both lines have the same number of columns
     if (n_col1 != n_col2) {
@@ -509,34 +513,8 @@ bool FileComparator::compareFiles(const std::string& file1,
   }  // end read in file
 
   // check if both files have the same number of lines
-  int linesFile1 = 0;
-  int linesFile2 = 0;
-  std::ifstream countFile1(file1);
-  std::ifstream countFile2(file2);
-  std::string temp;
-
-  while (std::getline(countFile1, temp)) linesFile1++;
-  while (std::getline(countFile2, temp)) linesFile2++;
-  if (linesFile1 != linesFile2) {
-    std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
-              << std::endl;
-    if (counter.lineNumber != linesFile1 || counter.lineNumber != linesFile2) {
-      std::cout << "   First " << counter.lineNumber << " lines match"
-                << std::endl;
-      std::cout << "   " << counter.elemNumber << " elements checked"
-                << std::endl;
-    }
-    std::cerr << "   File1 has " << linesFile1 << " lines " << std::endl;
-    std::cerr << "   File2 has " << linesFile2 << " lines " << std::endl;
-
+  if (!compareFileLengths(file1, file2)) {
     return false;
-  } else {
-#ifdef DEBUG
-    std::cout << "Files have the same number of lines: " << linesFile1
-              << std::endl;
-    std::cout << "Files have the same number of elements: "
-              << counter.elemNumber << std::endl;
-#endif
   }
 
   if (counter.diff_print > 0) {
@@ -626,6 +604,57 @@ double FileComparator::calculateThreshold(int ndp) const {
     return dp_threshold;
   }
   return threshold;
+}
+
+long unsigned int FileComparator::getFileLength(const std::string& file) {
+  std::ifstream infile(file);
+  if (!infile.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
+              << std::endl;
+    isERROR = true;
+    return 0;
+  }
+  long unsigned int length = 0;
+  std::string line;
+  while (std::getline(infile, line)) {
+    ++length;
+  }
+  infile.close();
+  return length;
+}
+
+// Implementation moved outside the class definition
+
+bool FileComparator::compareFileLengths(const std::string& file1,
+                                        const std::string& file2) {
+  long unsigned int length1 = getFileLength(file1);
+  long unsigned int length2 = getFileLength(file2);
+
+  if (length1 != length2) {
+    std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
+              << length1 << " bytes) and " << file2 << " (" << length2
+              << " bytes)\033[0m" << std::endl;
+
+    std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
+              << std::endl;
+    if (counter.lineNumber != length1 || counter.lineNumber != length2) {
+      std::cout << "   First " << counter.lineNumber << " lines match"
+                << std::endl;
+      std::cout << "   " << counter.elemNumber << " elements checked"
+                << std::endl;
+    }
+    std::cerr << "   File1 has " << length1 << " lines " << std::endl;
+    std::cerr << "   File2 has " << length2 << " lines " << std::endl;
+
+    return false;
+  }
+#ifdef DEBUG
+  std::cout << "Files have the same number of lines: " << length1 << std::endl;
+  std::cout << "Files have the same number of elements: " << counter.elemNumber
+            << std::endl;
+#endif
+
+  return true;
 }
 
 int main(int argc, char* argv[]) {
