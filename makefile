@@ -1,7 +1,9 @@
-# Thomas Daley
-# September 13, 2021
+# A generic makefile for C/C++ programs
+# Mar 2023 JCL
+# Adapted from template by Thomas Daley (Sep 2021)
 
-# A generic build template for C/C++ programs
+# get name of this directory
+DIR.NAME=$(shell basename $$PWD)
 
 # C compiler
 CC = gcc
@@ -16,11 +18,9 @@ output = -o $@
 warnings = -Wall
 debug = -g
 
-
 # define macros
 macros = -D DEBUG
 
-# include directories
 # include directories for C/C++ source files
 includes = -I include -I src
 
@@ -31,11 +31,12 @@ UFLAGS = $(warnings) $(debug) $(macros) $(includes) $(output)
 CFLAGS =
 # C++ flags
 CXXFLAGS =
+# dependency generation flags
+DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.d
 # compile C source
 COMPILE.c = $(CC) $(CFLAGS) $(UFLAGS) $(compile)
 # compile C++ source
-COMPILE.cxx = $(CXX) $(CXXFLAGS) $(UFLAGS) $(compile)
-
+COMPILE.cxx = $(CXX) $(CXXFLAGS) $(DEPFLAGS) $(UFLAGS) $(compile)
 
 # linker flags
 LDFLAGS =
@@ -49,12 +50,9 @@ LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 BINDIR := bin
 OBJDIR := obj
 #
-# source file lists
-#
-# program driver files (executable)
+# program driver files (correspond to executables)
 MAINS.C = $(wildcard *.c)
 MAINS.CPP = $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.cxx)
-
 # add driver directory, if present
 MAIN_DIR := main
 ifneq ("$(strip $(wildcard $(MAIN_DIR)))","")
@@ -66,7 +64,8 @@ MAINS.CPP := $(strip $(MAINS.CPP))
 MAINS = $(strip $(MAINS.C) $(MAINS.CPP))
 # exclude readme files from the main list
 #MAINS := $(filter-out $(wildcard *readme*), $(MAINS))
-
+#
+# source files (implementation, correspond to header files)
 # add source directory, if present
 SRCDIR := src
 ifneq ("$(strip $(wildcard $(SRCDIR)))","")
@@ -76,7 +75,8 @@ ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 endif
 SRCS.CPP := $(strip $(SRCS.CPP))
 SRCS = $(strip $(SRCS.C) $(SRCS.CPP))
-
+#
+# object files
 # replace source file extensions with object file extensions
 OBJS.src = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(SRCS)))))
 # strip source directory from object list
@@ -84,10 +84,9 @@ OBJS.src = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsu
 OBJS.o := $(OBJS.src:$(SRCDIR)/%=%)
 # add object directory
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
-#
-# executables
-EXE = sunset
-TARGET = $(addprefix $(BINDIR)/,$(EXE))
+
+# dependency files
+DEPS := $(OBJS:.o=.d)
 
 # strip file extensions from main files
 EXECS.main = $(patsubst %.cxx,%,$(patsubst %.cpp,%,$(patsubst %.cc,%,$(patsubst %.c,%,$(MAINS)))))
@@ -123,9 +122,6 @@ printvars:
 	@echo "SRCS.C   = $(SRCS.C)"
 	@echo "SRCS.CPP = $(SRCS.CPP)"
 	@echo "SRCS     = $(SRCS)"
-	@echo "----------------------------------------------------"
-	@echo
-	@echo "SOURCES = $(SOURCES)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -141,9 +137,7 @@ printvars:
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "EXE = $(EXE)"
-	@echo "TARGET = $(TARGET)"
-	@echo "EXES = $(EXES)"
+	@echo "DEPS = $(DEPS)"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo "$@ done"
@@ -184,6 +178,19 @@ $(BINDIR)/%: $(MAIN_DIR)/%.cxx $(OBJS) | $(BINDIR)
 $(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
 	@/bin/echo -e "\ncompiling generic C (.c) object $@..."
 	$(COMPILE.c)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
+	$(COMPILE.cxx)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic C++ (.cpp) object $@..."
+	$(COMPILE.cxx)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic C++ (.cxx) object $@..."
+	$(COMPILE.cxx)
+
+$(OBJDIR)/%.o:	%.c | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic C (.c) object $@..."
+	$(COMPILE.c)
 $(OBJDIR)/%.o: %.cc | $(OBJDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
 	$(COMPILE.cxx)
@@ -193,6 +200,10 @@ $(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 $(OBJDIR)/%.o: %.cxx | $(OBJDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cxx) object $@..."
 	$(COMPILE.cxx)
+
+# Include dependency files (ignore missing files with -)
+-include $(DEPS)
+
 #
 # define directory creation
 $(BINDIR):
@@ -210,29 +221,31 @@ mostlyclean:
 	@echo "removing compiled binary files..."
 # remove build files
 	$(RM) $(OBJS)
+# remove dependency files
+	$(RM) $(DEPS)
 # remove remaining binaries
 	$(RM) $(OBJDIR)/*.o
 	$(RM) $(OBJDIR)
 	$(RM) *.o *.obj
-	@echo "$(THISDIR) $@ done"
+	@echo "$(DIR.NAME) $@ done"
 clean: mostlyclean
 # remove binaries and executables
 	@/bin/echo -e "\nremoving compiled executable files..."
 # remove build files
-	$(RM) $(BINDIR)/$(EXE)
+	$(RM) $(EXECS)
 # remove remaining binaries
 	$(RM) $(BINDIR)/*.exe
 	$(RM) $(BINDIR)
 	$(RM) *.exe
 	$(RM) *.out
-	@echo "$(THISDIR) $@ done"
+	@echo "$(DIR.NAME) $@ done"
 force: clean
 # force re-make
 	@$(MAKE) --no-print-directory
 out:
 # remove outputs produced by executables
 	@/bin/echo -e "\nremoving output files..."
-	@echo "$(THISDIR) $@ done"
+	@echo "$(DIR.NAME) $@ done"
 realclean: clean out
 # remove binaries and outputs
 
@@ -244,24 +257,25 @@ distclean: realclean
 # remove Emacs backup files
 	$(RM) *~ \#*\#
 # clean sub-programs
-	@echo "$(THISDIR) $@ done"
+	@echo "$(DIR.NAME) $@ done"
 reset: distclean
 # remove untracked files
 	@/bin/echo -e "\nresetting repository..."
 	git reset HEAD
 	git stash
 	git clean -f
-	@echo "$(THISDIR) $@ done"
+	@echo "$(DIR.NAME) $@ done"
 
 # force rebuild
 .PHONY: remake
-remake:	clean $(BINDIR)/$(EXE)
+remake:	clean all
 
-# execute the program
+# execute the program (runs first executable found)
 .PHONY: run
-run: $(TARGET)
-	./$(TARGET)
-
-# remove everything except source
-.PHONY: reset
-reset: realclean
+run: all
+	@if [ -n "$(word 1,$(EXECS))" ]; then \
+		echo "Running $(word 1,$(EXECS))..."; \
+		./$(word 1,$(EXECS)); \
+	else \
+		echo "No executables found to run"; \
+	fi
