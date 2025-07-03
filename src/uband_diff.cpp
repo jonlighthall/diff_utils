@@ -148,6 +148,8 @@ class FileComparator {
 
  private:
   double calculateThreshold(int decimal_places) const;
+
+    void updateCounters(double diff_rounded);
 };
 
 bool FileComparator::compareFiles(const std::string& file1,
@@ -343,20 +345,8 @@ bool FileComparator::compareFiles(const std::string& file1,
       if (diff_rounded > differ.max_rounded) {
         differ.max_rounded = diff_rounded;
       }
-      // define epsilon when threshold is zero
-      double eps_zero = pow(2, -23);  // equal to single precision epsilon
-      if (diff_rounded > eps_zero) {
-        counter.diff_non_zero++;
-      }
 
-      // define epsilon for user-defined threshold
-      double eps_user = threshold * 0.1;
-      if (threshold == 0) {
-        eps_user = eps_zero;
-      }
-      if (diff_rounded > (threshold + eps_user)) {
-        counter.diff_user++;
-      }
+      updateCounters(diff_rounded);
 
       double ithreshold = calculateThreshold(min_dp);
       double ieps = ithreshold * 0.1;
@@ -515,7 +505,6 @@ bool FileComparator::compareFiles(const std::string& file1,
         // #endif
         return false;
       }
-
     }  // end check values in line
   }  // end read in file
 
@@ -598,6 +587,22 @@ LineData FileComparator::parseLine(const std::string& line) {
     }
   }
   return result;
+}
+
+void FileComparator::updateCounters(double diff_rounded) {
+  // Update counters
+
+  // define epsilon when threshold is zero
+  double eps_zero = pow(2, -23);  // equal to single precision epsilon
+  if (diff_rounded > eps_zero) {
+    counter.diff_non_zero++;
+  }
+
+  // define epsilon for user-defined threshold
+  double eps_user = (threshold == 0) ? eps_zero : threshold * 0.1;
+  if (diff_rounded > (threshold + eps_user)) {
+    counter.diff_user++;
+  }
 }
 
 double FileComparator::calculateThreshold(int ndp) const {
