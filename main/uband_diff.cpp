@@ -1,7 +1,22 @@
+/*
+ * File: uband_diff.cpp
+ * Description: Main program for comparing numerical data files with precision-aware
+ *              difference thresholds. Supports complex numbers and variable precision.
+ * Author: J. Lighthall
+ * Date: January 2025
+ * Adapted from tldiff.f90 (Aug 2022)
+ *
+ * Usage: uband_diff <file1> <file2> [threshold] [hard_threshold] [print_level]
+ *   file1, file2    - Input files to compare
+ *   threshold       - Soft difference threshold (default: 0.05)
+ *   hard_threshold  - Hard difference threshold for failure (default: 10.0)
+ *   print_level     - Print verbosity level (default: 1.0)
+ */
+
 #include "uband_diff.h"
 
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <string>
 
 int main(int argc, char* argv[]) {
@@ -16,13 +31,21 @@ int main(int argc, char* argv[]) {
   /* DEFAULTS */
   std::string file1 = "file1.txt";
   std::string file2 = "file2.txt";
-  float count_level = 0.05;
-  float hard_level = 10;
-  float print_level = 1;  // print level for differences
+  double count_level = 0.05;
+  double hard_level = 10;
+  double print_level = 1;  // print level for differences
 
 #ifdef DEBUG2
   std::cout << "Debug mode 2 is ON" << std::endl;
 #endif
+
+  if (argc < 3) {
+    std::cout << "WARNING: " << std::endl;
+    std::cout << "   Two file names not provided." << std::endl;
+    std::cout << "   Usage: " << argv[0]
+              << " <file1> <file2> [threshold] [hard_threshold] [print_level]"
+              << std::endl;
+  }
 
 #ifdef DEBUG
   std::cout << "Debug mode is ON" << std::endl;
@@ -32,6 +55,23 @@ int main(int argc, char* argv[]) {
     std::cout << "   argv[" << i << "]: " << argv[i] << std::endl;
   }
 #endif
+
+  // check the number of arguments
+  // remember that argv[0] is the program name
+  // so we expect at least 2 arguments (file1 and file2)
+  // and at most 6 arguments (file1, file2, threshold, hard_threshold,
+  // print_level) if the number of arguments is not in this range, print an
+  // error
+
+  // if the number of aruments is zero, use the default file names and print a
+  // warning
+
+  if (argc > 6) {
+    std::cerr << "Usage: " << argv[0]
+              << " <file1> <file2> [threshold] [hard_threshold] [print_level]"
+              << std::endl;
+    return 1;
+  }
 
   std::cout << "SETTINGS: " << std::endl;
   // Check if the user provided file names as arguments
@@ -73,20 +113,24 @@ int main(int argc, char* argv[]) {
   }
 
   isERROR = false;
-  FileComparator comparator(count_level, hard_level);
-  if (comparator.compareFiles(file1, file2)) {
+  if (FileComparator comparator(count_level, hard_level); comparator.compareFiles(file1, file2)) {
     std::cout << "Files " << file1 << " and " << file2 << " are identical"
               << std::endl;
   } else {
-    std::cout << "File1: " << file1 << std::endl;
-    std::cout << "File2: " << file2 << std::endl;
+    std::cout << "SUMMARY:" << std::endl;
+    std::cout << "   Input:";
+    for (int i = 0; i < argc; ++i) {
+      std::cout << " " << argv[i];
+    }
+    std::cout << std::endl;
+    std::cout << "   File1: " << file1 << std::endl;
+    std::cout << "   File2: " << file2 << std::endl;
     if (isERROR) {
-      std::cout << "\033[1;31mError found.\033[0m" << std::endl;
+      std::cout << "   \033[1;31mError found.\033[0m" << std::endl;
     } else {
-      std::cout << "\033[1;31mFiles are different.\033[0m" << std::endl;
+      std::cout << "   \033[1;31mFiles are different.\033[0m" << std::endl;
       return 1;
     }
   }
-
   return 0;
 }
