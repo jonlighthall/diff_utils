@@ -69,7 +69,8 @@ class FileComparator {
   double calculateThreshold(int decimal_places);
   void updateCounters(double diff_rounded);
   long unsigned int getFileLength(const std::string& file) const;
-  bool compareFileLengths(const std::string& file1, const std::string& file2) const;
+  bool compareFileLengths(const std::string& file1,
+                          const std::string& file2) const;
   bool compareColumn(const LineData& data1, const LineData& data2,
                      size_t columnIndex, std::vector<int>& dp_per_col,
                      bool& new_fmt, bool& is_same);
@@ -77,7 +78,9 @@ class FileComparator {
   void printDifferenceRow(double rounded1, double rounded2, double diff_rounded,
                           double ithreshold, int dp1, int dp2,
                           size_t columnIndex, double rangeValue);
-void printTable(int columnIndex, double line_threshold, double rangeValue, double val1, int deci1, double val2, int deci2);
+  void printTable(size_t columnIndex, double line_threshold, double rangeValue,
+                  double val1, int deci1, double val2, int deci2,
+                  double diff_rounded);
 
   bool updateDecimalPlaces(size_t columnIndex, int min_dp,
                            std::vector<int>& dp_per_col, bool& new_fmt);
@@ -86,7 +89,7 @@ void printTable(int columnIndex, double line_threshold, double rangeValue, doubl
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
-                                int maxDecimals) const;
+                           int maxDecimals) const;
 };
 
 #endif  // UBAND_DIFF_H
