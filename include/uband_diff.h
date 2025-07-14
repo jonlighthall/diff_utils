@@ -74,7 +74,9 @@ class FileComparator {
   bool compareColumn(const LineData& data1, const LineData& data2,
                      size_t columnIndex, std::vector<int>& dp_per_col,
                      bool& new_fmt, bool& is_same);
-
+bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
+                                     std::vector<int>& dp_per_col,
+                                     size_t& prev_n_col);
   void printDifferenceRow(double rounded1, double rounded2, double diff_rounded,
                           double ithreshold, int dp1, int dp2,
                           size_t columnIndex, double rangeValue);

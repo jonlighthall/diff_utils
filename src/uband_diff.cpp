@@ -186,45 +186,11 @@ bool FileComparator::compareFiles(const std::string& file1,
     // get the number of columns in file1
     long unsigned int n_col1 = data1.values.size();
 
-    // check if both lines have the same number of columns
-    if (long unsigned int n_col2 = data2.values.size(); n_col1 != n_col2) {
-      std::cerr << "Line " << counter.lineNumber
-                << " has different number of columns!" << std::endl;
+    // validate and track column format
+    if (!validateAndTrackColumnFormat(n_col1, data2.values.size(), dp_per_col,
+                                      prev_n_col)) {
       return false;
-    } else {
-      this_line_ncols = n_col1;
-      // check if the number of columns has changed
-      // if it is not the first line, compare with the previous number of
-      // columns and print a warning if it has changed
-      if (counter.lineNumber == 1) {
-        prev_n_col = n_col1;  // initialize prev_n_col on first line
-#ifdef DEBUG2
-        std::cout << "   FORMAT: " << n_col1
-                  << " columns (both files) - initialized" << std::endl;
-#endif
-      }
-      if (prev_n_col > 0 && n_col1 != prev_n_col) {
-        std::cerr << "\033[1;31mNote: Number of columns changed at line "
-                  << counter.lineNumber << " (previous: " << prev_n_col
-                  << ", current: " << n_col1 << ")\033[0m" << std::endl;
-        dp_per_col.clear();
-        new_fmt = true;  // set new_fmt to true if the number of columns
-        this_fmt_line = counter.lineNumber;
-        std::cout << this_fmt_line << ": FMT number of columns has changed"
-                  << std::endl;
-        std::cout << "format has changed" << std::endl;
-        // has changed
-      } else {
-        if (counter.lineNumber > 1) {
-#ifdef DEBUG3
-          std::cout << "Line " << counter.lineNumber << " same column format"
-                    << std::endl;
-#endif
-          new_fmt = false;
-        }
-      }
-      prev_n_col = n_col1;
-    }  // end check number of columns
+    }
 
     // loop over columns
     for (size_t i = 0; i < n_col1; ++i) {
@@ -491,7 +457,6 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   std::cout << std::setw(5) << std::setprecision(3) << line_threshold
             << "\033[0m | ";
 
-
   double ieps = line_threshold * 0.1;
   double thresh_prec = (line_threshold + ieps);
 
@@ -676,5 +641,50 @@ bool FileComparator::compareFileLengths(const std::string& file1,
             << std::endl;
 #endif
 
+  return true;
+}
+
+bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
+                                                  std::vector<int>& dp_per_col,
+                                                  size_t& prev_n_col) {
+  // Check if both lines have the same number of columns
+  if (n_col1 != n_col2) {
+    std::cerr << "Line " << counter.lineNumber
+              << " has different number of columns!" << std::endl;
+    return false;
+  }
+
+  this_line_ncols = n_col1;
+
+  // Check if the number of columns has changed
+  if (counter.lineNumber == 1) {
+    prev_n_col = n_col1;  // initialize prev_n_col on first line
+#ifdef DEBUG2
+    std::cout << "   FORMAT: " << n_col1
+              << " columns (both files) - initialized" << std::endl;
+#endif
+  }
+
+  if (prev_n_col > 0 && n_col1 != prev_n_col) {
+    std::cerr << "\033[1;31mNote: Number of columns changed at line "
+              << counter.lineNumber << " (previous: " << prev_n_col
+              << ", current: " << n_col1 << ")\033[0m" << std::endl;
+    dp_per_col.clear();
+    new_fmt = true;
+    this_fmt_line = counter.lineNumber;
+    std::cout << this_fmt_line << ": FMT number of columns has changed"
+              << std::endl;
+    std::cout << "format has changed" << std::endl;
+  } else {
+    if (counter.lineNumber > 1) {
+#ifdef DEBUG3
+      std::cout << "Line " << counter.lineNumber << " same column format"
+                << std::endl;
+#endif
+      new_fmt = false;
+    }
+  }
+
+  prev_n_col = n_col1;
   return true;
 }
