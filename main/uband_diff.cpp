@@ -1,9 +1,11 @@
-/*
- * File: uband_diff.cpp
- * Description: Main program for comparing numerical data files with precision-aware
- *              difference thresholds. Supports complex numbers and variable precision.
- * Author: J. Lighthall
- * Date: January 2025
+/**
+ * @file uband_diff.cpp
+ * @brief Main program for comparing numerical data files with
+ * precision-aware difference thresholds. Supports complex numbers and variable
+ * precision.
+ *
+ * @author J. Lighthall
+ * @date January 2025
  * Adapted from tldiff.f90 (Aug 2022)
  *
  * Usage: uband_diff <file1> <file2> [threshold] [hard_threshold] [print_level]
@@ -86,7 +88,6 @@ int main(int argc, char* argv[]) {
 
   std::cout << "   Diff threshold : " << std::fixed << std::setprecision(3)
             << std::setw(7) << std::right;
-
   if (argc >= 4) {
     count_level = std::stof(argv[3]);
     std::cout << count_level << std::endl;
@@ -113,11 +114,13 @@ int main(int argc, char* argv[]) {
   }
 
   isERROR = false;
-  if (FileComparator comparator(count_level, hard_level); comparator.compareFiles(file1, file2)) {
+  if (FileComparator comparator(count_level, hard_level);
+      comparator.compareFiles(file1, file2)) {
     std::cout << "Files " << file1 << " and " << file2 << " are identical"
               << std::endl;
   } else {
     std::cout << "SUMMARY:" << std::endl;
+    // print command line arguments
     std::cout << "   Input:";
     for (int i = 0; i < argc; ++i) {
       std::cout << " " << argv[i];

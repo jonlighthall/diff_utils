@@ -569,7 +569,6 @@ double FileComparator::calculateThreshold(int ndp) {
 
   if (new_fmt) {
     if (this_fmt_line != last_fmt_line) {
-
       std::cout << "PRECISION: Line " << this_fmt_line;
       if (counter.lineNumber == 1) {
         std::cout << " (initial format)";
