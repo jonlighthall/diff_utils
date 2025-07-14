@@ -2,6 +2,7 @@
 #define UBAND_DIFF_H
 
 #include <cmath>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -71,9 +72,11 @@ class FileComparator {
   long unsigned int getFileLength(const std::string& file) const;
   bool compareFileLengths(const std::string& file1,
                           const std::string& file2) const;
+  bool openFiles(const std::string& file1, const std::string& file2,
+                 std::ifstream& infile1, std::ifstream& infile2);
   bool compareColumn(const LineData& data1, const LineData& data2,
                      size_t columnIndex, std::vector<int>& dp_per_col,
-                     bool& new_fmt, bool& is_same);
+                     bool& is_same);
 bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
                                      std::vector<int>& dp_per_col,
                                      size_t& prev_n_col);
@@ -85,13 +88,15 @@ bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
                   double diff_rounded);
 
   bool updateDecimalPlaces(size_t columnIndex, int min_dp,
-                           std::vector<int>& dp_per_col, bool& new_fmt);
+                           std::vector<int>& dp_per_col);
 
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                            int maxDecimals) const;
+  void checkMaxDiff(double value1,
+                    double value2);
 };
 
 #endif  // UBAND_DIFF_H

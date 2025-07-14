@@ -128,21 +128,9 @@ auto round_to_decimals = [](double value, int precision) {
 
 bool FileComparator::compareFiles(const std::string& file1,
                                   const std::string& file2) {
-  // assign files to input file streams
-  std::ifstream infile1(file1);
-  std::ifstream infile2(file2);
-
-  // check if the files are open
-  if (!infile1.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
-              << std::endl;
-    isERROR = true;
-    return false;
-  }
-  if (!infile2.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
-              << std::endl;
-    isERROR = true;
+  std::ifstream infile1;
+  std::ifstream infile2;
+  if (!openFiles(file1, file2, infile1, infile2)) {
     return false;
   }
 
@@ -194,11 +182,7 @@ bool FileComparator::compareFiles(const std::string& file1,
 
     // loop over columns
     for (size_t i = 0; i < n_col1; ++i) {
-      // compare values (without rounding)
-      if (double diff = std::abs(data1.values[i] - data2.values[i]);
-          diff > differ.max) {
-        differ.max = diff;
-      }
+    checkMaxDiff(data1.values[i], data2.values[i]);
 
       // get the number of decimal places for each column
       int dp1 = data1.decimal_places[i];
@@ -686,5 +670,32 @@ bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
   }
 
   prev_n_col = n_col1;
+  return true;
+}
+
+void FileComparator::checkMaxDiff(double value1,
+                                  double value2) {
+      // compare values (without rounding)
+      if (double diff = std::abs(value1 - value2);
+          diff > differ.max) {
+        differ.max = diff;
+      }
+}
+
+bool FileComparator::openFiles(const std::string& file1, const std::string& file2,
+                               std::ifstream& infile1, std::ifstream& infile2) {
+  infile1.open(file1);
+  infile2.open(file2);
+
+  if (!infile1.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m" << std::endl;
+    isERROR = true;
+    return false;
+  }
+  if (!infile2.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m" << std::endl;
+    isERROR = true;
+    return false;
+  }
   return true;
 }
