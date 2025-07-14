@@ -48,6 +48,10 @@ class FileComparator {
   double threshold;
   double hard_threshold;
   bool new_fmt = false;
+  unsigned long this_fmt_line;
+  unsigned long this_fmt_column;
+  unsigned long last_fmt_line;
+  unsigned long this_line_ncols;
   // define the maximum valid value for TL (Transmission Loss)
   const double max_TL = -20 * log10(pow(2, -23));
   DiffStats differ;
@@ -62,7 +66,7 @@ class FileComparator {
   bool compareFiles(const std::string& file1, const std::string& file2);
 
  private:
-  double calculateThreshold(int decimal_places) const;
+  double calculateThreshold(int decimal_places);
   void updateCounters(double diff_rounded);
   long unsigned int getFileLength(const std::string& file);
   bool compareFileLengths(const std::string& file1, const std::string& file2);

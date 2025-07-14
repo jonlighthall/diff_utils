@@ -1,18 +1,22 @@
 /**
  * @file uband_diff.cpp
- * @brief Implementation of file comparison utilities for numerical data with support for complex numbers.
+ * @brief Implementation of file comparison utilities for numerical data with
+ * support for complex numbers.
  *
- * This file provides the implementation for comparing two files containing numerical data,
- * including support for complex numbers in the format (real, imag). The comparison is performed
- * line by line and column by column, with configurable thresholds for floating-point differences.
- * The code tracks and reports differences, handles changes in file format (such as column count or precision),
- * and prints detailed diagnostics for mismatches.
+ * This file provides the implementation for comparing two files containing
+ * numerical data, including support for complex numbers in the format (real,
+ * imag). The comparison is performed line by line and column by column, with
+ * configurable thresholds for floating-point differences. The code tracks and
+ * reports differences, handles changes in file format (such as column count or
+ * precision), and prints detailed diagnostics for mismatches.
  *
  * Features:
  * - Supports real and complex number formats.
- * - Automatically detects and adapts to changes in column count and decimal precision.
+ * - Automatically detects and adapts to changes in column count and decimal
+ * precision.
  * - Configurable thresholds for reporting differences.
- * - Detailed output with color-coded diagnostics for easy identification of issues.
+ * - Detailed output with color-coded diagnostics for easy identification of
+ * issues.
  * - Debugging macros for step-by-step tracing.
  *
  * @author J. Lighthall
@@ -189,6 +193,7 @@ bool FileComparator::compareFiles(const std::string& file1,
                 << " has different number of columns!" << std::endl;
       return false;
     } else {
+      this_line_ncols = n_col1;
       // check if the number of columns has changed
       // if it is not the first line, compare with the previous number of
       // columns and print a warning if it has changed
@@ -205,6 +210,9 @@ bool FileComparator::compareFiles(const std::string& file1,
                   << ", current: " << n_col1 << ")\033[0m" << std::endl;
         dp_per_col.clear();
         new_fmt = true;  // set new_fmt to true if the number of columns
+        this_fmt_line = counter.lineNumber;
+        std::cout << this_fmt_line << ": FMT number of columns has changed"
+                  << std::endl;
         std::cout << "format has changed" << std::endl;
         // has changed
       } else {
@@ -252,6 +260,8 @@ bool FileComparator::compareFiles(const std::string& file1,
         std::cout << "format initialized" << std::endl;
 #endif
         new_fmt = true;  // set new_fmt to true if the number of columns
+        this_fmt_line = counter.lineNumber;
+        this_fmt_column = i + 1;  // store the column index
       } else {
 #ifdef DEBUG3
         std::cout << "not line 1" << std::endl;
@@ -285,6 +295,10 @@ bool FileComparator::compareFiles(const std::string& file1,
 #endif
           dp_per_col[i] = min_dp;
           new_fmt = true;  // set new_fmt to true if the number of
+          this_fmt_line = counter.lineNumber;
+          std::cout << this_fmt_line
+                    << ": FMT number of decimal places has changed"
+                    << std::endl;
         }
       }
 
@@ -549,13 +563,30 @@ void FileComparator::updateCounters(double diff_rounded) {
   }
 }
 
-double FileComparator::calculateThreshold(int ndp) const {
+double FileComparator::calculateThreshold(int ndp) {
   // determine the comparison threshold
   double dp_threshold = std::pow(10, -ndp);
 
   if (new_fmt) {
+    if (this_fmt_line != last_fmt_line) {
+
+      std::cout << "PRECISION: Line " << this_fmt_line;
+      if (counter.lineNumber == 1) {
+        std::cout << " (initial format)";
+      } else {
+        std::cout << " (change in format)";
+      }
+      std::cout << std::endl;
+    }
+    last_fmt_line = this_fmt_line;
 #ifdef DEBUG
-    std::cout << "   PRECISION: " << ndp << " decimal places or 10^(" << -ndp
+    // Set the width for line numbers based on the number of digits in
+    // this_fmt_line
+    int line_num_width =
+        static_cast<int>(std::to_string(this_line_ncols).length());
+    std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
+              << ": ";
+    std::cout << ndp << " decimal places or 10^(" << -ndp
               << ") = " << dp_threshold << std::endl;
 #endif
   }
