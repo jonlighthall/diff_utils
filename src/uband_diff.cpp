@@ -1,3 +1,23 @@
+/**
+ * @file uband_diff.cpp
+ * @brief Implementation of file comparison utilities for numerical data with support for complex numbers.
+ *
+ * This file provides the implementation for comparing two files containing numerical data,
+ * including support for complex numbers in the format (real, imag). The comparison is performed
+ * line by line and column by column, with configurable thresholds for floating-point differences.
+ * The code tracks and reports differences, handles changes in file format (such as column count or precision),
+ * and prints detailed diagnostics for mismatches.
+ *
+ * Features:
+ * - Supports real and complex number formats.
+ * - Automatically detects and adapts to changes in column count and decimal precision.
+ * - Configurable thresholds for reporting differences.
+ * - Detailed output with color-coded diagnostics for easy identification of issues.
+ * - Debugging macros for step-by-step tracing.
+ *
+ * @author J. Lighthall
+ * @date January 2025
+ */
 #include "uband_diff.h"
 
 #include <cmath>

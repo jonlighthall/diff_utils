@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   // print_level) if the number of arguments is not in this range, print an
   // error
 
-  // if the number of aruments is zero, use the default file names and print a
+  // if the number of arguments is zero, use the default file names and print a
   // warning
 
   if (argc > 6) {
