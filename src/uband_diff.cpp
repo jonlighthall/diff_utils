@@ -354,35 +354,7 @@ bool FileComparator::compareFiles(const std::string& file1,
           return std::string(width - str.length(), ' ') + str;
         };
 
-        auto formatNumber = [&](double value, int prec, int maxIntegerWidth,
-                                int maxDecimals) {
-          // convert the number to a string with the specified precision
-          std::ostringstream oss;
 
-          int iprec = prec;  // Use the provided precision
-          if (prec > maxDecimals) {
-            iprec = maxDecimals;  // Ensure precision is within bounds
-          }
-
-          oss << std::fixed << std::setprecision(iprec) << value;
-          std::string numStr = oss.str();
-
-          // Find position of decimal point
-          size_t dotPos = numStr.find('.');
-
-          // Calculate padding for integer part
-          int intWidth = (dotPos != std::string::npos)
-                             ? static_cast<int>(dotPos)
-                             : static_cast<int>(numStr.length());
-
-          int padding_width = maxIntegerWidth - intWidth;
-
-          int padRight = maxDecimals - iprec;
-          if (padRight < 0) padRight = 0;  // Ensure no negative padding
-
-          return std::string(padding_width, ' ') + numStr +
-                 std::string(padRight, ' ');
-        };
 
         if (counter.diff_print == 0) {
           is_same = false;
@@ -540,6 +512,36 @@ LineData FileComparator::parseLine(const std::string& line) const {
   }
   return result;
 }
+
+std::string FileComparator::formatNumber(double value, int prec, int maxIntegerWidth,
+                                          int maxDecimals) const {
+  // convert the number to a string with the specified precision
+  std::ostringstream oss;
+
+          int iprec = prec;  // Use the provided precision
+          if (prec > maxDecimals) {
+            iprec = maxDecimals;  // Ensure precision is within bounds
+          }
+
+          oss << std::fixed << std::setprecision(iprec) << value;
+          std::string numStr = oss.str();
+
+          // Find position of decimal point
+          size_t dotPos = numStr.find('.');
+
+          // Calculate padding for integer part
+          int intWidth = (dotPos != std::string::npos)
+                             ? static_cast<int>(dotPos)
+                             : static_cast<int>(numStr.length());
+
+          int padding_width = maxIntegerWidth - intWidth;
+
+          int padRight = maxDecimals - iprec;
+          if (padRight < 0) padRight = 0;  // Ensure no negative padding
+
+          return std::string(padding_width, ' ') + numStr +
+                 std::string(padRight, ' ');
+        };
 
 void FileComparator::updateCounters(double diff_rounded) {
   // Update counters

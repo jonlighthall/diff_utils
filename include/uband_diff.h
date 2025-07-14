@@ -84,6 +84,8 @@ class FileComparator {
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex);
   void printFormatInfo(int dp1, int dp2, size_t columnIndex);
+  std::string formatNumber(double value, int prec, int maxIntegerWidth,
+                                int maxDecimals) const;
 };
 
 #endif  // UBAND_DIFF_H
