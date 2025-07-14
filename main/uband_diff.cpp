@@ -51,6 +51,9 @@ int main(int argc, char* argv[]) {
 
 #ifdef DEBUG
   std::cout << "Debug mode is ON" << std::endl;
+  // Print the path of this source file
+  std::cout << "SOURCE: " << std::endl;
+  std::cout << "   " << __FILE__ << std::endl;
   std::cout << "ARGUMENTS: " << std::endl;
   std::cout << "   argc   : " << argc << std::endl;
   for (int i = 0; i < argc; i++) {

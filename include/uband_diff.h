@@ -87,16 +87,26 @@ bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
                   double val1, int deci1, double val2, int deci2,
                   double diff_rounded);
 
-  bool updateDecimalPlaces(size_t columnIndex, int min_dp,
-                           std::vector<int>& dp_per_col);
-
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                            int maxDecimals) const;
-  void checkMaxDiff(double value1,
-                    double value2);
+  void checkMaxDiff(double value1, double value2);
+
+  // New methods for refactoring
+  bool processLine(const LineData& data1, const LineData& data2,
+                   std::vector<int>& dp_per_col, size_t& prev_n_col);
+  bool processColumn(const LineData& data1, const LineData& data2,
+                     size_t columnIndex, std::vector<int>& dp_per_col);
+  bool initializeDecimalPlaces(int min_dp, size_t columnIndex,
+                               std::vector<int>& dp_per_col);
+  bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
+                                 std::vector<int>& dp_per_col);
+  bool validateDecimalPlaces(int dp1, int dp2) const;
+  bool processDifference(double rounded1, double rounded2, double diff_rounded,
+                         size_t columnIndex, int dp1, int dp2,
+                         double rangeValue, int min_dp);
 };
 
 #endif  // UBAND_DIFF_H
