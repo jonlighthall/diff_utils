@@ -114,26 +114,29 @@ int main(int argc, char* argv[]) {
   }
 
   isERROR = false;
-  if (FileComparator comparator(count_level, hard_level);
-      comparator.compareFiles(file1, file2)) {
-    std::cout << "Files " << file1 << " and " << file2 << " are identical"
-              << std::endl;
-  } else {
-    std::cout << "SUMMARY:" << std::endl;
-    // print command line arguments
-    std::cout << "   Input:";
-    for (int i = 0; i < argc; ++i) {
-      std::cout << " " << argv[i];
-    }
-    std::cout << std::endl;
-    std::cout << "   File1: " << file1 << std::endl;
-    std::cout << "   File2: " << file2 << std::endl;
-    if (isERROR) {
-      std::cout << "   \033[1;31mError found.\033[0m" << std::endl;
-    } else {
-      std::cout << "   \033[1;31mFiles are different.\033[0m" << std::endl;
-      return 1;
-    }
+  FileComparator comparator(count_level, hard_level);
+  bool result = comparator.compareFiles(file1, file2);
+
+  std::cout << "SUMMARY:" << std::endl;
+  // print command line arguments
+  std::cout << "   Input:";
+  for (int i = 0; i < argc; ++i) {
+    std::cout << " " << argv[i];
   }
-  return 0;
+  std::cout << std::endl;
+  std::cout << "   File1: " << file1 << std::endl;
+  std::cout << "   File2: " << file2 << std::endl;
+
+  if (isERROR) {
+    std::cout << "   \033[1;31mError found.\033[0m" << std::endl;
+    return 1;
+  }
+
+  if (result) {
+    std::cout << "Files are identical within tolerance." << std::endl;
+    return 0;
+  } else {
+    std::cout << "Files differ significantly." << std::endl;
+    return 1;
+  }
 }
