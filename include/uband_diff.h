@@ -62,14 +62,14 @@ class FileComparator {
       : threshold(thresh), hard_threshold(hard_thresh) {};
   // the function parseLine() reads a line from the file and returns a LineData
   // object
-  LineData parseLine(const std::string& line);
+  LineData parseLine(const std::string& line) const;
   bool compareFiles(const std::string& file1, const std::string& file2);
 
  private:
   double calculateThreshold(int decimal_places);
   void updateCounters(double diff_rounded);
-  long unsigned int getFileLength(const std::string& file);
-  bool compareFileLengths(const std::string& file1, const std::string& file2);
+  long unsigned int getFileLength(const std::string& file) const;
+  bool compareFileLengths(const std::string& file1, const std::string& file2) const;
   bool compareColumn(const LineData& data1, const LineData& data2,
                      size_t columnIndex, std::vector<int>& dp_per_col,
                      bool& new_fmt, bool& is_same);

@@ -183,12 +183,11 @@ bool FileComparator::compareFiles(const std::string& file1,
     std::cout << std::endl;
 #endif
 
-    // get the numbers of columns in each file
+    // get the number of columns in file1
     long unsigned int n_col1 = data1.values.size();
-    long unsigned int n_col2 = data2.values.size();
 
     // check if both lines have the same number of columns
-    if (n_col1 != n_col2) {
+    if (long unsigned int n_col2 = data2.values.size(); n_col1 != n_col2) {
       std::cerr << "Line " << counter.lineNumber
                 << " has different number of columns!" << std::endl;
       return false;
@@ -230,8 +229,7 @@ bool FileComparator::compareFiles(const std::string& file1,
     // loop over columns
     for (size_t i = 0; i < n_col1; ++i) {
       // compare values (without rounding)
-      double diff = std::abs(data1.values[i] - data2.values[i]);
-      if (diff > differ.max) {
+      if (double diff = std::abs(data1.values[i] - data2.values[i]); diff > differ.max) {
         differ.max = diff;
       }
 
@@ -302,20 +300,18 @@ bool FileComparator::compareFiles(const std::string& file1,
         }
       }
 
-      // check if the number of decimal places is the same
-      if (dp1 != dp2) {
-        if (new_fmt) {
+      // check if the number of decimal places is the same and if new format
+      if (dp1 != dp2 && new_fmt) {
 #ifdef DEBUG2
-          std::cout << "   NEW FORMAT" << std::endl;
+        std::cout << "   NEW FORMAT" << std::endl;
 #endif
 // print the format
 #ifdef DEBUG
-          std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
-                    << i + 1 << std::endl;
-          std::cout << "   FORMAT: number of decimal places file1: " << dp1
-                    << ", file2: " << dp2 << std::endl;
+        std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
+                  << i + 1 << std::endl;
+        std::cout << "   FORMAT: number of decimal places file1: " << dp1
+                  << ", file2: " << dp2 << std::endl;
 #endif
-        }
       }
 
       // now that the minimum decimal places are determined, we can
@@ -341,9 +337,7 @@ bool FileComparator::compareFiles(const std::string& file1,
         counter.diff_prec++;
       }
 
-      double thresh_plot = 0;
-
-      if (diff_rounded > thresh_plot) {
+      if (double thresh_plot = 0; diff_rounded > thresh_plot) {
         // if the difference is greater than the threshold, print the
         // difference
 #ifdef DEBUG2
@@ -355,7 +349,7 @@ bool FileComparator::compareFiles(const std::string& file1,
         int mxdec = 5;                      // maximum decimal places for range
         int val_width = mxint + mxdec + 1;  // total width for value columns
 
-        auto padLeft = [](const std::string& str, int width) -> std::string {
+        auto padLeft = [](const std::string& str, int width) {
           if (static_cast<int>(str.length()) >= width) return str;
           return std::string(width - str.length(), ' ') + str;
         };
@@ -381,12 +375,12 @@ bool FileComparator::compareFiles(const std::string& file1,
                              ? static_cast<int>(dotPos)
                              : static_cast<int>(numStr.length());
 
-          int padLeft = maxIntegerWidth - intWidth;
+          int padding_width = maxIntegerWidth - intWidth;
 
           int padRight = maxDecimals - iprec;
           if (padRight < 0) padRight = 0;  // Ensure no negative padding
 
-          return std::string(padLeft, ' ') + numStr +
+          return std::string(padding_width, ' ') + numStr +
                  std::string(padRight, ' ');
         };
 
@@ -464,7 +458,7 @@ bool FileComparator::compareFiles(const std::string& file1,
       if ((diff_rounded > hard_threshold) &&
           ((data1.values[i] <= max_TL) && (data2.values[i] <= max_TL))) {
         counter.diff_hard++;
-        is_same = false;
+        // is_same = false;
         // #ifdef DEBUG
         std::cerr << "\033[1;31mLarge difference found at line "
                   << counter.lineNumber << ", column " << i + 1 << "\033[0m"
@@ -508,7 +502,7 @@ bool FileComparator::compareFiles(const std::string& file1,
   return is_same;
 }
 
-LineData FileComparator::parseLine(const std::string& line) {
+LineData FileComparator::parseLine(const std::string& line) const {
   LineData result;
   std::istringstream stream(line);
   char ch;
@@ -581,7 +575,7 @@ double FileComparator::calculateThreshold(int ndp) {
 #ifdef DEBUG
     // Set the width for line numbers based on the number of digits in
     // this_fmt_line
-    int line_num_width =
+    auto line_num_width =
         static_cast<int>(std::to_string(this_line_ncols).length());
     std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
               << ": ";
@@ -602,7 +596,7 @@ double FileComparator::calculateThreshold(int ndp) {
   return threshold;
 }
 
-long unsigned int FileComparator::getFileLength(const std::string& file) {
+long unsigned int FileComparator::getFileLength(const std::string& file) const {
   std::ifstream infile(file);
   if (!infile.is_open()) {
     std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
@@ -622,11 +616,10 @@ long unsigned int FileComparator::getFileLength(const std::string& file) {
 // Implementation moved outside the class definition
 
 bool FileComparator::compareFileLengths(const std::string& file1,
-                                        const std::string& file2) {
+                                        const std::string& file2) const {
   long unsigned int length1 = getFileLength(file1);
-  long unsigned int length2 = getFileLength(file2);
 
-  if (length1 != length2) {
+  if (long unsigned int length2 = getFileLength(file2); length1 != length2) {
     std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
               << length1 << " bytes) and " << file2 << " (" << length2
               << " bytes)\033[0m" << std::endl;
