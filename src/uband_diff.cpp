@@ -222,16 +222,10 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   // This function is called when a difference is found that exceeds the
   // threshold
 
-  // print header if this is the first difference
-  if (counter.diff_print == 0) {
-    std::cout << " line  col    range " << std::setw(12) << "tl1"
-              << std::setw(12) << "tl2" << " | thres | diff" << std::endl;
-    std::cout << "----------------------------------------+-------+------"
-              << std::endl;
-  }
 #ifdef DEBUG2
-  std::cout << "Line " << counter.lineNumber << ", Column " << columnIndex + 1
-            << " exceeds threshold: " << line_threshold << std::endl;
+  std::cout << "   DIFF: Difference at line " << counter.lineNumber
+            << ", column " << columnIndex + 1 << ": " << diff_rounded
+            << " (threshold: " << line_threshold << ")" << std::endl;
 #endif
 
   int mxint = 3;                      // maximum integer width for range
@@ -244,8 +238,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   };
 
   if (counter.diff_print == 0) {
-    // is_same = false;
-    // print table header on first difference
+    // Print header if this is the first difference
     std::cout << " line  col    range " << padLeft("tl1", val_width) << " "
               << padLeft("tl2", val_width) << " | thres | diff" << std::endl;
     std::cout << "----------------------------------------+-------+------"
@@ -340,7 +333,7 @@ std::string FileComparator::formatNumber(double value, int prec,
   if (padRight < 0) padRight = 0;  // Ensure no negative padding
 
   return std::string(padding_width, ' ') + numStr + std::string(padRight, ' ');
-};
+}
 
 void FileComparator::printHardThresholdError(double rounded1, double rounded2,
                                              double diff_rounded,
@@ -365,6 +358,20 @@ void FileComparator::printHardThresholdError(double rounded1, double rounded2,
   std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
   std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
             << "\033[0m" << std::endl;
+}
+
+void FileComparator::printFormatInfo(int dp1, int dp2,
+                                     size_t columnIndex) const {
+#ifdef DEBUG2
+  std::cout << "   NEW FORMAT" << std::endl;
+#endif
+// print the format
+#ifdef DEBUG
+  std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
+            << columnIndex + 1 << std::endl;
+  std::cout << "   FORMAT: number of decimal places file1: " << dp1
+            << ", file2: " << dp2 << std::endl;
+#endif
 }
 
 void FileComparator::updateCounters(double diff_rounded) {
@@ -517,27 +524,28 @@ bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
   return true;
 }
 
-void FileComparator::checkMaxDiff(double value1,
-                                  double value2) {
-      // compare values (without rounding)
-      if (double diff = std::abs(value1 - value2);
-          diff > differ.max) {
-        differ.max = diff;
-      }
+void FileComparator::checkMaxDiff(double value1, double value2) {
+  // compare values (without rounding)
+  if (double diff = std::abs(value1 - value2); diff > differ.max) {
+    differ.max = diff;
+  }
 }
 
-bool FileComparator::openFiles(const std::string& file1, const std::string& file2,
-                               std::ifstream& infile1, std::ifstream& infile2) {
+bool FileComparator::openFiles(const std::string& file1,
+                               const std::string& file2, std::ifstream& infile1,
+                               std::ifstream& infile2) {
   infile1.open(file1);
   infile2.open(file2);
 
   if (!infile1.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m" << std::endl;
+    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
+              << std::endl;
     isERROR = true;
     return false;
   }
   if (!infile2.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m" << std::endl;
+    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
+              << std::endl;
     isERROR = true;
     return false;
   }
@@ -545,10 +553,20 @@ bool FileComparator::openFiles(const std::string& file1, const std::string& file
 }
 
 bool FileComparator::processLine(const LineData& data1, const LineData& data2,
-                                 std::vector<int>& dp_per_col, size_t& prev_n_col) {
-#ifdef DEBUG2
+                                 std::vector<int>& dp_per_col,
+                                 size_t& prev_n_col) {
+  // Get the number of columns in each line
+  if (data1.values.empty() || data2.values.empty()) {
+    std::cerr << "Line " << counter.lineNumber << " has no values to compare!"
+              << std::endl;
+    isERROR = true;
+    return false;
+  }
   size_t n_col1 = data1.values.size();
   size_t n_col2 = data2.values.size();
+
+  // print debug information if DEBUG2 is defined
+#ifdef DEBUG2
   std::cout << "DEBUG2: Line " << counter.lineNumber << std::endl;
   std::cout << "   CONTENTS:";
   std::cout << " file1: ";
@@ -563,13 +581,12 @@ bool FileComparator::processLine(const LineData& data1, const LineData& data2,
 #endif
 
   // Validate column format
-  if (!validateAndTrackColumnFormat(data1.values.size(), data2.values.size(),
-                                    dp_per_col, prev_n_col)) {
+  if (!validateAndTrackColumnFormat(n_col1, n_col2, dp_per_col, prev_n_col)) {
     return false;
   }
 
   // Process each column
-  for (size_t i = 0; i < data1.values.size(); ++i) {
+  for (size_t i = 0; i < n_col1; ++i) {
     if (!processColumn(data1, data2, i, dp_per_col)) {
       return false;
     }
@@ -579,7 +596,8 @@ bool FileComparator::processLine(const LineData& data1, const LineData& data2,
 }
 
 bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
-                                   size_t columnIndex, std::vector<int>& dp_per_col) {
+                                   size_t columnIndex,
+                                   std::vector<int>& dp_per_col) {
   checkMaxDiff(data1.values[columnIndex], data2.values[columnIndex]);
 
   // get the number of decimal places for each column
@@ -609,9 +627,9 @@ bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
     printFormatInfo(dp1, dp2, columnIndex);
   }
 
-        // now that the minimum decimal places are determined, we can
-      // round the values to the minimum decimal places
-      // and compare them
+  // now that the minimum decimal places are determined, we can
+  // round the values to the minimum decimal places
+  // and compare them
 
   // Calculate rounded values and process difference
   double rounded1 = round_to_decimals(data1.values[columnIndex], min_dp);
@@ -622,8 +640,8 @@ bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
     differ.max_rounded = diff_rounded;
   }
 
-  return processDifference(rounded1, rounded2, diff_rounded, columnIndex,
-                          dp1, dp2, data1.values[0], min_dp);
+  return processDifference(rounded1, rounded2, diff_rounded, columnIndex, dp1,
+                           dp2, data1.values[0], min_dp);
 }
 
 bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
@@ -638,8 +656,8 @@ bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
 
 bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
                                              std::vector<int>& dp_per_col) {
-    // initialize the dp_per_col vector with the minimum decimal places
-    dp_per_col.push_back(min_dp);
+  // initialize the dp_per_col vector with the minimum decimal places
+  dp_per_col.push_back(min_dp);
 
 #ifdef DEBUG3
   std::cout << "dp_per_col: ";
@@ -664,10 +682,15 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
 #endif
 
   // Validate vector size
+  if (dp_per_col.size() != columnIndex + 1) {
+    std::cerr << "Warning: dp_per_col size mismatch at line "
+              << counter.lineNumber << std::endl;
+  }
+
   if (dp_per_col.size() <= columnIndex) {
     std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << columnIndex + 1
-              << " at line " << counter.lineNumber << std::endl;
+              << ") insufficient for column " << columnIndex + 1 << " at line "
+              << counter.lineNumber << std::endl;
     return false;
   }
 
@@ -677,7 +700,7 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
               << dp_per_col[j] << std::endl;
   }
 #endif
-// check if the minimum decimal places for this column has changed
+  // check if the minimum decimal places for this column has changed
   if (dp_per_col[columnIndex] != min_dp) {
     // If the minimum decimal places for this column is different from the
 // previous minimum decimal places, update it
@@ -688,13 +711,13 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
     dp_per_col[columnIndex] = min_dp;
     new_fmt = true;
     this_fmt_line = counter.lineNumber;
-    std::cout << this_fmt_line
-              << ": FMT number of decimal places has changed" << std::endl;
+    std::cout << this_fmt_line << ": FMT number of decimal places has changed"
+              << std::endl;
   }
 #ifdef DEBUG3
   else {
     // If the minimum decimal places for this column is the same as the
-// previous minimum decimal places, do nothing
+    // previous minimum decimal places, do nothing
     std::cout << "DEBUG3: same" << std::endl;
   }
 #endif
@@ -718,15 +741,14 @@ bool FileComparator::processDifference(double rounded1, double rounded2,
 
   // Print differences if above plot threshold
   if (double thresh_plot = 0; diff_rounded > thresh_plot) {
-    printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1,
-               rounded2, dp2, diff_rounded);
+    printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1, rounded2,
+               dp2, diff_rounded);
     std::cout << std::endl;
   } else {
     counter.elemNumber++;
 #ifdef DEBUG2
-    std::cout << "   DIFF: Values at line " << counter.lineNumber
-              << ", column " << columnIndex + 1 << " are equal: " << rounded1
-              << std::endl;
+    std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
+              << columnIndex + 1 << " are equal: " << rounded1 << std::endl;
 #endif
   }
 
@@ -739,17 +761,4 @@ bool FileComparator::processDifference(double rounded1, double rounded2,
   }
 
   return true;
-}
-
-void FileComparator::printFormatInfo(int dp1, int dp2, size_t columnIndex) const {
-#ifdef DEBUG2
-  std::cout << "   NEW FORMAT" << std::endl;
-#endif
-// print the format
-#ifdef DEBUG
-  std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
-            << columnIndex + 1 << std::endl;
-  std::cout << "   FORMAT: number of decimal places file1: " << dp1
-            << ", file2: " << dp2 << std::endl;
-#endif
 }
