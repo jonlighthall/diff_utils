@@ -82,8 +82,8 @@ class FileComparator {
                            std::vector<int>& dp_per_col, bool& new_fmt);
 
   void printHardThresholdError(double rounded1, double rounded2,
-                               double diff_rounded, size_t columnIndex);
-  void printFormatInfo(int dp1, int dp2, size_t columnIndex);
+                               double diff_rounded, size_t columnIndex) const;
+  void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                                 int maxDecimals) const;
 };

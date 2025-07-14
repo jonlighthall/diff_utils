@@ -229,7 +229,8 @@ bool FileComparator::compareFiles(const std::string& file1,
     // loop over columns
     for (size_t i = 0; i < n_col1; ++i) {
       // compare values (without rounding)
-      if (double diff = std::abs(data1.values[i] - data2.values[i]); diff > differ.max) {
+      if (double diff = std::abs(data1.values[i] - data2.values[i]);
+          diff > differ.max) {
         differ.max = diff;
       }
 
@@ -354,8 +355,6 @@ bool FileComparator::compareFiles(const std::string& file1,
           return std::string(width - str.length(), ' ') + str;
         };
 
-
-
         if (counter.diff_print == 0) {
           is_same = false;
           // print table header on first difference
@@ -432,26 +431,7 @@ bool FileComparator::compareFiles(const std::string& file1,
         counter.diff_hard++;
         // is_same = false;
         // #ifdef DEBUG
-        std::cerr << "\033[1;31mLarge difference found at line "
-                  << counter.lineNumber << ", column " << i + 1 << "\033[0m"
-                  << std::endl;
-
-        if (counter.lineNumber > 0) {
-          std::cout << "   First " << counter.lineNumber - 1 << " lines match"
-                    << std::endl;
-        }
-        if (counter.elemNumber > 0) {
-          std::cout << "   " << counter.elemNumber << " element";
-          if (counter.elemNumber > 1) std::cout << "s";
-          std::cout << " checked" << std::endl;
-        }
-        std::cout << counter.diff_print << " with differences between "
-                  << threshold << " and " << hard_threshold << std::endl;
-
-        std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
-        std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
-        std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
-                  << "\033[0m" << std::endl;
+        printHardThresholdError(rounded1, rounded2, diff_rounded, i);
         // #endif
         return false;
       }
@@ -513,35 +493,60 @@ LineData FileComparator::parseLine(const std::string& line) const {
   return result;
 }
 
-std::string FileComparator::formatNumber(double value, int prec, int maxIntegerWidth,
-                                          int maxDecimals) const {
+std::string FileComparator::formatNumber(double value, int prec,
+                                         int maxIntegerWidth,
+                                         int maxDecimals) const {
   // convert the number to a string with the specified precision
   std::ostringstream oss;
 
-          int iprec = prec;  // Use the provided precision
-          if (prec > maxDecimals) {
-            iprec = maxDecimals;  // Ensure precision is within bounds
-          }
+  int iprec = prec;  // Use the provided precision
+  if (prec > maxDecimals) {
+    iprec = maxDecimals;  // Ensure precision is within bounds
+  }
 
-          oss << std::fixed << std::setprecision(iprec) << value;
-          std::string numStr = oss.str();
+  oss << std::fixed << std::setprecision(iprec) << value;
+  std::string numStr = oss.str();
 
-          // Find position of decimal point
-          size_t dotPos = numStr.find('.');
+  // Find position of decimal point
+  size_t dotPos = numStr.find('.');
 
-          // Calculate padding for integer part
-          int intWidth = (dotPos != std::string::npos)
-                             ? static_cast<int>(dotPos)
-                             : static_cast<int>(numStr.length());
+  // Calculate padding for integer part
+  int intWidth = (dotPos != std::string::npos)
+                     ? static_cast<int>(dotPos)
+                     : static_cast<int>(numStr.length());
 
-          int padding_width = maxIntegerWidth - intWidth;
+  int padding_width = maxIntegerWidth - intWidth;
 
-          int padRight = maxDecimals - iprec;
-          if (padRight < 0) padRight = 0;  // Ensure no negative padding
+  int padRight = maxDecimals - iprec;
+  if (padRight < 0) padRight = 0;  // Ensure no negative padding
 
-          return std::string(padding_width, ' ') + numStr +
-                 std::string(padRight, ' ');
-        };
+  return std::string(padding_width, ' ') + numStr + std::string(padRight, ' ');
+};
+
+void FileComparator::printHardThresholdError(double rounded1, double rounded2,
+                                             double diff_rounded,
+                                             size_t columnIndex) const {
+  std::cerr << "\033[1;31mLarge difference found at line " << counter.lineNumber
+            << ", column " << columnIndex + 1 << "\033[0m" << std::endl;
+
+  if (counter.lineNumber > 0) {
+    std::cout << "   First " << counter.lineNumber - 1 << " lines match"
+              << std::endl;
+  }
+  if (counter.elemNumber > 0) {
+    std::cout << "   " << counter.elemNumber << " element";
+    if (counter.elemNumber > 1) std::cout << "s";
+    std::cout << " checked" << std::endl;
+  }
+
+          std::cout << counter.diff_print << " with differences between "
+                  << threshold << " and " << hard_threshold << std::endl;
+
+  std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
+  std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
+  std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
+            << "\033[0m" << std::endl;
+}
 
 void FileComparator::updateCounters(double diff_rounded) {
   // Update counters
