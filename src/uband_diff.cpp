@@ -341,61 +341,11 @@ bool FileComparator::compareFiles(const std::string& file1,
       if (double thresh_plot = 0; diff_rounded > thresh_plot) {
         // if the difference is greater than the threshold, print the
         // difference
-#ifdef DEBUG2
-        std::cout << "Line " << counter.lineNumber << ", Column " << i + 1
-                  << " exceeds threshold: " << ithreshold << std::endl;
-#endif
 
-        int mxint = 3;                      // maximum integer width for range
-        int mxdec = 5;                      // maximum decimal places for range
-        int val_width = mxint + mxdec + 1;  // total width for value columns
+        printTable(i, ithreshold,data1.values[0],rounded1, dp1, rounded2, dp2);
 
-        auto padLeft = [](const std::string& str, int width) {
-          if (static_cast<int>(str.length()) >= width) return str;
-          return std::string(width - str.length(), ' ') + str;
-        };
 
-        if (counter.diff_print == 0) {
-          is_same = false;
-          // print table header on first difference
-          std::cout << " line  col    range " << padLeft("tl1", val_width)
-                    << " " << padLeft("tl2", val_width) << " | thres | diff"
-                    << std::endl;
-          std::cout << "----------------------------------------+-------+------"
-                    << std::endl;
-        }
-        counter.diff_print++;
-        /* PRINT DIFF TABLE ENTRY */
-        // line
-        std::cout << std::setw(5) << counter.lineNumber;
-        // column
-        std::cout << std::setw(5) << i + 1;
 
-        // range (first value in the line)
-        std::cout << std::fixed << std::setprecision(2) << std::setw(val_width)
-                  << data1.values[0] << " ";
-        // values in file1
-
-        if (rounded1 > max_TL) {
-          std::cout << "\033[1;34m";
-        }
-        std::cout << formatNumber(rounded1, dp1, mxint, mxdec);
-
-        std::cout << "\033[0m ";
-
-        // values in file2
-        if (rounded2 > max_TL) {
-          std::cout << "\033[1;34m";
-        }
-        std::cout << formatNumber(rounded2, dp2, mxint, mxdec);
-        std::cout << "\033[0m" << " | ";
-
-        // threshold
-        if (ithreshold > threshold) {
-          std::cout << "\033[1;33m";
-        }
-        std::cout << std::setw(5) << std::setprecision(3) << ithreshold
-                  << "\033[0m | ";
 
         // difference
         if (rounded1 > max_TL || rounded2 > max_TL) {
@@ -493,6 +443,78 @@ LineData FileComparator::parseLine(const std::string& line) const {
   return result;
 }
 
+void FileComparator::printTable(int columnIndex, double line_threshold, double rangeValue, double val1, int deci1, double val2, int deci2) {
+  // Print a row in the difference table
+  // This function is called when a difference is found that exceeds the
+  // threshold
+
+  // print header if this is the first difference
+  if (counter.diff_print == 0) {
+    std::cout << " line  col    range " << std::setw(12) << "tl1"
+              << std::setw(12) << "tl2" << " | thres | diff" << std::endl;
+    std::cout << "----------------------------------------+-------+------"
+              << std::endl;
+  }
+#ifdef DEBUG2
+  std::cout << "Line " << counter.lineNumber << ", Column " << columnIndex + 1
+            << " exceeds threshold: " << line_threshold << std::endl;
+#endif
+
+  int mxint = 3;                      // maximum integer width for range
+  int mxdec = 5;                      // maximum decimal places for range
+  int val_width = mxint + mxdec + 1;  // total width for value columns
+
+  auto padLeft = [](const std::string& str, int width) {
+    if (static_cast<int>(str.length()) >= width) return str;
+    return std::string(width - str.length(), ' ') + str;
+  };
+
+  if (counter.diff_print == 0) {
+   // is_same = false;
+    // print table header on first difference
+    std::cout << " line  col    range " << padLeft("tl1", val_width) << " "
+              << padLeft("tl2", val_width) << " | thres | diff" << std::endl;
+    std::cout << "----------------------------------------+-------+------"
+              << std::endl;
+  }
+  counter.diff_print++;
+
+  /* PRINT DIFF TABLE ENTRY */
+  // line
+  std::cout << std::setw(5) << counter.lineNumber;
+  // column
+  std::cout << std::setw(5) << columnIndex + 1;
+
+        // range (first value in the line)
+        std::cout << std::fixed << std::setprecision(2) << std::setw(val_width)
+                  << rangeValue << " ";
+
+
+                  // values in file1
+        if (val1 > max_TL) {
+          std::cout << "\033[1;34m";
+        }
+        std::cout << formatNumber(val1, deci1, mxint, mxdec);
+
+        std::cout << "\033[0m ";
+
+        // values in file2
+        if (val2 > max_TL) {
+          std::cout << "\033[1;34m";
+        }
+        std::cout << formatNumber(val2, deci2, mxint, mxdec);
+        std::cout << "\033[0m" << " | ";
+
+        // threshold
+        if (line_threshold > threshold) {
+          std::cout << "\033[1;33m";
+        }
+        std::cout << std::setw(5) << std::setprecision(3) << line_threshold
+                  << "\033[0m | ";
+
+
+}
+
 std::string FileComparator::formatNumber(double value, int prec,
                                          int maxIntegerWidth,
                                          int maxDecimals) const {
@@ -539,8 +561,8 @@ void FileComparator::printHardThresholdError(double rounded1, double rounded2,
     std::cout << " checked" << std::endl;
   }
 
-          std::cout << counter.diff_print << " with differences between "
-                  << threshold << " and " << hard_threshold << std::endl;
+  std::cout << counter.diff_print << " with differences between " << threshold
+            << " and " << hard_threshold << std::endl;
 
   std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
   std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;

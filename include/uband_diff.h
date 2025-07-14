@@ -77,6 +77,7 @@ class FileComparator {
   void printDifferenceRow(double rounded1, double rounded2, double diff_rounded,
                           double ithreshold, int dp1, int dp2,
                           size_t columnIndex, double rangeValue);
+void printTable(int columnIndex, double line_threshold, double rangeValue, double val1, int deci1, double val2, int deci2);
 
   bool updateDecimalPlaces(size_t columnIndex, int min_dp,
                            std::vector<int>& dp_per_col, bool& new_fmt);
