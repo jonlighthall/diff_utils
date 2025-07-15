@@ -79,15 +79,20 @@ int main(int argc, char* argv[]) {
   }
 
   std::cout << "SETTINGS: " << std::endl;
+
   // Check if the user provided file names as arguments
   if (argc >= 3) {
     file1 = argv[1];  // first file name
     file2 = argv[2];  // second file name
   } else {
+#ifdef DEBUG
     std::cout << "   Using default file names:" << std::endl;
+#endif
   }
+#ifdef DEBUG
   std::cout << "   File1: " << file1 << std::endl;
   std::cout << "   File2: " << file2 << std::endl;
+#endif
 
   std::cout << "   Diff threshold : " << std::fixed << std::setprecision(3)
             << std::setw(7) << std::right;

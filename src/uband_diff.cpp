@@ -461,15 +461,17 @@ bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
 
 bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
                                             size_t columnIndex) const {
-  // #ifdef DEBUG3
+#ifdef DEBUG3
   for (size_t j = 0; j < dp_per_col.size(); ++j) {
     std::cout << "   minimum decimal places in column " << j + 1 << " = "
               << dp_per_col[j] << std::endl;
   }
-  // #endif
+#endif
 
+#ifdef DEBUG2
   std::cout << "   size of dp_per_col: " << dp_per_col.size();
   std::cout << ", columnIndex: " << columnIndex + 1 << std::endl;
+#endif
 
   // Validate vector size
   if (dp_per_col.size() != columnIndex + 1) {
@@ -506,7 +508,7 @@ bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
 
   if (!ValidateDeciColumnSize(dp_per_col, columnIndex)) return false;
 
-  // #ifdef DEBUG3
+#ifdef DEBUG2
   std::cout << "FORMAT: Line " << counter.lineNumber << " initialization"
             << std::endl;
   std::cout << "   dp_per_col: ";
@@ -514,7 +516,7 @@ bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
     std::cout << d << " ";
   }
   std::cout << std::endl;
-  // #endif
+#endif
 
   new_fmt = true;
   this_fmt_line = counter.lineNumber;
@@ -560,6 +562,7 @@ double FileComparator::calculateThreshold(int ndp) {
 
   if (new_fmt) {
     if (this_fmt_line != last_fmt_line) {
+#ifdef DEBUG
       std::cout << "PRECISION: Line " << this_fmt_line;
       if (counter.lineNumber == 1) {
         std::cout << " (initial format)";
@@ -567,6 +570,7 @@ double FileComparator::calculateThreshold(int ndp) {
         std::cout << " (change in format)";
       }
       std::cout << std::endl;
+#endif
     }
     last_fmt_line = this_fmt_line;
 #ifdef DEBUG
@@ -704,14 +708,15 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   };
 
   if (counter.diff_print == 0) {
+    std::cout << "DIFERENCES:" << std::endl;
     // Print header if this is the first difference
     std::cout << std::setw(col_widths[0]) << "line";
     std::cout << std::setw(col_widths[1]) << "col";
     std::cout << std::setw(col_widths[2]) << "range";
-    std::cout << std::setw(col_widths[3]+2) << "file1";
-    std::cout << std::setw(col_widths[4]+2) << "file2 |";
-    std::cout << padLeft(" thres |", col_widths[5]+2);
-    std::cout << padLeft("diff", col_widths[6]+2) << std::endl;
+    std::cout << std::setw(col_widths[3] + 2) << "file1";
+    std::cout << std::setw(col_widths[4] + 2) << "file2 |";
+    std::cout << padLeft(" thres |", col_widths[5] + 2);
+    std::cout << padLeft("diff", col_widths[6] + 2) << std::endl;
 
     std::cout << "-------------------------------------------+-------+------"
               << std::endl;
@@ -747,8 +752,8 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   if (line_threshold > threshold) {
     std::cout << "\033[1;33m";
   }
-  std::cout << std::setw(col_widths[5]) << std::setprecision(3) << line_threshold
-            << "\033[0m | ";
+  std::cout << std::setw(col_widths[5]) << std::setprecision(3)
+            << line_threshold << "\033[0m | ";
 
   double ieps = line_threshold * 0.1;
   double thresh_prec = (line_threshold + ieps);
