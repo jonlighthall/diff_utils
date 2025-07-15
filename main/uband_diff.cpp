@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
   }
 
   isERROR = false;
-  FileComparator comparator(count_level, hard_level);
+  FileComparator comparator(count_level, hard_level, print_level);
   bool result = comparator.compareFiles(file1, file2);
 
   std::cout << "SUMMARY:" << std::endl;

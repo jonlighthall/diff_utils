@@ -615,7 +615,7 @@ bool FileComparator::processDifference(double rounded1, double rounded2,
   }
 
   // Print differences if above plot threshold
-  if (double thresh_plot = 0; diff_rounded > thresh_plot) {
+  if (diff_rounded > print_threshold) {
     printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1, rounded2,
                dp2, diff_rounded);
     std::cout << std::endl;

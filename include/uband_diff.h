@@ -48,6 +48,7 @@ class FileComparator {
  private:
   double threshold;
   double hard_threshold;
+  double print_threshold;
   bool new_fmt = false;
   unsigned long this_fmt_line;
   unsigned long this_fmt_column;
@@ -60,8 +61,8 @@ class FileComparator {
 
  public:
   // Constructor
-  FileComparator(double thresh, double hard_thresh)
-      : threshold(thresh), hard_threshold(hard_thresh) {};
+  FileComparator(double thresh, double hard_thresh, double print_thresh)
+      : threshold(thresh), hard_threshold(hard_thresh), print_threshold(print_thresh) {};
 
   // ========================================================================
   // Public Interface
