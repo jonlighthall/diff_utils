@@ -96,19 +96,9 @@ class FileComparator {
   bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
                                     std::vector<int>& dp_per_col,
                                     size_t& prev_n_col);
+  bool validateDecimalPlaces(int dp1, int dp2) const;
   bool ValidateDeciColumnSize(std::vector<int>& dp_per_col,
                               size_t columnIndex) const;
-  bool validateDecimalPlaces(int dp1, int dp2) const;
-
-  // ========================================================================
-  // Difference Processing
-  // ========================================================================
-  bool processDifference(double rounded1, double rounded2, double diff_rounded,
-                         size_t columnIndex, int dp1, int dp2,
-                         double rangeValue, int min_dp);
-  double calculateThreshold(int decimal_places);
-  void updateCounters(double diff_rounded);
-  void checkMaxDiff(double value1, double value2);
 
   // ========================================================================
   // Decimal Places Management
@@ -118,6 +108,16 @@ class FileComparator {
                                std::vector<int>& dp_per_col);
   bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
                                  std::vector<int>& dp_per_col);
+  double calculateThreshold(int decimal_places);
+
+  // ========================================================================
+  // Difference Processing
+  // ========================================================================
+  bool processDifference(double rounded1, double rounded2, double diff_rounded,
+                         size_t columnIndex, int dp1, int dp2,
+                         double rangeValue, int min_dp);
+  void updateCounters(double diff_rounded);
+  void checkMaxDiff(double value1, double value2);
 
   // ========================================================================
   // Output & Formatting
@@ -125,12 +125,11 @@ class FileComparator {
   void printTable(size_t columnIndex, double line_threshold, double rangeValue,
                   double val1, int deci1, double val2, int deci2,
                   double diff_rounded);
-
+  std::string formatNumber(double value, int prec, int maxIntegerWidth,
+                           int maxDecimals) const;
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
-  std::string formatNumber(double value, int prec, int maxIntegerWidth,
-                           int maxDecimals) const;
 };
 
 #endif  // UBAND_DIFF_H
