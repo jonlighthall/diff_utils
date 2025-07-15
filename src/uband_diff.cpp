@@ -233,6 +233,18 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
   auto padLeft = [](const std::string& str, int width) {
+    // if (str.empty()) {
+    //   std::cerr << "Error: padLeft received an empty string" << std::endl;
+
+    //   return std::string(width, ' ');
+    // }
+
+    // if (width < 0) {
+    //   std::cerr << "Error: padLeft received negative width: " << width
+    //             << std::endl;
+    //   width = 0;
+    // }
+
     if (static_cast<int>(str.length()) >= width) return str;
     return std::string(width - str.length(), ' ') + str;
   };
@@ -308,6 +320,25 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 std::string FileComparator::formatNumber(double value, int prec,
                                          int maxIntegerWidth,
                                          int maxDecimals) const {
+//   // Error handling for input arguments
+//   if (prec < 0) {
+
+
+//     std::cerr << "Error: Negative precision in formatNumber: " << prec
+//               << std::endl;
+//     prec = 0;
+//   }
+//   if (maxIntegerWidth < 1) {
+//     std::cerr << "Error: maxIntegerWidth must be positive in formatNumber: "
+//               << maxIntegerWidth << std::endl;
+//     maxIntegerWidth = 1;
+//   }
+//   if (maxDecimals < 0) {
+//     std::cerr << "Error: maxDecimals must be non-negative in formatNumber: "
+//               << maxDecimals << std::endl;
+//     maxDecimals = 0;
+//   }
+
   // convert the number to a string with the specified precision
   std::ostringstream oss;
 
@@ -328,6 +359,16 @@ std::string FileComparator::formatNumber(double value, int prec,
                      : static_cast<int>(numStr.length());
 
   int padding_width = maxIntegerWidth - intWidth;
+std::cout << "maxIntegerWidth: " << maxIntegerWidth
+          << ", intWidth: " << intWidth << ", padding_width: "
+          << padding_width << std::endl;
+  if (padding_width < 0) {
+    std::cerr << "Error: Negative padding width in formatNumber: "
+              << padding_width << std::endl;
+    padding_width = 0;  // Prevent negative padding
+  }
+
+//   if (padding_width < 0) padding_width = 0;  // Prevent negative padding
 
   int padRight = maxDecimals - iprec;
   if (padRight < 0) padRight = 0;  // Ensure no negative padding
@@ -413,7 +454,7 @@ double FileComparator::calculateThreshold(int ndp) {
     std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
               << ": ";
     std::cout << ndp << " decimal places or 10^(" << -ndp
-              << ") = " << dp_threshold << std::endl;
+              << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
 #endif
   }
   if (threshold < dp_threshold) {
@@ -568,14 +609,18 @@ bool FileComparator::processLine(const LineData& data1, const LineData& data2,
   // print debug information if DEBUG2 is defined
 #ifdef DEBUG2
   std::cout << "DEBUG2: Line " << counter.lineNumber << std::endl;
-  std::cout << "   CONTENTS:";
-  std::cout << " file1: ";
+  std::cout << "   CONTENTS:" << std::endl;
+  std::cout << "      file1:";
   for (size_t i = 0; i < n_col1; ++i) {
-    std::cout << data1.values[i] << "(" << data1.decimal_places[i] << ") ";
+    int ndp = data1.decimal_places[i];
+    std::cout << " " << std::setprecision(ndp) << data1.values[i] << "(" << ndp
+              << ")";
   }
-  std::cout << ", file2: ";
+  std::cout << std::endl << "      file2:";
   for (size_t i = 0; i < n_col2; ++i) {
-    std::cout << data2.values[i] << "(" << data2.decimal_places[i] << ") ";
+    int ndp = data2.decimal_places[i];
+    std::cout << " " << std::setprecision(ndp) << data2.values[i] << "(" << ndp
+              << ")";
   }
   std::cout << std::endl;
 #endif
@@ -659,14 +704,15 @@ bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
   // initialize the dp_per_col vector with the minimum decimal places
   dp_per_col.push_back(min_dp);
 
-#ifdef DEBUG3
-  std::cout << "dp_per_col: ";
+  if (!ValidateDeciColumnSize(dp_per_col, columnIndex)) return false;
+
+  // #ifdef DEBUG3
+  std::cout << "   dp_per_col: ";
   for (const auto& d : dp_per_col) {
     std::cout << d << " ";
   }
-  std::cout << "initialized" << std::endl;
-  std::cout << "format initialized" << std::endl;
-#endif
+  std::cout << "(format initialized)" << std::endl;
+  // #endif
 
   new_fmt = true;
   this_fmt_line = counter.lineNumber;
@@ -681,25 +727,6 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
   std::cout << "not line 1" << std::endl;
 #endif
 
-  // Validate vector size
-  if (dp_per_col.size() != columnIndex + 1) {
-    std::cerr << "Warning: dp_per_col size mismatch at line "
-              << counter.lineNumber << std::endl;
-  }
-
-  if (dp_per_col.size() <= columnIndex) {
-    std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << columnIndex + 1 << " at line "
-              << counter.lineNumber << std::endl;
-    return false;
-  }
-
-#ifdef DEBUG3
-  for (size_t j = 0; j < dp_per_col.size(); ++j) {
-    std::cout << "minimum decimal places in column " << j + 1 << " = "
-              << dp_per_col[j] << std::endl;
-  }
-#endif
   // check if the minimum decimal places for this column has changed
   if (dp_per_col[columnIndex] != min_dp) {
     // If the minimum decimal places for this column is different from the
@@ -725,6 +752,43 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
   return true;
 }
 
+bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
+                                            size_t columnIndex) const {
+  // #ifdef DEBUG3
+  for (size_t j = 0; j < dp_per_col.size(); ++j) {
+    std::cout << "   minimum decimal places in column " << j + 1 << " = "
+              << dp_per_col[j] << std::endl;
+  }
+  // #endif
+
+  std::cout << "size of dp_per_col: " << dp_per_col.size() << std::endl;
+  std::cout << ", columnIndex: " << columnIndex + 1 << std::endl;
+
+  // Validate vector size
+  if (dp_per_col.size() != columnIndex + 1) {
+    std::cerr << "Warning: dp_per_col size mismatch at line "
+              << counter.lineNumber << std::endl;
+    isERROR = true;
+    std::cerr << "Expected size: " << columnIndex + 1
+              << ", Actual size: " << dp_per_col.size() << std::endl;
+    std::cerr << "Please check the input files for consistency." << std::endl;
+    return false;
+  }
+
+  if (dp_per_col.size() <= columnIndex) {
+    std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
+              << ") insufficient for column " << columnIndex + 1 << " at line "
+              << counter.lineNumber << std::endl;
+    isERROR = true;
+    std::cerr << "Please check the input files for consistency." << std::endl;
+    std::cerr << "Expected at least " << columnIndex + 1 << " columns, but got "
+              << dp_per_col.size() << std::endl;
+
+    return false;
+  }
+  return true;
+}
+
 bool FileComparator::processDifference(double rounded1, double rounded2,
                                        double diff_rounded, size_t columnIndex,
                                        int dp1, int dp2, double rangeValue,
@@ -747,8 +811,14 @@ bool FileComparator::processDifference(double rounded1, double rounded2,
   } else {
     counter.elemNumber++;
 #ifdef DEBUG2
+    auto line_num_width =
+        static_cast<int>(std::to_string(this_line_ncols).length());
+    // std::cout << "ncols: " << this_line_ncols           << ", columnIndex: "
+    // << columnIndex + 1 << std::endl;
     std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
-              << columnIndex + 1 << " are equal: " << rounded1 << std::endl;
+              << std::setw(line_num_width) << columnIndex + 1
+              << " are equal: " << std::setprecision(min_dp) << rounded1
+              << std::endl;
 #endif
   }
 

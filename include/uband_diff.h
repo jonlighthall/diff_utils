@@ -103,6 +103,7 @@ bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
                                std::vector<int>& dp_per_col);
   bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
                                  std::vector<int>& dp_per_col);
+  bool ValidateDeciColumnSize(std::vector<int>& dp_per_col, size_t columnIndex) const;
   bool validateDecimalPlaces(int dp1, int dp2) const;
   bool processDifference(double rounded1, double rounded2, double diff_rounded,
                          size_t columnIndex, int dp1, int dp2,
