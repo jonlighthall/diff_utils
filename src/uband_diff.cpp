@@ -228,7 +228,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
             << " (threshold: " << line_threshold << ")" << std::endl;
 #endif
 
-  int mxint = 3;                      // maximum integer width for range
+  int mxint = 4;                      // maximum integer width for range
   int mxdec = 5;                      // maximum decimal places for range
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
@@ -359,16 +359,16 @@ std::string FileComparator::formatNumber(double value, int prec,
                      : static_cast<int>(numStr.length());
 
   int padding_width = maxIntegerWidth - intWidth;
-std::cout << "maxIntegerWidth: " << maxIntegerWidth
-          << ", intWidth: " << intWidth << ", padding_width: "
-          << padding_width << std::endl;
+  // Prevent negative padding
   if (padding_width < 0) {
+    std::cout << std::endl
+              << "maxIntegerWidth: " << maxIntegerWidth << std::endl
+              << "intWidth: " << intWidth << std::endl
+              << "padding_width: " << padding_width << std::endl;
     std::cerr << "Error: Negative padding width in formatNumber: "
               << padding_width << std::endl;
     padding_width = 0;  // Prevent negative padding
   }
-
-//   if (padding_width < 0) padding_width = 0;  // Prevent negative padding
 
   int padRight = maxDecimals - iprec;
   if (padRight < 0) padRight = 0;  // Ensure no negative padding
@@ -707,11 +707,13 @@ bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
   if (!ValidateDeciColumnSize(dp_per_col, columnIndex)) return false;
 
   // #ifdef DEBUG3
+  std::cout << "FORMAT: Line " << counter.lineNumber << " initialization"
+            << std::endl;
   std::cout << "   dp_per_col: ";
   for (const auto& d : dp_per_col) {
     std::cout << d << " ";
   }
-  std::cout << "(format initialized)" << std::endl;
+  std::cout << std::endl;
   // #endif
 
   new_fmt = true;
@@ -761,7 +763,7 @@ bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
   }
   // #endif
 
-  std::cout << "size of dp_per_col: " << dp_per_col.size() << std::endl;
+  std::cout << "   size of dp_per_col: " << dp_per_col.size();
   std::cout << ", columnIndex: " << columnIndex + 1 << std::endl;
 
   // Validate vector size
