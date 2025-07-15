@@ -32,6 +32,10 @@
 #include <string>
 #include <vector>
 
+#undef DEBUG3
+#undef DEBUG2
+#undef DEBUG
+
 #ifdef DEBUG3  // print each step of the process
 #ifndef DEBUG2
 #define DEBUG2
@@ -666,6 +670,17 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
                                 double rangeValue, double val1, int deci1,
                                 double val2, int deci2, double diff_rounded) {
   // Print a row in the difference table
+  // Contents of the table:
+  //    [0] the line number is printed
+  //    [1] the column number is printed (1-based index)
+  //    [2] the first value in the line is printed as "range"
+  //    [3-4] the values in file1 and file2 are printed, with color coding if
+  //    they
+  //        exceed the maximum threshold (max_TL)
+  //    [5] the threshold for the line is printed
+  //    [6] the difference is printed, with color coding if it exceeds the
+  //    threshold
+
   // This function is called when a difference is found that exceeds the
   // threshold
 
@@ -675,44 +690,42 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
             << " (threshold: " << line_threshold << ")" << std::endl;
 #endif
 
-  int mxint = 4;                      // maximum integer width for range
-  int mxdec = 5;                      // maximum decimal places for range
+  // define maximum display format for the values being printed
+  int mxint = 4;                      // maximum integer width
+  int mxdec = 5;                      // maximum decimal places
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
+  // define column widths
+  std::vector<int> col_widths = {5, 5, val_width, val_width, val_width, 5, 4};
+
   auto padLeft = [](const std::string& str, int width) {
-    // if (str.empty()) {
-    //   std::cerr << "Error: padLeft received an empty string" << std::endl;
-
-    //   return std::string(width, ' ');
-    // }
-
-    // if (width < 0) {
-    //   std::cerr << "Error: padLeft received negative width: " << width
-    //             << std::endl;
-    //   width = 0;
-    // }
-
     if (static_cast<int>(str.length()) >= width) return str;
     return std::string(width - str.length(), ' ') + str;
   };
 
   if (counter.diff_print == 0) {
     // Print header if this is the first difference
-    std::cout << " line  col    range " << padLeft("tl1", val_width) << " "
-              << padLeft("tl2", val_width) << " | thres | diff" << std::endl;
-    std::cout << "----------------------------------------+-------+------"
+    std::cout << std::setw(col_widths[0]) << "line";
+    std::cout << std::setw(col_widths[1]) << "col";
+    std::cout << std::setw(col_widths[2]) << "range";
+    std::cout << std::setw(col_widths[3]+2) << "file1";
+    std::cout << std::setw(col_widths[4]+2) << "file2 |";
+    std::cout << padLeft(" thres |", col_widths[5]+2);
+    std::cout << padLeft("diff", col_widths[6]+2) << std::endl;
+
+    std::cout << "-------------------------------------------+-------+------"
               << std::endl;
   }
   counter.diff_print++;
 
   /* PRINT DIFF TABLE ENTRY */
   // line
-  std::cout << std::setw(5) << counter.lineNumber;
+  std::cout << std::setw(col_widths[0]) << counter.lineNumber;
   // column
-  std::cout << std::setw(5) << columnIndex + 1;
+  std::cout << std::setw(col_widths[1]) << columnIndex + 1;
 
   // range (first value in the line)
-  std::cout << std::fixed << std::setprecision(2) << std::setw(val_width)
+  std::cout << std::fixed << std::setprecision(2) << std::setw(col_widths[2])
             << rangeValue << " ";
 
   // values in file1
@@ -734,7 +747,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   if (line_threshold > threshold) {
     std::cout << "\033[1;33m";
   }
-  std::cout << std::setw(5) << std::setprecision(3) << line_threshold
+  std::cout << std::setw(col_widths[5]) << std::setprecision(3) << line_threshold
             << "\033[0m | ";
 
   double ieps = line_threshold * 0.1;
@@ -756,7 +769,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
     std::cout << "\033[0m";
   }
 
-  std::cout << std::setw(4) << diff_rounded << "\033[0m";
+  std::cout << std::setw(col_widths[6]) << diff_rounded << "\033[0m";
 
   // std::cout << " > " << ithreshold << " : " << (diff_rounded -
   // ithreshold)
