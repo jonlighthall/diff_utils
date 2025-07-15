@@ -31,16 +31,14 @@ struct CountStats {
   long unsigned int lineNumber = 0;  // lines read
   long unsigned int elemNumber = 0;  // elements checked
 
-  // differences found (where the difference is greater than
-  // threshold, which is the minimum between the function argument
-  // threshold and the minimum difference between the two files, based on format
-  // precision)
+  // non-zero differences found (independent of arguments)
+  long unsigned int diff_non_zero = 0;  // zero (non-zero differences)
+  long unsigned int diff_prec = 0;      // format precision threshold
 
-  long unsigned int diff_print = 0;     // differences printed
-  long unsigned int diff_non_zero = 0;  // non-zero differences
-  long unsigned int diff_user = 0;      // user-defined differences
-  long unsigned int diff_prec = 0;      // precision-related differences
-  long unsigned int diff_hard = 0;      // hard threshold differences
+  // differences found greater than user defined...
+  long unsigned int diff_user = 0;   // nominal threshold ("good enough")
+  long unsigned int diff_hard = 0;   // hard threshold (fail and exit)
+  long unsigned int diff_print = 0;  // print threshold (for difference table)
 };
 
 // Main class declaration
@@ -56,22 +54,27 @@ class FileComparator {
   unsigned long this_line_ncols;
   // define the maximum valid value for TL (Transmission Loss)
   const double max_TL = -20 * log10(pow(2, -23));
+  // define epsilon when threshold is zero
+  const double eps_zero = pow(2, -23);  // equal to single precision epsilon
   DiffStats differ;
   CountStats counter;
 
  public:
   // Constructor
   FileComparator(double thresh, double hard_thresh, double print_thresh)
-      : threshold(thresh), hard_threshold(hard_thresh), print_threshold(print_thresh) {};
+      : threshold(thresh),
+        hard_threshold(hard_thresh),
+        print_threshold(print_thresh) {};
 
   // ========================================================================
   // Public Interface
   // ========================================================================
   bool compareFiles(const std::string& file1, const std::string& file2);
   LineData parseLine(const std::string& line) const;
-
   /** @note the function parseLine() reads a line from the file and returns a
    LineData object */
+  void printSummary(const std::string& file1, const std::string& file2,
+                    int argc, char* argv[]) const;
 
  private:
   // ========================================================================
@@ -118,7 +121,8 @@ class FileComparator {
                          size_t columnIndex, int dp1, int dp2,
                          double rangeValue, int min_dp);
   void updateCounters(double diff_rounded);
-  void checkMaxDiff(double value1, double value2);
+  void processRawValues(double value1, double value2);
+  void processDiffRounded(double rounded_diff, double minimum_deci);
 
   // ========================================================================
   // Output & Formatting
