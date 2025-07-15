@@ -19,7 +19,7 @@ warnings = -Wall
 debug = -g
 
 # define macros
-macros = -D DEBUG
+#macros = -D DEBUG
 
 # include directories for C/C++ source files
 includes = -I include -I src
