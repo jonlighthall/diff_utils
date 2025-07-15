@@ -59,30 +59,69 @@ class FileComparator {
   CountStats counter;
 
  public:
+  // Constructor
   FileComparator(double thresh, double hard_thresh)
       : threshold(thresh), hard_threshold(hard_thresh) {};
-  // the function parseLine() reads a line from the file and returns a LineData
-  // object
-  LineData parseLine(const std::string& line) const;
+
+  // ========================================================================
+  // Public Interface
+  // ========================================================================
   bool compareFiles(const std::string& file1, const std::string& file2);
+  LineData parseLine(const std::string& line) const;
+
+  /** @note the function parseLine() reads a line from the file and returns a
+   LineData object */
 
  private:
-  double calculateThreshold(int decimal_places);
-  void updateCounters(double diff_rounded);
+  // ========================================================================
+  // File Operations
+  // ========================================================================
+  bool openFiles(const std::string& file1, const std::string& file2,
+                 std::ifstream& infile1, std::ifstream& infile2);
   long unsigned int getFileLength(const std::string& file) const;
   bool compareFileLengths(const std::string& file1,
                           const std::string& file2) const;
-  bool openFiles(const std::string& file1, const std::string& file2,
-                 std::ifstream& infile1, std::ifstream& infile2);
-  bool compareColumn(const LineData& data1, const LineData& data2,
-                     size_t columnIndex, std::vector<int>& dp_per_col,
-                     bool& is_same);
-bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
-                                     std::vector<int>& dp_per_col,
-                                     size_t& prev_n_col);
-  void printDifferenceRow(double rounded1, double rounded2, double diff_rounded,
-                          double ithreshold, int dp1, int dp2,
-                          size_t columnIndex, double rangeValue);
+
+  // ========================================================================
+  // Line/Column Processing
+  // ========================================================================
+  bool processLine(const LineData& data1, const LineData& data2,
+                   std::vector<int>& dp_per_col, size_t& prev_n_col);
+  bool processColumn(const LineData& data1, const LineData& data2,
+                     size_t columnIndex, std::vector<int>& dp_per_col);
+
+  // ========================================================================
+  // Validation & Format Management
+  // ========================================================================
+  bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
+                                    std::vector<int>& dp_per_col,
+                                    size_t& prev_n_col);
+  bool ValidateDeciColumnSize(std::vector<int>& dp_per_col,
+                              size_t columnIndex) const;
+  bool validateDecimalPlaces(int dp1, int dp2) const;
+
+  // ========================================================================
+  // Difference Processing
+  // ========================================================================
+  bool processDifference(double rounded1, double rounded2, double diff_rounded,
+                         size_t columnIndex, int dp1, int dp2,
+                         double rangeValue, int min_dp);
+  double calculateThreshold(int decimal_places);
+  void updateCounters(double diff_rounded);
+  void checkMaxDiff(double value1, double value2);
+
+  // ========================================================================
+  // Decimal Places Management
+  // ========================================================================
+  // New methods for refactoring
+  bool initializeDecimalPlaces(int min_dp, size_t columnIndex,
+                               std::vector<int>& dp_per_col);
+  bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
+                                 std::vector<int>& dp_per_col);
+
+  // ========================================================================
+  // Output & Formatting
+  // ========================================================================
   void printTable(size_t columnIndex, double line_threshold, double rangeValue,
                   double val1, int deci1, double val2, int deci2,
                   double diff_rounded);
@@ -92,22 +131,6 @@ bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                            int maxDecimals) const;
-  void checkMaxDiff(double value1, double value2);
-
-  // New methods for refactoring
-  bool processLine(const LineData& data1, const LineData& data2,
-                   std::vector<int>& dp_per_col, size_t& prev_n_col);
-  bool processColumn(const LineData& data1, const LineData& data2,
-                     size_t columnIndex, std::vector<int>& dp_per_col);
-  bool initializeDecimalPlaces(int min_dp, size_t columnIndex,
-                               std::vector<int>& dp_per_col);
-  bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
-                                 std::vector<int>& dp_per_col);
-  bool ValidateDeciColumnSize(std::vector<int>& dp_per_col, size_t columnIndex) const;
-  bool validateDecimalPlaces(int dp1, int dp2) const;
-  bool processDifference(double rounded1, double rounded2, double diff_rounded,
-                         size_t columnIndex, int dp1, int dp2,
-                         double rangeValue, int min_dp);
 };
 
 #endif  // UBAND_DIFF_H

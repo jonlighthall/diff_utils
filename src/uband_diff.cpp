@@ -46,6 +46,10 @@
 
 bool isERROR = false;
 
+// Implementation moved outside the class definition
+
+// Global utility functions
+
 // Function to count decimal places in a string token
 auto stream_countDecimalPlaces = [](std::istringstream& stream) {
   // Peek ahead to determine the format of the number
@@ -125,6 +129,8 @@ auto round_to_decimals = [](double value, int precision) {
   double scale = std::pow(10.0, precision);
   return std::round(value * scale) / scale;
 };
+
+// Main public interface methods
 
 bool FileComparator::compareFiles(const std::string& file1,
                                   const std::string& file2) {
@@ -215,6 +221,436 @@ LineData FileComparator::parseLine(const std::string& line) const {
   return result;
 }
 
+// File operations
+
+bool FileComparator::openFiles(const std::string& file1,
+                               const std::string& file2, std::ifstream& infile1,
+                               std::ifstream& infile2) {
+  infile1.open(file1);
+  infile2.open(file2);
+
+  if (!infile1.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
+              << std::endl;
+    isERROR = true;
+    return false;
+  }
+  if (!infile2.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
+              << std::endl;
+    isERROR = true;
+    return false;
+  }
+  return true;
+}
+
+long unsigned int FileComparator::getFileLength(const std::string& file) const {
+  std::ifstream infile(file);
+  if (!infile.is_open()) {
+    std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
+              << std::endl;
+    isERROR = true;
+    return 0;
+  }
+  long unsigned int length = 0;
+  std::string line;
+  while (std::getline(infile, line)) {
+    ++length;
+  }
+  infile.close();
+  return length;
+}
+
+bool FileComparator::compareFileLengths(const std::string& file1,
+                                        const std::string& file2) const {
+  long unsigned int length1 = getFileLength(file1);
+
+  if (long unsigned int length2 = getFileLength(file2); length1 != length2) {
+    std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
+              << length1 << " bytes) and " << file2 << " (" << length2
+              << " bytes)\033[0m" << std::endl;
+
+    std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
+              << std::endl;
+    if (counter.lineNumber != length1 || counter.lineNumber != length2) {
+      std::cout << "   First " << counter.lineNumber << " lines match"
+                << std::endl;
+      std::cout << "   " << counter.elemNumber << " elements checked"
+                << std::endl;
+    }
+    std::cerr << "   File1 has " << length1 << " lines " << std::endl;
+    std::cerr << "   File2 has " << length2 << " lines " << std::endl;
+
+    return false;
+  }
+#ifdef DEBUG
+  std::cout << "Files have the same number of lines: " << length1 << std::endl;
+  std::cout << "Files have the same number of elements: " << counter.elemNumber
+            << std::endl;
+#endif
+
+  return true;
+}
+
+/* Main Workflow
+ * -------------
+ * Line/Column processing
+ */
+
+bool FileComparator::processLine(const LineData& data1, const LineData& data2,
+                                 std::vector<int>& dp_per_col,
+                                 size_t& prev_n_col) {
+  // Get the number of columns in each line
+  if (data1.values.empty() || data2.values.empty()) {
+    std::cerr << "Line " << counter.lineNumber << " has no values to compare!"
+              << std::endl;
+    isERROR = true;
+    return false;
+  }
+  size_t n_col1 = data1.values.size();
+  size_t n_col2 = data2.values.size();
+
+  // print debug information if DEBUG2 is defined
+#ifdef DEBUG2
+  std::cout << "DEBUG2: Line " << counter.lineNumber << std::endl;
+  std::cout << "   CONTENTS:" << std::endl;
+  std::cout << "      file1:";
+  for (size_t i = 0; i < n_col1; ++i) {
+    int ndp = data1.decimal_places[i];
+    std::cout << " " << std::setprecision(ndp) << data1.values[i] << "(" << ndp
+              << ")";
+  }
+  std::cout << std::endl << "      file2:";
+  for (size_t i = 0; i < n_col2; ++i) {
+    int ndp = data2.decimal_places[i];
+    std::cout << " " << std::setprecision(ndp) << data2.values[i] << "(" << ndp
+              << ")";
+  }
+  std::cout << std::endl;
+#endif
+
+  // Validate column format
+  if (!validateAndTrackColumnFormat(n_col1, n_col2, dp_per_col, prev_n_col)) {
+    return false;
+  }
+
+  // Process each column
+  for (size_t i = 0; i < n_col1; ++i) {
+    if (!processColumn(data1, data2, i, dp_per_col)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
+                                   size_t columnIndex,
+                                   std::vector<int>& dp_per_col) {
+  checkMaxDiff(data1.values[columnIndex], data2.values[columnIndex]);
+
+  // get the number of decimal places for each column
+  int dp1 = data1.decimal_places[columnIndex];
+  int dp2 = data2.decimal_places[columnIndex];
+
+  if (!validateDecimalPlaces(dp1, dp2)) {
+    return false;
+  }
+
+  // Calculate minimum difference
+  int min_dp = std::min(dp1, dp2);
+
+  // Handle decimal places initialization and updates
+  if (counter.lineNumber == 1) {
+    if (!initializeDecimalPlaces(min_dp, columnIndex, dp_per_col)) {
+      return false;
+    }
+  } else {
+    if (!updateDecimalPlacesFormat(min_dp, columnIndex, dp_per_col)) {
+      return false;
+    }
+  }
+
+  // Print format info if needed
+  if (dp1 != dp2 && new_fmt) {
+    printFormatInfo(dp1, dp2, columnIndex);
+  }
+
+  // now that the minimum decimal places are determined, we can
+  // round the values to the minimum decimal places
+  // and compare them
+
+  // Calculate rounded values and process difference
+  double rounded1 = round_to_decimals(data1.values[columnIndex], min_dp);
+  double rounded2 = round_to_decimals(data2.values[columnIndex], min_dp);
+  double diff_rounded = std::abs(rounded1 - rounded2);
+
+  if (diff_rounded > differ.max_rounded) {
+    differ.max_rounded = diff_rounded;
+  }
+
+  return processDifference(rounded1, rounded2, diff_rounded, columnIndex, dp1,
+                           dp2, data1.values[0], min_dp);
+}
+
+// Validation methods
+
+bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
+                                                  std::vector<int>& dp_per_col,
+                                                  size_t& prev_n_col) {
+  // Check if both lines have the same number of columns
+  if (n_col1 != n_col2) {
+    std::cerr << "Line " << counter.lineNumber
+              << " has different number of columns!" << std::endl;
+    return false;
+  }
+
+  this_line_ncols = n_col1;
+
+  // Check if the number of columns has changed
+  if (counter.lineNumber == 1) {
+    prev_n_col = n_col1;  // initialize prev_n_col on first line
+#ifdef DEBUG2
+    std::cout << "   FORMAT: " << n_col1
+              << " columns (both files) - initialized" << std::endl;
+#endif
+  }
+
+  if (prev_n_col > 0 && n_col1 != prev_n_col) {
+    std::cerr << "\033[1;31mNote: Number of columns changed at line "
+              << counter.lineNumber << " (previous: " << prev_n_col
+              << ", current: " << n_col1 << ")\033[0m" << std::endl;
+    dp_per_col.clear();
+    new_fmt = true;
+    this_fmt_line = counter.lineNumber;
+    std::cout << this_fmt_line << ": FMT number of columns has changed"
+              << std::endl;
+    std::cout << "format has changed" << std::endl;
+  } else {
+    if (counter.lineNumber > 1) {
+#ifdef DEBUG3
+      std::cout << "Line " << counter.lineNumber << " same column format"
+                << std::endl;
+#endif
+      new_fmt = false;
+    }
+  }
+
+  prev_n_col = n_col1;
+  return true;
+}
+
+bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
+  if (dp1 < 0 || dp2 < 0) {
+    std::cerr << "Line " << counter.lineNumber
+              << " has negative number of decimal places!" << std::endl;
+    isERROR = true;
+    return false;
+  }
+  return true;
+}
+
+// Decimal places management
+bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
+                                             std::vector<int>& dp_per_col) {
+  // initialize the dp_per_col vector with the minimum decimal places
+  dp_per_col.push_back(min_dp);
+
+  if (!ValidateDeciColumnSize(dp_per_col, columnIndex)) return false;
+
+  // #ifdef DEBUG3
+  std::cout << "FORMAT: Line " << counter.lineNumber << " initialization"
+            << std::endl;
+  std::cout << "   dp_per_col: ";
+  for (const auto& d : dp_per_col) {
+    std::cout << d << " ";
+  }
+  std::cout << std::endl;
+  // #endif
+
+  new_fmt = true;
+  this_fmt_line = counter.lineNumber;
+  this_fmt_column = columnIndex + 1;
+
+  return true;
+}
+
+bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
+                                               std::vector<int>& dp_per_col) {
+#ifdef DEBUG3
+  std::cout << "not line 1" << std::endl;
+#endif
+
+  // check if the minimum decimal places for this column has changed
+  if (dp_per_col[columnIndex] != min_dp) {
+    // If the minimum decimal places for this column is different from the
+// previous minimum decimal places, update it
+#ifdef DEBUG3
+    std::cout << "DEBUG3: different" << std::endl;
+    std::cout << "DEBUG3: format has changed" << std::endl;
+#endif
+    dp_per_col[columnIndex] = min_dp;
+    new_fmt = true;
+    this_fmt_line = counter.lineNumber;
+    std::cout << this_fmt_line << ": FMT number of decimal places has changed"
+              << std::endl;
+  }
+#ifdef DEBUG3
+  else {
+    // If the minimum decimal places for this column is the same as the
+    // previous minimum decimal places, do nothing
+    std::cout << "DEBUG3: same" << std::endl;
+  }
+#endif
+
+  return true;
+}
+
+bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
+                                            size_t columnIndex) const {
+  // #ifdef DEBUG3
+  for (size_t j = 0; j < dp_per_col.size(); ++j) {
+    std::cout << "   minimum decimal places in column " << j + 1 << " = "
+              << dp_per_col[j] << std::endl;
+  }
+  // #endif
+
+  std::cout << "   size of dp_per_col: " << dp_per_col.size();
+  std::cout << ", columnIndex: " << columnIndex + 1 << std::endl;
+
+  // Validate vector size
+  if (dp_per_col.size() != columnIndex + 1) {
+    std::cerr << "Warning: dp_per_col size mismatch at line "
+              << counter.lineNumber << std::endl;
+    isERROR = true;
+    std::cerr << "Expected size: " << columnIndex + 1
+              << ", Actual size: " << dp_per_col.size() << std::endl;
+    std::cerr << "Please check the input files for consistency." << std::endl;
+    return false;
+  }
+
+  if (dp_per_col.size() <= columnIndex) {
+    std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
+              << ") insufficient for column " << columnIndex + 1 << " at line "
+              << counter.lineNumber << std::endl;
+    isERROR = true;
+    std::cerr << "Please check the input files for consistency." << std::endl;
+    std::cerr << "Expected at least " << columnIndex + 1 << " columns, but got "
+              << dp_per_col.size() << std::endl;
+
+    return false;
+  }
+  return true;
+}
+
+// Difference processing
+bool FileComparator::processDifference(double rounded1, double rounded2,
+                                       double diff_rounded, size_t columnIndex,
+                                       int dp1, int dp2, double rangeValue,
+                                       int min_dp) {
+  updateCounters(diff_rounded);
+
+  double ithreshold = calculateThreshold(min_dp);
+  double ieps = ithreshold * 0.1;
+
+  // Check precision threshold
+  if (double thresh_prec = ithreshold + ieps; diff_rounded > thresh_prec) {
+    counter.diff_prec++;
+  }
+
+  // Print differences if above plot threshold
+  if (double thresh_plot = 0; diff_rounded > thresh_plot) {
+    printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1, rounded2,
+               dp2, diff_rounded);
+    std::cout << std::endl;
+  } else {
+    counter.elemNumber++;
+#ifdef DEBUG2
+    auto line_num_width =
+        static_cast<int>(std::to_string(this_line_ncols).length());
+    // std::cout << "ncols: " << this_line_ncols           << ", columnIndex: "
+    // << columnIndex + 1 << std::endl;
+    std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
+              << std::setw(line_num_width) << columnIndex + 1
+              << " are equal: " << std::setprecision(min_dp) << rounded1
+              << std::endl;
+#endif
+  }
+
+  // Check hard threshold
+  if ((diff_rounded > hard_threshold) &&
+      ((rounded1 <= max_TL) && (rounded2 <= max_TL))) {
+    counter.diff_hard++;
+    printHardThresholdError(rounded1, rounded2, diff_rounded, columnIndex);
+    return false;
+  }
+
+  return true;
+}
+
+double FileComparator::calculateThreshold(int ndp) {
+  // determine the comparison threshold
+  double dp_threshold = std::pow(10, -ndp);
+
+  if (new_fmt) {
+    if (this_fmt_line != last_fmt_line) {
+      std::cout << "PRECISION: Line " << this_fmt_line;
+      if (counter.lineNumber == 1) {
+        std::cout << " (initial format)";
+      } else {
+        std::cout << " (change in format)";
+      }
+      std::cout << std::endl;
+    }
+    last_fmt_line = this_fmt_line;
+#ifdef DEBUG
+    // Set the width for line numbers based on the number of digits in
+    // this_fmt_line
+    auto line_num_width =
+        static_cast<int>(std::to_string(this_line_ncols).length());
+    std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
+              << ": ";
+    std::cout << ndp << " decimal places or 10^(" << -ndp
+              << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
+#endif
+  }
+  if (threshold < dp_threshold) {
+#ifdef DEBUG
+    if (new_fmt) {
+      std::cout << "   \033[1;33mNOTE: " << dp_threshold
+                << " is greater than the specified threshold: " << threshold
+                << "\033[0m" << std::endl;
+    }
+#endif
+    return dp_threshold;
+  }
+  return threshold;
+}
+
+void FileComparator::updateCounters(double diff_rounded) {
+  // Update counters
+
+  // define epsilon when threshold is zero
+  double eps_zero = pow(2, -23);  // equal to single precision epsilon
+  if (diff_rounded > eps_zero) {
+    counter.diff_non_zero++;
+  }
+
+  // define epsilon for user-defined threshold
+  double eps_user = (threshold == 0) ? eps_zero : threshold * 0.1;
+  if (diff_rounded > (threshold + eps_user)) {
+    counter.diff_user++;
+  }
+}
+
+void FileComparator::checkMaxDiff(double value1, double value2) {
+  // compare values (without rounding)
+  if (double diff = std::abs(value1 - value2); diff > differ.max) {
+    differ.max = diff;
+  }
+}
+
+// Output/Formatting methods
 void FileComparator::printTable(size_t columnIndex, double line_threshold,
                                 double rangeValue, double val1, int deci1,
                                 double val2, int deci2, double diff_rounded) {
@@ -320,24 +756,25 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 std::string FileComparator::formatNumber(double value, int prec,
                                          int maxIntegerWidth,
                                          int maxDecimals) const {
-//   // Error handling for input arguments
-//   if (prec < 0) {
+  //   // Error handling for input arguments
+  //   if (prec < 0) {
 
-
-//     std::cerr << "Error: Negative precision in formatNumber: " << prec
-//               << std::endl;
-//     prec = 0;
-//   }
-//   if (maxIntegerWidth < 1) {
-//     std::cerr << "Error: maxIntegerWidth must be positive in formatNumber: "
-//               << maxIntegerWidth << std::endl;
-//     maxIntegerWidth = 1;
-//   }
-//   if (maxDecimals < 0) {
-//     std::cerr << "Error: maxDecimals must be non-negative in formatNumber: "
-//               << maxDecimals << std::endl;
-//     maxDecimals = 0;
-//   }
+  //     std::cerr << "Error: Negative precision in formatNumber: " << prec
+  //               << std::endl;
+  //     prec = 0;
+  //   }
+  //   if (maxIntegerWidth < 1) {
+  //     std::cerr << "Error: maxIntegerWidth must be positive in formatNumber:
+  //     "
+  //               << maxIntegerWidth << std::endl;
+  //     maxIntegerWidth = 1;
+  //   }
+  //   if (maxDecimals < 0) {
+  //     std::cerr << "Error: maxDecimals must be non-negative in formatNumber:
+  //     "
+  //               << maxDecimals << std::endl;
+  //     maxDecimals = 0;
+  //   }
 
   // convert the number to a string with the specified precision
   std::ostringstream oss;
@@ -413,424 +850,4 @@ void FileComparator::printFormatInfo(int dp1, int dp2,
   std::cout << "   FORMAT: number of decimal places file1: " << dp1
             << ", file2: " << dp2 << std::endl;
 #endif
-}
-
-void FileComparator::updateCounters(double diff_rounded) {
-  // Update counters
-
-  // define epsilon when threshold is zero
-  double eps_zero = pow(2, -23);  // equal to single precision epsilon
-  if (diff_rounded > eps_zero) {
-    counter.diff_non_zero++;
-  }
-
-  // define epsilon for user-defined threshold
-  double eps_user = (threshold == 0) ? eps_zero : threshold * 0.1;
-  if (diff_rounded > (threshold + eps_user)) {
-    counter.diff_user++;
-  }
-}
-
-double FileComparator::calculateThreshold(int ndp) {
-  // determine the comparison threshold
-  double dp_threshold = std::pow(10, -ndp);
-
-  if (new_fmt) {
-    if (this_fmt_line != last_fmt_line) {
-      std::cout << "PRECISION: Line " << this_fmt_line;
-      if (counter.lineNumber == 1) {
-        std::cout << " (initial format)";
-      } else {
-        std::cout << " (change in format)";
-      }
-      std::cout << std::endl;
-    }
-    last_fmt_line = this_fmt_line;
-#ifdef DEBUG
-    // Set the width for line numbers based on the number of digits in
-    // this_fmt_line
-    auto line_num_width =
-        static_cast<int>(std::to_string(this_line_ncols).length());
-    std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
-              << ": ";
-    std::cout << ndp << " decimal places or 10^(" << -ndp
-              << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
-#endif
-  }
-  if (threshold < dp_threshold) {
-#ifdef DEBUG
-    if (new_fmt) {
-      std::cout << "   \033[1;33mNOTE: " << dp_threshold
-                << " is greater than the specified threshold: " << threshold
-                << "\033[0m" << std::endl;
-    }
-#endif
-    return dp_threshold;
-  }
-  return threshold;
-}
-
-long unsigned int FileComparator::getFileLength(const std::string& file) const {
-  std::ifstream infile(file);
-  if (!infile.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
-              << std::endl;
-    isERROR = true;
-    return 0;
-  }
-  long unsigned int length = 0;
-  std::string line;
-  while (std::getline(infile, line)) {
-    ++length;
-  }
-  infile.close();
-  return length;
-}
-
-// Implementation moved outside the class definition
-
-bool FileComparator::compareFileLengths(const std::string& file1,
-                                        const std::string& file2) const {
-  long unsigned int length1 = getFileLength(file1);
-
-  if (long unsigned int length2 = getFileLength(file2); length1 != length2) {
-    std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
-              << length1 << " bytes) and " << file2 << " (" << length2
-              << " bytes)\033[0m" << std::endl;
-
-    std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
-              << std::endl;
-    if (counter.lineNumber != length1 || counter.lineNumber != length2) {
-      std::cout << "   First " << counter.lineNumber << " lines match"
-                << std::endl;
-      std::cout << "   " << counter.elemNumber << " elements checked"
-                << std::endl;
-    }
-    std::cerr << "   File1 has " << length1 << " lines " << std::endl;
-    std::cerr << "   File2 has " << length2 << " lines " << std::endl;
-
-    return false;
-  }
-#ifdef DEBUG
-  std::cout << "Files have the same number of lines: " << length1 << std::endl;
-  std::cout << "Files have the same number of elements: " << counter.elemNumber
-            << std::endl;
-#endif
-
-  return true;
-}
-
-bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
-                                                  std::vector<int>& dp_per_col,
-                                                  size_t& prev_n_col) {
-  // Check if both lines have the same number of columns
-  if (n_col1 != n_col2) {
-    std::cerr << "Line " << counter.lineNumber
-              << " has different number of columns!" << std::endl;
-    return false;
-  }
-
-  this_line_ncols = n_col1;
-
-  // Check if the number of columns has changed
-  if (counter.lineNumber == 1) {
-    prev_n_col = n_col1;  // initialize prev_n_col on first line
-#ifdef DEBUG2
-    std::cout << "   FORMAT: " << n_col1
-              << " columns (both files) - initialized" << std::endl;
-#endif
-  }
-
-  if (prev_n_col > 0 && n_col1 != prev_n_col) {
-    std::cerr << "\033[1;31mNote: Number of columns changed at line "
-              << counter.lineNumber << " (previous: " << prev_n_col
-              << ", current: " << n_col1 << ")\033[0m" << std::endl;
-    dp_per_col.clear();
-    new_fmt = true;
-    this_fmt_line = counter.lineNumber;
-    std::cout << this_fmt_line << ": FMT number of columns has changed"
-              << std::endl;
-    std::cout << "format has changed" << std::endl;
-  } else {
-    if (counter.lineNumber > 1) {
-#ifdef DEBUG3
-      std::cout << "Line " << counter.lineNumber << " same column format"
-                << std::endl;
-#endif
-      new_fmt = false;
-    }
-  }
-
-  prev_n_col = n_col1;
-  return true;
-}
-
-void FileComparator::checkMaxDiff(double value1, double value2) {
-  // compare values (without rounding)
-  if (double diff = std::abs(value1 - value2); diff > differ.max) {
-    differ.max = diff;
-  }
-}
-
-bool FileComparator::openFiles(const std::string& file1,
-                               const std::string& file2, std::ifstream& infile1,
-                               std::ifstream& infile2) {
-  infile1.open(file1);
-  infile2.open(file2);
-
-  if (!infile1.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
-              << std::endl;
-    isERROR = true;
-    return false;
-  }
-  if (!infile2.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
-              << std::endl;
-    isERROR = true;
-    return false;
-  }
-  return true;
-}
-
-bool FileComparator::processLine(const LineData& data1, const LineData& data2,
-                                 std::vector<int>& dp_per_col,
-                                 size_t& prev_n_col) {
-  // Get the number of columns in each line
-  if (data1.values.empty() || data2.values.empty()) {
-    std::cerr << "Line " << counter.lineNumber << " has no values to compare!"
-              << std::endl;
-    isERROR = true;
-    return false;
-  }
-  size_t n_col1 = data1.values.size();
-  size_t n_col2 = data2.values.size();
-
-  // print debug information if DEBUG2 is defined
-#ifdef DEBUG2
-  std::cout << "DEBUG2: Line " << counter.lineNumber << std::endl;
-  std::cout << "   CONTENTS:" << std::endl;
-  std::cout << "      file1:";
-  for (size_t i = 0; i < n_col1; ++i) {
-    int ndp = data1.decimal_places[i];
-    std::cout << " " << std::setprecision(ndp) << data1.values[i] << "(" << ndp
-              << ")";
-  }
-  std::cout << std::endl << "      file2:";
-  for (size_t i = 0; i < n_col2; ++i) {
-    int ndp = data2.decimal_places[i];
-    std::cout << " " << std::setprecision(ndp) << data2.values[i] << "(" << ndp
-              << ")";
-  }
-  std::cout << std::endl;
-#endif
-
-  // Validate column format
-  if (!validateAndTrackColumnFormat(n_col1, n_col2, dp_per_col, prev_n_col)) {
-    return false;
-  }
-
-  // Process each column
-  for (size_t i = 0; i < n_col1; ++i) {
-    if (!processColumn(data1, data2, i, dp_per_col)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
-                                   size_t columnIndex,
-                                   std::vector<int>& dp_per_col) {
-  checkMaxDiff(data1.values[columnIndex], data2.values[columnIndex]);
-
-  // get the number of decimal places for each column
-  int dp1 = data1.decimal_places[columnIndex];
-  int dp2 = data2.decimal_places[columnIndex];
-
-  if (!validateDecimalPlaces(dp1, dp2)) {
-    return false;
-  }
-
-  // Calculate minimum difference
-  int min_dp = std::min(dp1, dp2);
-
-  // Handle decimal places initialization and updates
-  if (counter.lineNumber == 1) {
-    if (!initializeDecimalPlaces(min_dp, columnIndex, dp_per_col)) {
-      return false;
-    }
-  } else {
-    if (!updateDecimalPlacesFormat(min_dp, columnIndex, dp_per_col)) {
-      return false;
-    }
-  }
-
-  // Print format info if needed
-  if (dp1 != dp2 && new_fmt) {
-    printFormatInfo(dp1, dp2, columnIndex);
-  }
-
-  // now that the minimum decimal places are determined, we can
-  // round the values to the minimum decimal places
-  // and compare them
-
-  // Calculate rounded values and process difference
-  double rounded1 = round_to_decimals(data1.values[columnIndex], min_dp);
-  double rounded2 = round_to_decimals(data2.values[columnIndex], min_dp);
-  double diff_rounded = std::abs(rounded1 - rounded2);
-
-  if (diff_rounded > differ.max_rounded) {
-    differ.max_rounded = diff_rounded;
-  }
-
-  return processDifference(rounded1, rounded2, diff_rounded, columnIndex, dp1,
-                           dp2, data1.values[0], min_dp);
-}
-
-bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
-  if (dp1 < 0 || dp2 < 0) {
-    std::cerr << "Line " << counter.lineNumber
-              << " has negative number of decimal places!" << std::endl;
-    isERROR = true;
-    return false;
-  }
-  return true;
-}
-
-bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
-                                             std::vector<int>& dp_per_col) {
-  // initialize the dp_per_col vector with the minimum decimal places
-  dp_per_col.push_back(min_dp);
-
-  if (!ValidateDeciColumnSize(dp_per_col, columnIndex)) return false;
-
-  // #ifdef DEBUG3
-  std::cout << "FORMAT: Line " << counter.lineNumber << " initialization"
-            << std::endl;
-  std::cout << "   dp_per_col: ";
-  for (const auto& d : dp_per_col) {
-    std::cout << d << " ";
-  }
-  std::cout << std::endl;
-  // #endif
-
-  new_fmt = true;
-  this_fmt_line = counter.lineNumber;
-  this_fmt_column = columnIndex + 1;
-
-  return true;
-}
-
-bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
-                                               std::vector<int>& dp_per_col) {
-#ifdef DEBUG3
-  std::cout << "not line 1" << std::endl;
-#endif
-
-  // check if the minimum decimal places for this column has changed
-  if (dp_per_col[columnIndex] != min_dp) {
-    // If the minimum decimal places for this column is different from the
-// previous minimum decimal places, update it
-#ifdef DEBUG3
-    std::cout << "DEBUG3: different" << std::endl;
-    std::cout << "DEBUG3: format has changed" << std::endl;
-#endif
-    dp_per_col[columnIndex] = min_dp;
-    new_fmt = true;
-    this_fmt_line = counter.lineNumber;
-    std::cout << this_fmt_line << ": FMT number of decimal places has changed"
-              << std::endl;
-  }
-#ifdef DEBUG3
-  else {
-    // If the minimum decimal places for this column is the same as the
-    // previous minimum decimal places, do nothing
-    std::cout << "DEBUG3: same" << std::endl;
-  }
-#endif
-
-  return true;
-}
-
-bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
-                                            size_t columnIndex) const {
-  // #ifdef DEBUG3
-  for (size_t j = 0; j < dp_per_col.size(); ++j) {
-    std::cout << "   minimum decimal places in column " << j + 1 << " = "
-              << dp_per_col[j] << std::endl;
-  }
-  // #endif
-
-  std::cout << "   size of dp_per_col: " << dp_per_col.size();
-  std::cout << ", columnIndex: " << columnIndex + 1 << std::endl;
-
-  // Validate vector size
-  if (dp_per_col.size() != columnIndex + 1) {
-    std::cerr << "Warning: dp_per_col size mismatch at line "
-              << counter.lineNumber << std::endl;
-    isERROR = true;
-    std::cerr << "Expected size: " << columnIndex + 1
-              << ", Actual size: " << dp_per_col.size() << std::endl;
-    std::cerr << "Please check the input files for consistency." << std::endl;
-    return false;
-  }
-
-  if (dp_per_col.size() <= columnIndex) {
-    std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << columnIndex + 1 << " at line "
-              << counter.lineNumber << std::endl;
-    isERROR = true;
-    std::cerr << "Please check the input files for consistency." << std::endl;
-    std::cerr << "Expected at least " << columnIndex + 1 << " columns, but got "
-              << dp_per_col.size() << std::endl;
-
-    return false;
-  }
-  return true;
-}
-
-bool FileComparator::processDifference(double rounded1, double rounded2,
-                                       double diff_rounded, size_t columnIndex,
-                                       int dp1, int dp2, double rangeValue,
-                                       int min_dp) {
-  updateCounters(diff_rounded);
-
-  double ithreshold = calculateThreshold(min_dp);
-  double ieps = ithreshold * 0.1;
-
-  // Check precision threshold
-  if (double thresh_prec = ithreshold + ieps; diff_rounded > thresh_prec) {
-    counter.diff_prec++;
-  }
-
-  // Print differences if above plot threshold
-  if (double thresh_plot = 0; diff_rounded > thresh_plot) {
-    printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1, rounded2,
-               dp2, diff_rounded);
-    std::cout << std::endl;
-  } else {
-    counter.elemNumber++;
-#ifdef DEBUG2
-    auto line_num_width =
-        static_cast<int>(std::to_string(this_line_ncols).length());
-    // std::cout << "ncols: " << this_line_ncols           << ", columnIndex: "
-    // << columnIndex + 1 << std::endl;
-    std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
-              << std::setw(line_num_width) << columnIndex + 1
-              << " are equal: " << std::setprecision(min_dp) << rounded1
-              << std::endl;
-#endif
-  }
-
-  // Check hard threshold
-  if ((diff_rounded > hard_threshold) &&
-      ((rounded1 <= max_TL) && (rounded2 <= max_TL))) {
-    counter.diff_hard++;
-    printHardThresholdError(rounded1, rounded2, diff_rounded, columnIndex);
-    return false;
-  }
-
-  return true;
 }
