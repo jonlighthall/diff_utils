@@ -117,12 +117,11 @@ class FileComparator {
   // ========================================================================
   // Difference Processing
   // ========================================================================
-  bool processDifference(double rounded1, double rounded2, double diff_rounded,
-                         size_t columnIndex, int dp1, int dp2,
-                         double rangeValue, int min_dp);
-  void updateCounters(double diff_rounded);
+  bool processDifference(double value1, double value2, int min_dp,
+                                       int dp1, int dp2, size_t columnIndex,
+                                       double rangeValue);
   void processRawValues(double value1, double value2);
-  void processDiffRounded(double rounded_diff, double minimum_deci);
+  void processRoundedValues(double rounded_diff, double minimum_deci);
 
   // ========================================================================
   // Output & Formatting

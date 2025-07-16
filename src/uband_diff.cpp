@@ -275,14 +275,18 @@ bool FileComparator::compareFileLengths(const std::string& file1,
 
   if (long unsigned int length2 = getFileLength(file2); length1 != length2) {
     std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
-              << length1 << " bytes) and " << file2 << " (" << length2
-              << " bytes)\033[0m" << std::endl;
+              << length1 << " lines) and " << file2 << " (" << length2
+              << " lines)\033[0m" << std::endl;
 
     std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
               << std::endl;
     if (counter.lineNumber != length1 || counter.lineNumber != length2) {
-      std::cout << "   First " << counter.lineNumber << " lines match"
-                << std::endl;
+      std::cout << "   First " << counter.lineNumber << " lines ";
+      if (counter.diff_user > 0) {
+        std::cout << "match" << std::endl;
+      } else {
+        std::cout << "checked" << std::endl;
+      }
       std::cout << "   " << counter.elemNumber << " elements checked"
                 << std::endl;
     }
@@ -388,15 +392,8 @@ bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
   // round the values to the minimum decimal places
   // and compare them
 
-  // Calculate rounded values and process difference
-  double rounded1 = round_to_decimals(data1.values[columnIndex], min_dp);
-  double rounded2 = round_to_decimals(data2.values[columnIndex], min_dp);
-  double diff_rounded = std::abs(rounded1 - rounded2);
-
-  processDiffRounded(diff_rounded, min_dp);
-
-  return processDifference(rounded1, rounded2, diff_rounded, columnIndex, dp1,
-                           dp2, data1.values[0], min_dp);
+  return processDifference(data1.values[columnIndex], data2.values[columnIndex],
+                           min_dp, dp1, dp2, columnIndex, data1.values[0]);
 }
 
 // ========================================================================
@@ -516,17 +513,17 @@ bool FileComparator::initializeDecimalPlaces(int min_dp, size_t columnIndex,
   std::cout << std::endl;
 #endif
 
+  // since this is an initialization, it is always a new format
   new_fmt = true;
   this_fmt_line = counter.lineNumber;
   this_fmt_column = columnIndex + 1;
-
   return true;
 }
 
 bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
                                                std::vector<int>& dp_per_col) {
 #ifdef DEBUG3
-  std::cout << "not line 1" << std::endl;
+  std::cout << "not first line" << std::endl;
 #endif
 
   // check if the minimum decimal places for this column has changed
@@ -550,17 +547,19 @@ bool FileComparator::updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
     std::cout << "DEBUG3: same" << std::endl;
   }
 #endif
-
   return true;
 }
 
 double FileComparator::calculateThreshold(int ndp) {
-  // determine the comparison threshold
+  // determine the smallest possible difference, base on the number of
+  // decimal places (equal to the minimum number of decimal places for the
+  // current element)
   double dp_threshold = std::pow(10, -ndp);
 
   if (new_fmt) {
     if (this_fmt_line != last_fmt_line) {
 #ifdef DEBUG
+      // group together all format specifications on the same line
       std::cout << "PRECISION: Line " << this_fmt_line;
       if (counter.lineNumber == 1) {
         std::cout << " (initial format)";
@@ -576,6 +575,7 @@ double FileComparator::calculateThreshold(int ndp) {
     // this_fmt_line
     auto line_num_width =
         static_cast<int>(std::to_string(this_line_ncols).length());
+    // indent the column format specification under the line number
     std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
               << ": ";
     std::cout << ndp << " decimal places or 10^(" << -ndp
@@ -598,18 +598,23 @@ double FileComparator::calculateThreshold(int ndp) {
 // ========================================================================
 // Difference Processing
 // ========================================================================
-bool FileComparator::processDifference(double rounded1, double rounded2,
-                                       double diff_rounded, size_t columnIndex,
-                                       int dp1, int dp2, double rangeValue,
-                                       int min_dp) {
-  updateCounters(diff_rounded);
+bool FileComparator::processDifference(double value1, double value2, int min_dp,
+                                       int dp1, int dp2, size_t columnIndex,
+                                       double rangeValue) {
+  // Calculate rounded values and process difference
+  double rounded1 = round_to_decimals(value1, min_dp);
+  double rounded2 = round_to_decimals(value2, min_dp);
+  double diff_rounded = std::abs(rounded1 - rounded2);
+
+  processRoundedValues(diff_rounded, min_dp);
 
   double ithreshold = calculateThreshold(min_dp);
 
   // Print differences if above plot threshold
   if (diff_rounded > print_threshold) {
-    printTable(columnIndex, ithreshold, rangeValue, rounded1, dp1, rounded2,
-               dp2, diff_rounded);
+
+    printTable(columnIndex, ithreshold, rangeValue, value1, dp1, value2, dp2,
+               diff_rounded);
     std::cout << std::endl;
   } else {
     counter.elemNumber++;
@@ -636,11 +641,6 @@ bool FileComparator::processDifference(double rounded1, double rounded2,
   return true;
 }
 
-void FileComparator::updateCounters(double diff_rounded) {
-  return;
-  // Update counters
-}
-
 void FileComparator::processRawValues(double value1, double value2) {
   // compare values (without rounding)
   double diff = std::abs(value1 - value2);
@@ -653,8 +653,8 @@ void FileComparator::processRawValues(double value1, double value2) {
   }
 }
 
-void FileComparator::processDiffRounded(double rounded_diff,
-                                        double minimum_deci) {
+void FileComparator::processRoundedValues(double rounded_diff,
+                                          double minimum_deci) {
   // compare values (with rounding)
 
   if (rounded_diff > differ.max_rounded) {
@@ -727,7 +727,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 
   if (counter.diff_print == 0) {
     std::cout << "DIFFERENCES:" << std::endl;
-if (threshold < print_threshold) {
+    if (threshold < print_threshold) {
       std::cout << "\033[1;33mWarning: Threshold for printing ("
                 << print_threshold << ") is less than the overall threshold ("
                 << threshold << "). Some significant differences may not be "
@@ -926,18 +926,25 @@ void FileComparator::printSummary(const std::string& file1,
   std::cout << "   File2: " << file2 << std::endl;
 
   std::cout << "STATISTICS:" << std::endl;
-  std::cout << "   Total lines compared: " << counter.lineNumber << std::endl;
+  std::cout << "   Total lines compared: " << counter.lineNumber;
+
+  // Check if all lines were compared
+  size_t length1 = getFileLength(file1);
+  if (length1 == counter.lineNumber) {
+    std::cout << " (all)" << std::endl;
+  } else {
+    std::cout << " of " << length1 << std::endl;
+    // print how many lines were not compared
+    size_t missing_lines = length1 - counter.lineNumber;
+    std::cout << "\033[1;31m   " << missing_lines
+              << " lines were not compared\033[0m" << std::endl;
+  }
+
   std::cout << "   Total elements checked: " << counter.elemNumber << std::endl;
-
-  std::cout << "DIFFERENCES:" << std::endl;
-
-
-  std::cout << "   Hard threshold differences: " << counter.diff_hard
-            << std::endl;
 
   std::cout << "SUMMARY:" << std::endl;
   // Calculate the width for formatting
-  int fmt_wid = static_cast<int>(std::to_string(counter.elemNumber).length());
+  auto fmt_wid = static_cast<int>(std::to_string(counter.elemNumber).length());
 
   // Diff-like differences
   // =========================================================
@@ -954,14 +961,14 @@ void FileComparator::printSummary(const std::string& file1,
     }
   }
 
-  std::cout << "   Non-zero differences ( >" << 0.0 << "): " << std::setw(fmt_wid)
-            << counter.diff_non_zero << std::endl;
-
+  std::cout << "   Non-zero differences ( >" << 0.0
+            << "): " << std::setw(fmt_wid) << counter.diff_non_zero
+            << std::endl;
 
   std::cout << "\033[1;33m   Files " << file1 << " and " << file2
             << " are different\033[0m" << std::endl;
 
-if (counter.diff_print < counter.diff_non_zero) {
+  if (counter.diff_print < counter.diff_non_zero) {
     std::cout << "   Printed differences  ( >" << print_threshold
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed = counter.diff_non_zero - counter.diff_print;
@@ -974,8 +981,6 @@ if (counter.diff_print < counter.diff_non_zero) {
                  "differences are printed."
               << std::endl;
   }
-
-
 
   std::cout << "   Maximum difference: " << differ.max << std::endl;
   printbar(1);
@@ -992,8 +997,8 @@ if (counter.diff_print < counter.diff_non_zero) {
   if (counter.diff_non_zero > counter.diff_prec) {
     size_t zero_diff = counter.diff_non_zero - counter.diff_prec;
     if (zero_diff > 0) {
-      std::cout << "   Trivial differences     ( >" << 0.0 << "): " << std::setw(fmt_wid)
-                            << zero_diff << std::endl;
+      std::cout << "   Trivial differences     ( >" << 0.0
+                << "): " << std::setw(fmt_wid) << zero_diff << std::endl;
     }
   }
   std::cout << "   Non-trivial differences          : " << std::setw(fmt_wid)
@@ -1002,7 +1007,7 @@ if (counter.diff_print < counter.diff_non_zero) {
   std::cout << "\033[1;33m   Files " << file1 << " and " << file2
             << " are non-trivially different\033[0m" << std::endl;
 
- if (counter.diff_print < counter.diff_prec) {
+  if (counter.diff_print < counter.diff_prec) {
     std::cout << "   Printed differences     ( >" << print_threshold
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed = counter.diff_prec - counter.diff_print;
@@ -1039,21 +1044,20 @@ if (counter.diff_print < counter.diff_non_zero) {
   std::cout << "\033[1;31m   Files " << file1 << " and " << file2
             << " are significantly different\033[0m" << std::endl;
 
-if (counter.diff_print < counter.diff_user) {
+  if (counter.diff_print < counter.diff_user) {
     std::cout << "   Printed differences      ( >" << print_threshold
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed_signif = counter.diff_user - counter.diff_print;
     if (not_printed_signif > 0) {
-      std::cout << "\033[1;31m   Not printed differences  (<=" << print_threshold
-                << "): " << std::setw(fmt_wid) << not_printed_signif
-                << "\033[0m" << std::endl;
+      std::cout << "\033[1;31m   Not printed differences  (<="
+                << print_threshold << "): " << std::setw(fmt_wid)
+                << not_printed_signif << "\033[0m" << std::endl;
     }
   } else {
     std::cout << "   All significant "
                  "differences are printed."
               << std::endl;
   }
-
 
   printbar(1);
 
@@ -1067,31 +1071,30 @@ if (counter.diff_print < counter.diff_user) {
   std::cout << "   Printed differences      ( >" << print_threshold
             << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
 
-if (threshold < print_threshold) {
-   if (counter.diff_user > counter.diff_print) {
-    size_t not_printed_signif = counter.diff_user - counter.diff_print;
-    if (not_printed_signif > 0) {
-      std::cout << "\033[1;31m   Not printed differences  (<=" << print_threshold
-                << "): " << std::setw(fmt_wid) << not_printed_signif << "\033[0m"
-                << std::endl;
+  if (threshold < print_threshold) {
+    if (counter.diff_user > counter.diff_print) {
+      size_t not_printed_signif = counter.diff_user - counter.diff_print;
+      if (not_printed_signif > 0) {
+        std::cout << "\033[1;31m   Not printed differences  (<="
+                  << print_threshold << "): " << std::setw(fmt_wid)
+                  << not_printed_signif << "\033[0m" << std::endl;
+      }
+    }
+  } else {
+    if (counter.diff_prec > counter.diff_print) {
+      size_t not_printed = counter.diff_prec - counter.diff_print;
+      if (not_printed > 0) {
+        std::cout << "   Not printed differences  (<=" << print_threshold
+                  << "): " << std::setw(fmt_wid) << not_printed << std::endl;
+      }
     }
   }
-} else {
-  if (counter.diff_prec > counter.diff_print) {
-    size_t not_printed = counter.diff_prec - counter.diff_print;
-    if (not_printed > 0) {
-      std::cout << "   Not printed differences  (<=" << print_threshold
-                << "): " << std::setw(fmt_wid) << not_printed << std::endl;
-    }
-  }
-}
 
-printbar(1);
+  printbar(1);
   // Hard threshold differences
   // =========================================================
   if (counter.diff_hard == 0) {
   }
-
 
   if (counter.diff_hard > 0) {
     std::cout << "\033[1;31m   Differences exceeding hard threshold ("
