@@ -157,7 +157,7 @@ bool FileComparator::compareFiles(const std::string& file1,
   // track if the files are the same
   bool is_same = false;
 
-  std::cout << "   Max TL: \033[1;34m" << max_TL << "\033[0m" << std::endl;
+  std::cout << "   Max TL: \033[1;34m" << thresh.ignore << "\033[0m" << std::endl;
 
   // Process files line by line
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
@@ -445,7 +445,7 @@ bool FileComparator::validateDecimalPlaces(int dp1, int dp2) const {
   return true;
 }
 
-bool FileComparator::ValidateDeciColumnSize(std::vector<int>& dp_per_col,
+bool FileComparator::ValidateDeciColumnSize(const std::vector<int>& dp_per_col,
                                             size_t columnIndex) const {
 #ifdef DEBUG3
   for (size_t j = 0; j < dp_per_col.size(); ++j) {
@@ -573,17 +573,17 @@ double FileComparator::calculateThreshold(int ndp) {
               << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
 #endif
   }
-  if (threshold < dp_threshold) {
+  if (thresh.user < dp_threshold) {
 #ifdef DEBUG
     if (new_fmt) {
       std::cout << "   \033[1;33mNOTE: " << dp_threshold
-                << " is greater than the specified threshold: " << threshold
+                << " is greater than the specified threshold: " << thresholds.user
                 << "\033[0m" << std::endl;
     }
 #endif
     return dp_threshold;
   }
-  return threshold;
+  return thresh.user;
 }
 
 // ========================================================================
@@ -602,7 +602,7 @@ bool FileComparator::processDifference(double value1, double value2, int min_dp,
   double ithreshold = calculateThreshold(min_dp);
 
   // Print differences if above plot threshold
-  if (diff_rounded > print_threshold) {
+  if (diff_rounded > thresh.print) {
     printTable(columnIndex, ithreshold, rangeValue, value1, dp1, value2, dp2,
                diff_rounded);
     std::cout << std::endl;
@@ -621,8 +621,8 @@ bool FileComparator::processDifference(double value1, double value2, int min_dp,
   }
 
   // Check hard threshold
-  if ((diff_rounded > hard_threshold) &&
-      ((rounded1 <= max_TL) && (rounded2 <= max_TL))) {
+  if ((diff_rounded > thresh.hard) &&
+      ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
     counter.diff_hard++;
     printHardThresholdError(rounded1, rounded2, diff_rounded, columnIndex);
     return false;
@@ -638,7 +638,7 @@ void FileComparator::processRawValues(double value1, double value2) {
     differ.max = diff;
   }
 
-  if (diff > eps_zero) {
+  if (diff > thresh.zero) {
     counter.diff_non_zero++;
   }
 }
@@ -668,7 +668,7 @@ void FileComparator::processRoundedValues(double rounded_diff,
 
   // define epsilon for user-defined threshold
 
-  const double user_threshold = threshold + eps_zero;
+  const double user_threshold = thresh.user + thresh.zero;
 
   if (rounded_diff > user_threshold) {
     counter.diff_user++;
@@ -717,10 +717,10 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 
   if (counter.diff_print == 0) {
     std::cout << "DIFFERENCES:" << std::endl;
-    if (threshold < print_threshold) {
+    if (thresh.user < thresh.print) {
       std::cout << "\033[1;33mWarning: Threshold for printing ("
-                << print_threshold << ") is less than the overall threshold ("
-                << threshold << "). Some significant differences may not be "
+                << thresh.print << ") is less than the overall threshold ("
+                << thresh.user << "). Some significant differences may not be "
                 << "printed.\033[0m" << std::endl;
     }
 
@@ -749,7 +749,7 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
             << rangeValue << " ";
 
   // values in file1
-  if (val1 > max_TL) {
+  if (val1 > thresh.ignore) {
     std::cout << "\033[1;34m";
   }
   std::cout << formatNumber(val1, deci1, mxint, mxdec);
@@ -757,14 +757,14 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   std::cout << "\033[0m ";
 
   // values in file2
-  if (val2 > max_TL) {
+  if (val2 > thresh.ignore) {
     std::cout << "\033[1;34m";
   }
   std::cout << formatNumber(val2, deci2, mxint, mxdec);
   std::cout << "\033[0m" << " | ";
 
   // threshold
-  if (line_threshold > threshold) {
+  if (line_threshold > thresh.user) {
     std::cout << "\033[1;33m";
   }
   std::cout << std::setw(col_widths[5]) << std::setprecision(3)
@@ -778,11 +778,11 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   }
 
   // difference
-  if (val1 > max_TL || val2 > max_TL) {
+  if (val1 > thresh.ignore || val2 > thresh.ignore) {
     std::cout << "\033[1;34m";
-  } else if (diff_rounded > threshold && diff_rounded < thresh_prec) {
+  } else if (diff_rounded > thresh.user && diff_rounded < thresh_prec) {
     std::cout << "\033[1;33m";
-  } else if (diff_rounded > hard_threshold) {
+  } else if (diff_rounded > thresh.hard) {
     std::cout << "\033[1;31m";
     isERROR = true;
   } else {
@@ -800,25 +800,6 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 std::string FileComparator::formatNumber(double value, int prec,
                                          int maxIntegerWidth,
                                          int maxDecimals) const {
-  //   // Error handling for input arguments
-  //   if (prec < 0) {
-
-  //     std::cerr << "Error: Negative precision in formatNumber: " << prec
-  //               << std::endl;
-  //     prec = 0;
-  //   }
-  //   if (maxIntegerWidth < 1) {
-  //     std::cerr << "Error: maxIntegerWidth must be positive in formatNumber:
-  //     "
-  //               << maxIntegerWidth << std::endl;
-  //     maxIntegerWidth = 1;
-  //   }
-  //   if (maxDecimals < 0) {
-  //     std::cerr << "Error: maxDecimals must be non-negative in formatNumber:
-  //     "
-  //               << maxDecimals << std::endl;
-  //     maxDecimals = 0;
-  //   }
 
   // convert the number to a string with the specified precision
   std::ostringstream oss;
@@ -873,8 +854,8 @@ void FileComparator::printHardThresholdError(double rounded1, double rounded2,
     std::cout << " checked" << std::endl;
   }
 
-  std::cout << counter.diff_print << " with differences between " << threshold
-            << " and " << hard_threshold << std::endl;
+  std::cout << counter.diff_print << " with differences between " << thresh.user
+            << " and " << thresh.hard << std::endl;
 
   std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
   std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
@@ -959,11 +940,11 @@ void FileComparator::printSummary(const std::string& file1,
             << " are different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_non_zero) {
-    std::cout << "   Printed differences  ( >" << print_threshold
+    std::cout << "   Printed differences  ( >" << thresh.print
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed = counter.diff_non_zero - counter.diff_print;
     if (not_printed > 0) {
-      std::cout << "   Not printed          (<=" << print_threshold
+      std::cout << "   Not printed          (<=" << thresh.print
                 << "): " << std::setw(fmt_wid) << not_printed << std::endl;
     }
   } else {
@@ -972,7 +953,7 @@ void FileComparator::printSummary(const std::string& file1,
               << std::endl;
   }
 
-  if (differ.max > eps_zero) {
+  if (differ.max > thresh.zero) {
     std::cout << "   Maximum difference: " << differ.max << std::endl;
   }
 
@@ -1001,11 +982,11 @@ void FileComparator::printSummary(const std::string& file1,
             << " are non-trivially different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_prec) {
-    std::cout << "   Printed differences     ( >" << print_threshold
+    std::cout << "   Printed differences     ( >" << thresh.print
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed = counter.diff_prec - counter.diff_print;
     if (not_printed > 0) {
-      std::cout << "   Not printed differences (<=" << print_threshold
+      std::cout << "   Not printed differences (<=" << thresh.print
                 << "): " << std::setw(fmt_wid) << not_printed << std::endl;
     }
   } else {
@@ -1025,12 +1006,12 @@ void FileComparator::printSummary(const std::string& file1,
               << " are identical within tolerance\033[0m" << std::endl;
     return;
   }
-  std::cout << "   Significant differences   ( >" << threshold
+  std::cout << "   Significant differences   ( >" << thresh.user
             << "): " << std::setw(fmt_wid) << counter.diff_user << std::endl;
   if (counter.diff_prec > counter.diff_user) {
     size_t zero_diff = counter.diff_prec - counter.diff_user;
     if (zero_diff > 0) {
-      std::cout << "   Insignificant differences (<=" << threshold
+      std::cout << "   Insignificant differences (<=" << thresh.user
                 << "): " << std::setw(fmt_wid) << zero_diff << std::endl;
     }
   }
@@ -1038,12 +1019,12 @@ void FileComparator::printSummary(const std::string& file1,
             << " are significantly different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_user) {
-    std::cout << "   Printed differences      ( >" << print_threshold
+    std::cout << "   Printed differences      ( >" << thresh.print
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed_signif = counter.diff_user - counter.diff_print;
     if (not_printed_signif > 0) {
       std::cout << "\033[1;31m   Not printed differences  (<="
-                << print_threshold << "): " << std::setw(fmt_wid)
+                << thresh.print << "): " << std::setw(fmt_wid)
                 << not_printed_signif << "\033[0m" << std::endl;
     }
   } else {
@@ -1061,15 +1042,15 @@ void FileComparator::printSummary(const std::string& file1,
               << " are identical within print threshold\033[0m" << std::endl;
     return;
   }
-  std::cout << "   Printed differences      ( >" << print_threshold
+  std::cout << "   Printed differences      ( >" << thresh.print
             << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
 
-  if (threshold < print_threshold) {
+  if (thresh.user < thresh.print) {
     if (counter.diff_user > counter.diff_print) {
       size_t not_printed_signif = counter.diff_user - counter.diff_print;
       if (not_printed_signif > 0) {
         std::cout << "\033[1;31m   Not printed differences  (<="
-                  << print_threshold << "): " << std::setw(fmt_wid)
+                  << thresh.print << "): " << std::setw(fmt_wid)
                   << not_printed_signif << "\033[0m" << std::endl;
       }
     }
@@ -1077,7 +1058,7 @@ void FileComparator::printSummary(const std::string& file1,
     if (counter.diff_prec > counter.diff_print) {
       size_t not_printed = counter.diff_prec - counter.diff_print;
       if (not_printed > 0) {
-        std::cout << "   Not printed differences  (<=" << print_threshold
+        std::cout << "   Not printed differences  (<=" << thresh.print
                   << "): " << std::setw(fmt_wid) << not_printed << std::endl;
       }
     }
@@ -1087,11 +1068,12 @@ void FileComparator::printSummary(const std::string& file1,
   // Hard threshold differences
   // =========================================================
   if (counter.diff_hard == 0) {
+    return;
   }
 
   if (counter.diff_hard > 0) {
     std::cout << "\033[1;31m   Differences exceeding hard threshold ("
-              << hard_threshold << "): " << counter.diff_hard << "\033[0m"
+              << thresh.hard << "): " << counter.diff_hard << "\033[0m"
               << std::endl;
   } else {
     std::cout << "   No differences exceeding hard threshold found."

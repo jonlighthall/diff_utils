@@ -41,30 +41,41 @@ struct CountStats {
   long unsigned int diff_print = 0;  // print threshold (for difference table)
 };
 
+struct Thresholds {
+  // user-defined thresholds
+  double user;   // lower threshold for significant difference (fail)
+  double hard;   // threshold for critical difference (exit)
+  double print;  // threshold for printing entry in table (print)
+
+  // fixed thresholds
+  // define epsilon when threshold is zero
+  const double zero = pow(2, -23);  // equal to single precision epsilon
+
+  const double marginal =
+      110;  // upper threshold for significant difference (warning)
+  // define the maximum valid value for TL (Transmission Loss)
+  const double ignore =
+      -20 *
+      log10(pow(2, -23));  // threshold for meaningless difference (no action)
+};
+
 // Main class declaration
 class FileComparator {
  private:
-  double threshold;
-  double hard_threshold;
-  double print_threshold;
   bool new_fmt = false;
   unsigned long this_fmt_line;
   unsigned long this_fmt_column;
   unsigned long last_fmt_line;
   unsigned long this_line_ncols;
-  // define the maximum valid value for TL (Transmission Loss)
-  const double max_TL = -20 * log10(pow(2, -23));
-  // define epsilon when threshold is zero
-  const double eps_zero = pow(2, -23);  // equal to single precision epsilon
+
   DiffStats differ;
   CountStats counter;
+  Thresholds thresh;
 
  public:
   // Constructor
-  FileComparator(double thresh, double hard_thresh, double print_thresh)
-      : threshold(thresh),
-        hard_threshold(hard_thresh),
-        print_threshold(print_thresh) {};
+  FileComparator(double user_thresh, double hard_thresh, double print_thresh)
+      : thresh{user_thresh, hard_thresh, print_thresh} {};
 
   // ========================================================================
   // Public Interface
@@ -101,7 +112,7 @@ class FileComparator {
                                     std::vector<int>& dp_per_col,
                                     size_t& prev_n_col);
   bool validateDecimalPlaces(int dp1, int dp2) const;
-  bool ValidateDeciColumnSize(std::vector<int>& dp_per_col,
+  bool ValidateDeciColumnSize(const std::vector<int>& dp_per_col,
                               size_t columnIndex) const;
 
   // ========================================================================
@@ -117,9 +128,8 @@ class FileComparator {
   // ========================================================================
   // Difference Processing
   // ========================================================================
-  bool processDifference(double value1, double value2, int min_dp,
-                                       int dp1, int dp2, size_t columnIndex,
-                                       double rangeValue);
+  bool processDifference(double value1, double value2, int min_dp, int dp1,
+                         int dp2, size_t columnIndex, double rangeValue);
   void processRawValues(double value1, double value2);
   void processRoundedValues(double rounded_diff, double minimum_deci);
 
