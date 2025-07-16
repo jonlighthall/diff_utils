@@ -176,15 +176,6 @@ bool FileComparator::compareFiles(const std::string& file1,
   if (!compareFileLengths(file1, file2)) {
     return false;
   }
-
-  if (counter.diff_print > 0) {
-    std::cout << "Total differences: " << counter.diff_print << " less than "
-              << hard_threshold << std::endl;
-  } else {
-    is_same = true;
-  }
-  std::cout << "Max difference: " << differ.max << std::endl;
-
   return is_same;
 }
 
@@ -612,7 +603,6 @@ bool FileComparator::processDifference(double value1, double value2, int min_dp,
 
   // Print differences if above plot threshold
   if (diff_rounded > print_threshold) {
-
     printTable(columnIndex, ithreshold, rangeValue, value1, dp1, value2, dp2,
                diff_rounded);
     std::cout << std::endl;
@@ -982,7 +972,10 @@ void FileComparator::printSummary(const std::string& file1,
               << std::endl;
   }
 
-  std::cout << "   Maximum difference: " << differ.max << std::endl;
+  if (differ.max > eps_zero) {
+    std::cout << "   Maximum difference: " << differ.max << std::endl;
+  }
+
   printbar(1);
 
   // Trivial differences
