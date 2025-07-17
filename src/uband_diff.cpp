@@ -340,7 +340,6 @@ bool FileComparator::processLine(const LineData& data1, const LineData& data2,
       return false;
     }
   }
-
   return true;
 }
 
@@ -376,7 +375,7 @@ bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
   // and compare them
 
   ColumnValues columnData = extractColumnValues(data1, data2, columnIndex);
-  
+
   // Print format info if needed
   if (dp1 != dp2 && new_fmt) {
     printFormatInfo(columnData, columnIndex);
@@ -428,7 +427,6 @@ bool FileComparator::validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
       new_fmt = false;
     }
   }
-
   prev_n_col = n_col1;
   return true;
 }
@@ -476,7 +474,6 @@ bool FileComparator::ValidateDeciColumnSize(const std::vector<int>& dp_per_col,
     std::cerr << "Please check the input files for consistency." << std::endl;
     std::cerr << "Expected at least " << columnIndex + 1 << " columns, but got "
               << dp_per_col.size() << std::endl;
-
     return false;
   }
   return true;
@@ -587,7 +584,8 @@ double FileComparator::calculateThreshold(int ndp) {
 // ========================================================================
 // Difference Processing
 // ========================================================================
-bool FileComparator::processDifference(const ColumnValues& columnData, size_t columnIndex) {
+bool FileComparator::processDifference(const ColumnValues& columnData,
+                                       size_t columnIndex) {
   // Calculate rounded values and process difference
   double rounded1 = round_to_decimals(columnData.value1, columnData.min_dp);
   double rounded2 = round_to_decimals(columnData.value2, columnData.min_dp);
@@ -610,8 +608,8 @@ bool FileComparator::processDifference(const ColumnValues& columnData, size_t co
     // << columnIndex + 1 << std::endl;
     std::cout << "   DIFF: Values at line " << counter.lineNumber << ", column "
               << std::setw(line_num_width) << columnIndex + 1
-              << " are equal: " << std::setprecision(columnData.min_dp) << rounded1
-              << std::endl;
+              << " are equal: " << std::setprecision(columnData.min_dp)
+              << rounded1 << std::endl;
 #endif
   }
 
@@ -622,7 +620,6 @@ bool FileComparator::processDifference(const ColumnValues& columnData, size_t co
     printHardThresholdError(rounded1, rounded2, diff_rounded, columnIndex);
     return false;
   }
-
   return true;
 }
 
@@ -632,7 +629,7 @@ void FileComparator::processRawValues(double value1, double value2) {
   if (diff > differ.max) {
     differ.max = diff;
   }
-
+  // track number of differences
   if (diff > thresh.zero) {
     counter.diff_non_zero++;
   }
@@ -641,7 +638,6 @@ void FileComparator::processRawValues(double value1, double value2) {
 void FileComparator::processRoundedValues(double rounded_diff,
                                           double minimum_deci) {
   // compare values (with rounding)
-
   if (rounded_diff > differ.max_rounded) {
     differ.max_rounded = rounded_diff;
   }
@@ -672,8 +668,9 @@ void FileComparator::processRoundedValues(double rounded_diff,
 // ========================================================================
 // Output & Formatting
 // ========================================================================
-void FileComparator::printTable(const ColumnValues& columnData, size_t columnIndex,
-                                double line_threshold, double diff_rounded) {
+void FileComparator::printTable(const ColumnValues& columnData,
+                                size_t columnIndex, double line_threshold,
+                                double diff_rounded) {
   // Print a row in the difference table
   // Contents of the table:
   //    [0] the line number is printed
@@ -862,7 +859,7 @@ void FileComparator::printFormatInfo(const ColumnValues& columnData,
 #ifdef DEBUG2
   std::cout << "   NEW FORMAT" << std::endl;
 #endif
-// print the format
+  // print the format
   std::cout << "DEBUG : Line " << counter.lineNumber << ", Column "
             << columnIndex + 1 << std::endl;
   std::cout << "   FORMAT: number of decimal places file1: " << columnData.dp1
@@ -879,8 +876,8 @@ void FileComparator::printDiffLikeSummary(const SummaryParams& params) const {
   // Diff-like differences
   // =========================================================
   if (counter.diff_non_zero == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
-              << " are identical\033[0m" << std::endl;
+    std::cout << "\033[1;32m   Files " << params.file1 << " and "
+              << params.file2 << " are identical\033[0m" << std::endl;
     return;
   }
   if (counter.elemNumber > counter.diff_non_zero) {
@@ -903,12 +900,14 @@ void FileComparator::printDiffLikeSummary(const SummaryParams& params) const {
   if (counter.diff_print < counter.diff_non_zero) {
 #ifdef DEBUG
     std::cout << "   Printed differences  ( >" << thresh.print
-              << "): " << std::setw(params.fmt_wid) << counter.diff_print << std::endl;
+              << "): " << std::setw(params.fmt_wid) << counter.diff_print
+              << std::endl;
 #endif
     size_t not_printed = counter.diff_non_zero - counter.diff_print;
     if (not_printed > 0) {
       std::cout << "   Not printed          (<=" << thresh.print
-                << "): " << std::setw(params.fmt_wid) << not_printed << std::endl;
+                << "): " << std::setw(params.fmt_wid) << not_printed
+                << std::endl;
     }
   } else {
     std::cout << "   All non-zero "
@@ -927,7 +926,8 @@ void FileComparator::printRoundedSummary(const SummaryParams& params) const {
   // Trivial differences
   // =========================================================
   if (counter.diff_prec == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
+    std::cout << "\033[1;32m   Files " << params.file1 << " and "
+              << params.file2
               << " are identical with trivial differences due to "
                  "formatting\033[0m"
               << std::endl;
@@ -940,19 +940,21 @@ void FileComparator::printRoundedSummary(const SummaryParams& params) const {
                 << "): " << std::setw(params.fmt_wid) << zero_diff << std::endl;
     }
   }
-  std::cout << "   Non-trivial differences          : " << std::setw(params.fmt_wid)
-            << counter.diff_prec << std::endl;
+  std::cout << "   Non-trivial differences          : "
+            << std::setw(params.fmt_wid) << counter.diff_prec << std::endl;
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are non-trivially different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_prec) {
     std::cout << "   Printed differences     ( >" << thresh.print
-              << "): " << std::setw(params.fmt_wid) << counter.diff_print << std::endl;
+              << "): " << std::setw(params.fmt_wid) << counter.diff_print
+              << std::endl;
     size_t not_printed = counter.diff_prec - counter.diff_print;
     if (not_printed > 0) {
       std::cout << "   Not printed differences (<=" << thresh.print
-                << "): " << std::setw(params.fmt_wid) << not_printed << std::endl;
+                << "): " << std::setw(params.fmt_wid) << not_printed
+                << std::endl;
     }
   } else {
     std::cout << "   All non-trivial "
@@ -965,16 +967,19 @@ void FileComparator::printRoundedSummary(const SummaryParams& params) const {
   printbar(1);
 }
 
-void FileComparator::printSignificantSummary(const SummaryParams& params) const {
+void FileComparator::printSignificantSummary(
+    const SummaryParams& params) const {
   // User-defined threshold differences
   // =========================================================
   if (counter.diff_user == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
-              << " are identical within tolerance\033[0m" << std::endl;
+    std::cout << "\033[1;32m   Files " << params.file1 << " and "
+              << params.file2 << " are identical within tolerance\033[0m"
+              << std::endl;
     return;
   }
   std::cout << "   Significant differences   ( >" << thresh.user
-            << "): " << std::setw(params.fmt_wid) << counter.diff_user << std::endl;
+            << "): " << std::setw(params.fmt_wid) << counter.diff_user
+            << std::endl;
   if (counter.diff_prec > counter.diff_user) {
     size_t zero_diff = counter.diff_prec - counter.diff_user;
     if (zero_diff > 0) {
@@ -987,7 +992,8 @@ void FileComparator::printSignificantSummary(const SummaryParams& params) const 
 
   if (counter.diff_print < counter.diff_user) {
     std::cout << "   Printed differences      ( >" << thresh.print
-              << "): " << std::setw(params.fmt_wid) << counter.diff_print << std::endl;
+              << "): " << std::setw(params.fmt_wid) << counter.diff_print
+              << std::endl;
     size_t not_printed_signif = counter.diff_user - counter.diff_print;
     if (not_printed_signif > 0) {
       std::cout << "\033[1;31m   Not printed differences  (<=" << thresh.print
@@ -1003,7 +1009,8 @@ void FileComparator::printSignificantSummary(const SummaryParams& params) const 
   printbar(1);
 }
 
-void FileComparator::printSummary(const SummaryParams& params, int argc,
+void FileComparator::printSummary(const std::string& file1,
+                                  const std::string& file2, int argc,
                                   char* argv[]) const {
 #ifdef DEBUG
   std::cout << "ARGUMENTS:" << std::endl;
@@ -1015,14 +1022,14 @@ void FileComparator::printSummary(const SummaryParams& params, int argc,
   }
   std::cout << std::endl;
 #ifdef DEBUG
-  std::cout << "   File1: " << params.file1 << std::endl;
-  std::cout << "   File2: " << params.file2 << std::endl;
+  std::cout << "   File1: " << file1 << std::endl;
+  std::cout << "   File2: " << file2 << std::endl;
 
   std::cout << "STATISTICS:" << std::endl;
   std::cout << "   Total lines compared: " << counter.lineNumber;
 
   // Check if all lines were compared
-  size_t length1 = getFileLength(params.file1);
+  size_t length1 = getFileLength(file1);
   if (length1 == counter.lineNumber) {
     std::cout << " (all)" << std::endl;
   } else {
@@ -1039,17 +1046,18 @@ void FileComparator::printSummary(const SummaryParams& params, int argc,
 
   // Calculate the width for formatting
   auto fmt_wid = static_cast<int>(std::to_string(counter.elemNumber).length());
-  SummaryParams params_with_width{params.file1, params.file2, fmt_wid};
+  SummaryParams params{file1, file2, fmt_wid};
 
-  printDiffLikeSummary(params_with_width);
-  printRoundedSummary(params_with_width);
-  printSignificantSummary(params_with_width);
+  printDiffLikeSummary(params);
+  printRoundedSummary(params);
+  printSignificantSummary(params);
 
   // Print theshold differences
   // =========================================================
   if (counter.diff_print == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
-              << " are identical within print threshold\033[0m" << std::endl;
+    std::cout << "\033[1;32m   Files " << params.file1 << " and "
+              << params.file2 << " are identical within print threshold\033[0m"
+              << std::endl;
     return;
   }
   std::cout << "   Printed differences      ( >" << thresh.print
@@ -1090,23 +1098,23 @@ void FileComparator::printSummary(const SummaryParams& params, int argc,
               << std::endl;
 
     if (counter.diff_print == 0) {
-      std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
-                << " are identical.\033[0m" << std::endl;
+      std::cout << "\033[1;32m   Files " << params.file1 << " and "
+                << params.file2 << " are identical.\033[0m" << std::endl;
     }
   }
 }
 
-ColumnValues FileComparator::extractColumnValues(
-    const LineData& data1, const LineData& data2, size_t columnIndex) const {
+ColumnValues FileComparator::extractColumnValues(const LineData& data1,
+                                                 const LineData& data2,
+                                                 size_t columnIndex) const {
+  double val1 = data1.values[columnIndex];
+  double val2 = data2.values[columnIndex];
+  double rangeValue = data1.values[0];  // first value in the line
 
-    double val1 = data1.values[columnIndex];
-    double val2 = data2.values[columnIndex];
-    double rangeValue = data1.values[0];  // first value in the line
+  // Get decimal places from the LineData structure
+  int dp1 = data1.decimal_places[columnIndex];
+  int dp2 = data2.decimal_places[columnIndex];
+  int min_dp = std::min(dp1, dp2);
 
-    // Get decimal places from the LineData structure
-    int dp1 = data1.decimal_places[columnIndex];
-    int dp2 = data2.decimal_places[columnIndex];
-    int min_dp = std::min(dp1, dp2);
-
-    return {val1, val2, rangeValue, dp1, dp2, min_dp};
+  return {val1, val2, rangeValue, dp1, dp2, min_dp};
 }

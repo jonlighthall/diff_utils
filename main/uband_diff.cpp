@@ -124,10 +124,7 @@ int main(int argc, char* argv[]) {
   isERROR = false;
   FileComparator comparator(count_level, hard_level, print_level);
   bool result = comparator.compareFiles(file1, file2);
-
-  // Create SummaryParams struct
-  SummaryParams params{file1, file2, -1}; // fmt_wid will be calculated in printSummary
-  comparator.printSummary(params, argc, argv);
+  comparator.printSummary(file1, file2, argc, argv);
 
   if (isERROR) {
     std::cout << "   \033[1;31mError found.\033[0m" << std::endl;

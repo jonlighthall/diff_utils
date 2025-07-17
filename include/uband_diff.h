@@ -21,18 +21,18 @@ struct LineData {
 };
 
 struct ColumnValues {
-  double value1;        // Value from first file at current column
-  double value2;        // Value from second file at current column
-  double range;        // First value in the line (used as range indicator)
-  int dp1;             // Decimal places for file1 value
-  int dp2;             // Decimal places for file2 value
-  int min_dp;          // Minimum decimal places (for rounding)
+  double value1;  // Value from first file at current column
+  double value2;  // Value from second file at current column
+  double range;   // First value in the line (used as range indicator)
+  int dp1;        // Decimal places for file1 value
+  int dp2;        // Decimal places for file2 value
+  int min_dp;     // Minimum decimal places (for rounding)
 };
 
 struct SummaryParams {
-  std::string file1;   // Path to first file
-  std::string file2;   // Path to second file
-  int fmt_wid;         // Formatting width for output alignment
+  std::string file1;  // Path to first file
+  std::string file2;  // Path to second file
+  int fmt_wid;        // Formatting width for output alignment
 };
 
 struct DiffStats {
@@ -99,7 +99,8 @@ class FileComparator {
   LineData parseLine(const std::string& line) const;
   /** @note the function parseLine() reads a line from the file and returns a
    LineData object */
-  void printSummary(const SummaryParams& params, int argc, char* argv[]) const;
+  void printSummary(const std::string& file1, const std::string& file2,
+                    int argc, char* argv[]) const;
 
  private:
   // ========================================================================
@@ -149,15 +150,16 @@ class FileComparator {
   // ========================================================================
   // Output & Formatting
   // ========================================================================
-  ColumnValues extractColumnValues(
-      const LineData& data1, const LineData& data2, size_t columnIndex) const;
+  ColumnValues extractColumnValues(const LineData& data1, const LineData& data2,
+                                   size_t columnIndex) const;
   void printTable(const ColumnValues& columnData, size_t columnIndex,
                   double line_threshold, double diff_rounded);
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                            int maxDecimals) const;
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
-  void printFormatInfo(const ColumnValues& columnData, size_t columnIndex) const;
+  void printFormatInfo(const ColumnValues& columnData,
+                       size_t columnIndex) const;
   void printDiffLikeSummary(const SummaryParams& params) const;
   void printRoundedSummary(const SummaryParams& params) const;
   void printSignificantSummary(const SummaryParams& params) const;
