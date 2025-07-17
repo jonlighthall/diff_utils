@@ -380,8 +380,7 @@ bool FileComparator::processColumn(const LineData& data1, const LineData& data2,
   // round the values to the minimum decimal places
   // and compare them
 
-  return processDifference(data1.values[columnIndex], data2.values[columnIndex],
-                           min_dp, dp1, dp2, columnIndex, data1.values[0]);
+  return processDifference(data1, data2, columnIndex, min_dp, dp1, dp2);
 }
 
 // ========================================================================
@@ -586,9 +585,13 @@ double FileComparator::calculateThreshold(int ndp) {
 // ========================================================================
 // Difference Processing
 // ========================================================================
-bool FileComparator::processDifference(double value1, double value2, int min_dp,
-                                       int dp1, int dp2, size_t columnIndex,
-                                       double rangeValue) {
+bool FileComparator::processDifference(const LineData& data1,
+                                       const LineData& data2,
+                                       size_t columnIndex, int min_dp, int dp1,
+                                       int dp2) {
+  double value1 = data1.values[columnIndex];
+  double value2 = data2.values[columnIndex];
+
   // Calculate rounded values and process difference
   double rounded1 = round_to_decimals(value1, min_dp);
   double rounded2 = round_to_decimals(value2, min_dp);
@@ -600,8 +603,7 @@ bool FileComparator::processDifference(double value1, double value2, int min_dp,
 
   // Print differences if above plot threshold
   if (diff_rounded > thresh.print) {
-    printTable(columnIndex, ithreshold, rangeValue, value1, dp1, value2, dp2,
-               diff_rounded);
+    printTable(data1, data2, columnIndex, ithreshold, dp1, dp2, diff_rounded);
     std::cout << std::endl;
   } else {
     counter.elemNumber++;
@@ -674,9 +676,9 @@ void FileComparator::processRoundedValues(double rounded_diff,
 // ========================================================================
 // Output & Formatting
 // ========================================================================
-void FileComparator::printTable(size_t columnIndex, double line_threshold,
-                                double rangeValue, double val1, int deci1,
-                                double val2, int deci2, double diff_rounded) {
+void FileComparator::printTable(const LineData& data1, const LineData& data2,
+                                size_t columnIndex, double line_threshold,
+                                int deci1, int deci2, double diff_rounded) {
   // Print a row in the difference table
   // Contents of the table:
   //    [0] the line number is printed
@@ -735,6 +737,10 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   counter.diff_print++;
 
   /* PRINT DIFF TABLE ENTRY */
+  double val1 = data1.values[columnIndex];
+  double val2 = data2.values[columnIndex];
+  double rangeValue = data1.values[0];  // first value in the line is the range
+
   // line
   std::cout << std::setw(col_widths[0]) << counter.lineNumber;
   // column
@@ -1103,4 +1109,3 @@ void FileComparator::printSummary(const std::string& file1,
     }
   }
 }
-                                                                      

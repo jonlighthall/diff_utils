@@ -128,29 +128,29 @@ class FileComparator {
   // ========================================================================
   // Difference Processing
   // ========================================================================
-  bool processDifference(double value1, double value2, int min_dp, int dp1,
-                         int dp2, size_t columnIndex, double rangeValue);
+  bool processDifference(const LineData& data1, const LineData& data2,
+                         size_t columnIndex, int min_dp, int dp1, int dp2);
   void processRawValues(double value1, double value2);
   void processRoundedValues(double rounded_diff, double minimum_deci);
 
   // ========================================================================
   // Output & Formatting
   // ========================================================================
-  void printTable(size_t columnIndex, double line_threshold, double rangeValue,
-                  double val1, int deci1, double val2, int deci2,
-                  double diff_rounded);
+  void printTable(const LineData& data1, const LineData& data2,
+                  size_t columnIndex, double line_threshold, int deci1,
+                  int deci2, double diff_rounded);
   std::string formatNumber(double value, int prec, int maxIntegerWidth,
                            int maxDecimals) const;
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
-    void printDiffLikeSummary(const std::string& file1,
-                                  const std::string& file2, const int fmt_wid) const;
-    void printRoundedSummary(const std::string& file1,
-                                  const std::string& file2, const int fmt_wid) const;
-    void printSignificantSummary(const std::string& file1,
-                                  const std::string& file2, const int fmt_wid) const;
-
+  void printDiffLikeSummary(const std::string& file1, const std::string& file2,
+                            const int fmt_wid) const;
+  void printRoundedSummary(const std::string& file1, const std::string& file2,
+                           const int fmt_wid) const;
+  void printSignificantSummary(const std::string& file1,
+                               const std::string& file2,
+                               const int fmt_wid) const;
 };
 
 #endif  // UBAND_DIFF_H
