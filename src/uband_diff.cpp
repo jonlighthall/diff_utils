@@ -168,6 +168,18 @@ LineData FileComparator::parse_line(const std::string& line) const {
   std::istringstream stream(line);
   char ch;
 
+  auto validate_decimal_places = [line_number = counter.line_number](
+                                     const int ndp, Flags& flags) {
+    if (ndp < 0 || ndp > 10) {  // Arbitrary limit for decimal places
+      std::cerr << "Invalid number of decimal places found on line "
+                << line_number << ": " << ndp << ". Must be between 0 and 10."
+                << std::endl;
+      flags.error_found = true;
+      return false;
+    }
+    return true;
+  };
+
   while (stream >> ch) {
     // check if the numbers are complex and read them accordingly
     // check if string starts with '('
@@ -176,7 +188,13 @@ LineData FileComparator::parse_line(const std::string& line) const {
       auto [real, imag, dp_real, dp_imag] = readComplex(stream, flag);
       result.values.push_back(real);
       result.values.push_back(imag);
-      result.decimal_places.push_back(dp_real);
+      // validate decimal places for real and imaginary parts
+      if (validate_decimal_places(dp_real, flag)) {
+        result.decimal_places.push_back(dp_real);
+      }
+      if (validate_decimal_places(dp_imag, flag)) {
+        result.decimal_places.push_back(dp_imag);
+      }
       result.decimal_places.push_back(dp_imag);
     } else {
       // if the character is not '(', it is a number
