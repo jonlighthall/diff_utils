@@ -32,10 +32,6 @@
 #include <string>
 #include <vector>
 
-#undef DEBUG3
-#undef DEBUG2
-#undef DEBUG
-
 #ifdef DEBUG3  // print each step of the process
 #ifndef DEBUG2
 #define DEBUG2
@@ -157,7 +153,8 @@ bool FileComparator::compareFiles(const std::string& file1,
   // track if the files are the same
   bool is_same = false;
 
-  std::cout << "   Max TL: \033[1;34m" << thresh.ignore << "\033[0m" << std::endl;
+  std::cout << "   Max TL: \033[1;34m" << thresh.ignore << "\033[0m"
+            << std::endl;
 
   // Process files line by line
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
@@ -224,7 +221,7 @@ LineData FileComparator::parseLine(const std::string& line) const {
 
 bool FileComparator::openFiles(const std::string& file1,
                                const std::string& file2, std::ifstream& infile1,
-                               std::ifstream& infile2) {
+                               std::ifstream& infile2) const {
   infile1.open(file1);
   infile2.open(file2);
 
@@ -577,8 +574,8 @@ double FileComparator::calculateThreshold(int ndp) {
 #ifdef DEBUG
     if (new_fmt) {
       std::cout << "   \033[1;33mNOTE: " << dp_threshold
-                << " is greater than the specified threshold: " << thresholds.user
-                << "\033[0m" << std::endl;
+                << " is greater than the specified threshold: "
+                << thresholds.user << "\033[0m" << std::endl;
     }
 #endif
     return dp_threshold;
@@ -652,7 +649,6 @@ void FileComparator::processRoundedValues(double rounded_diff,
   }
 
   //   double ieps = ithreshold * 0.1;
-
   //   // Check precision threshold
   //   if (double thresh_prec = ithreshold + ieps; diff_rounded > thresh_prec) {
   //     counter.diff_prec++;
@@ -718,9 +714,9 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
   if (counter.diff_print == 0) {
     std::cout << "DIFFERENCES:" << std::endl;
     if (thresh.user < thresh.print) {
-      std::cout << "\033[1;33mWarning: Threshold for printing ("
-                << thresh.print << ") is less than the overall threshold ("
-                << thresh.user << "). Some significant differences may not be "
+      std::cout << "\033[1;33mWarning: Threshold for printing (" << thresh.print
+                << ") is less than the overall threshold (" << thresh.user
+                << "). Some significant differences may not be "
                 << "printed.\033[0m" << std::endl;
     }
 
@@ -800,7 +796,6 @@ void FileComparator::printTable(size_t columnIndex, double line_threshold,
 std::string FileComparator::formatNumber(double value, int prec,
                                          int maxIntegerWidth,
                                          int maxDecimals) const {
-
   // convert the number to a string with the specified precision
   std::ostringstream oss;
 
@@ -883,40 +878,9 @@ void printbar(int indent = 0) {
             << std::endl;
 }
 
-void FileComparator::printSummary(const std::string& file1,
-                                  const std::string& file2, int argc,
-                                  char* argv[]) const {
-  std::cout << "ARGUMENTS:" << std::endl;
-  // print command line arguments
-  std::cout << "   Input:";
-  for (int i = 0; i < argc; ++i) {
-    std::cout << " " << argv[i];
-  }
-  std::cout << std::endl;
-  std::cout << "   File1: " << file1 << std::endl;
-  std::cout << "   File2: " << file2 << std::endl;
-
-  std::cout << "STATISTICS:" << std::endl;
-  std::cout << "   Total lines compared: " << counter.lineNumber;
-
-  // Check if all lines were compared
-  size_t length1 = getFileLength(file1);
-  if (length1 == counter.lineNumber) {
-    std::cout << " (all)" << std::endl;
-  } else {
-    std::cout << " of " << length1 << std::endl;
-    // print how many lines were not compared
-    size_t missing_lines = length1 - counter.lineNumber;
-    std::cout << "\033[1;31m   " << missing_lines
-              << " lines were not compared\033[0m" << std::endl;
-  }
-
-  std::cout << "   Total elements checked: " << counter.elemNumber << std::endl;
-
-  std::cout << "SUMMARY:" << std::endl;
-  // Calculate the width for formatting
-  auto fmt_wid = static_cast<int>(std::to_string(counter.elemNumber).length());
-
+void FileComparator::printDiffLikeSummary(const std::string& file1,
+                                          const std::string& file2,
+                                          const int fmt_wid) const {
   // Diff-like differences
   // =========================================================
   if (counter.diff_non_zero == 0) {
@@ -927,8 +891,10 @@ void FileComparator::printSummary(const std::string& file1,
   if (counter.elemNumber > counter.diff_non_zero) {
     const size_t zero_diff = counter.elemNumber - counter.diff_non_zero;
     if (zero_diff > 0) {
+#ifdef DEBUG
       std::cout << "   Exact matches        ( =" << 0.0
                 << "): " << std::setw(fmt_wid) << zero_diff << std::endl;
+#endif
     }
   }
 
@@ -940,8 +906,10 @@ void FileComparator::printSummary(const std::string& file1,
             << " are different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_non_zero) {
+#ifdef DEBUG
     std::cout << "   Printed differences  ( >" << thresh.print
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
+#endif
     size_t not_printed = counter.diff_non_zero - counter.diff_print;
     if (not_printed > 0) {
       std::cout << "   Not printed          (<=" << thresh.print
@@ -958,7 +926,11 @@ void FileComparator::printSummary(const std::string& file1,
   }
 
   printbar(1);
+}
 
+void FileComparator::printRoundedSummary(const std::string& file1,
+                                         const std::string& file2,
+                                         const int fmt_wid) const {
   // Trivial differences
   // =========================================================
   if (counter.diff_prec == 0) {
@@ -998,7 +970,11 @@ void FileComparator::printSummary(const std::string& file1,
   std::cout << "   Maximum rounded difference: " << differ.max_rounded
             << std::endl;
   printbar(1);
+}
 
+void FileComparator::printSignificantSummary(const std::string& file1,
+                                             const std::string& file2,
+                                             const int fmt_wid) const {
   // User-defined threshold differences
   // =========================================================
   if (counter.diff_user == 0) {
@@ -1023,9 +999,9 @@ void FileComparator::printSummary(const std::string& file1,
               << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
     size_t not_printed_signif = counter.diff_user - counter.diff_print;
     if (not_printed_signif > 0) {
-      std::cout << "\033[1;31m   Not printed differences  (<="
-                << thresh.print << "): " << std::setw(fmt_wid)
-                << not_printed_signif << "\033[0m" << std::endl;
+      std::cout << "\033[1;31m   Not printed differences  (<=" << thresh.print
+                << "): " << std::setw(fmt_wid) << not_printed_signif
+                << "\033[0m" << std::endl;
     }
   } else {
     std::cout << "   All significant "
@@ -1034,6 +1010,48 @@ void FileComparator::printSummary(const std::string& file1,
   }
 
   printbar(1);
+}
+
+void FileComparator::printSummary(const std::string& file1,
+                                  const std::string& file2, int argc,
+                                  char* argv[]) const {
+#ifdef DEBUG
+  std::cout << "ARGUMENTS:" << std::endl;
+#endif
+  // print command line arguments
+  std::cout << "   Input:";
+  for (int i = 0; i < argc; ++i) {
+    std::cout << " " << argv[i];
+  }
+  std::cout << std::endl;
+#ifdef DEBUG
+  std::cout << "   File1: " << file1 << std::endl;
+  std::cout << "   File2: " << file2 << std::endl;
+
+  std::cout << "STATISTICS:" << std::endl;
+  std::cout << "   Total lines compared: " << counter.lineNumber;
+
+  // Check if all lines were compared
+  size_t length1 = getFileLength(file1);
+  if (length1 == counter.lineNumber) {
+    std::cout << " (all)" << std::endl;
+  } else {
+    std::cout << " of " << length1 << std::endl;
+    // print how many lines were not compared
+    size_t missing_lines = length1 - counter.lineNumber;
+    std::cout << "\033[1;31m   " << missing_lines
+              << " lines were not compared\033[0m" << std::endl;
+  }
+
+  std::cout << "   Total elements checked: " << counter.elemNumber << std::endl;
+#endif
+  std::cout << "SUMMARY:" << std::endl;
+  // Calculate the width for formatting
+  auto fmt_wid = static_cast<int>(std::to_string(counter.elemNumber).length());
+
+  printDiffLikeSummary(file1, file2, fmt_wid);
+  printRoundedSummary(file1, file2, fmt_wid);
+  printSignificantSummary(file1, file2, fmt_wid);
 
   // Print theshold differences
   // =========================================================
@@ -1049,9 +1067,9 @@ void FileComparator::printSummary(const std::string& file1,
     if (counter.diff_user > counter.diff_print) {
       size_t not_printed_signif = counter.diff_user - counter.diff_print;
       if (not_printed_signif > 0) {
-        std::cout << "\033[1;31m   Not printed differences  (<="
-                  << thresh.print << "): " << std::setw(fmt_wid)
-                  << not_printed_signif << "\033[0m" << std::endl;
+        std::cout << "\033[1;31m   Not printed differences  (<=" << thresh.print
+                  << "): " << std::setw(fmt_wid) << not_printed_signif
+                  << "\033[0m" << std::endl;
       }
     }
   } else {
@@ -1085,3 +1103,4 @@ void FileComparator::printSummary(const std::string& file1,
     }
   }
 }
+                                                                      

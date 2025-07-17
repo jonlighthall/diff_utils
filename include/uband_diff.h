@@ -92,7 +92,7 @@ class FileComparator {
   // File Operations
   // ========================================================================
   bool openFiles(const std::string& file1, const std::string& file2,
-                 std::ifstream& infile1, std::ifstream& infile2);
+                 std::ifstream& infile1, std::ifstream& infile2) const;
   long unsigned int getFileLength(const std::string& file) const;
   bool compareFileLengths(const std::string& file1,
                           const std::string& file2) const;
@@ -144,6 +144,13 @@ class FileComparator {
   void printHardThresholdError(double rounded1, double rounded2,
                                double diff_rounded, size_t columnIndex) const;
   void printFormatInfo(int dp1, int dp2, size_t columnIndex) const;
+    void printDiffLikeSummary(const std::string& file1,
+                                  const std::string& file2, const int fmt_wid) const;
+    void printRoundedSummary(const std::string& file1,
+                                  const std::string& file2, const int fmt_wid) const;
+    void printSignificantSummary(const std::string& file1,
+                                  const std::string& file2, const int fmt_wid) const;
+
 };
 
 #endif  // UBAND_DIFF_H
