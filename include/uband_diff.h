@@ -8,13 +8,13 @@
 #include <tuple>
 #include <vector>
 
-// Global error flag
-extern bool isERROR;
-
-// Forward declarations for utility functions
-std::tuple<double, double, int, int> readComplex(std::istringstream& stream);
-
 // Data structures
+
+struct Flags {
+  bool new_fmt = false;;
+  bool isERROR = false;  // Global error flag
+};
+
 struct LineData {
   std::vector<double> values;
   std::vector<int> decimal_places;
@@ -74,19 +74,12 @@ struct Thresholds {
       log10(pow(2, -23));  // threshold for meaningless difference (no action)
 };
 
+// Forward declarations for utility functions
+std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
+                                                 Flags& flag);
+
 // Main class declaration
 class FileComparator {
- private:
-  bool new_fmt = false;
-  unsigned long this_fmt_line;
-  unsigned long this_fmt_column;
-  unsigned long last_fmt_line;
-  unsigned long this_line_ncols;
-
-  DiffStats differ;
-  CountStats counter;
-  Thresholds thresh;
-
  public:
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh)
@@ -102,7 +95,26 @@ class FileComparator {
   void printSummary(const std::string& file1, const std::string& file2,
                     int argc, char* argv[]) const;
 
+  // ========================================================================
+  // Flag Access Methods
+  // ========================================================================
+  const Flags& getFlag() const { return flag; }
+  Flags& getFlag() { return flag; }
+
  private:
+  // ========================================================================
+  // Data Members
+  // ========================================================================
+  mutable Flags flag;
+  unsigned long this_fmt_line;
+  unsigned long this_fmt_column;
+  unsigned long last_fmt_line;
+  unsigned long this_line_ncols;
+
+  DiffStats differ;
+  CountStats counter;
+  Thresholds thresh;
+
   // ========================================================================
   // File Operations
   // ========================================================================

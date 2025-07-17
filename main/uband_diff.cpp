@@ -121,12 +121,11 @@ int main(int argc, char* argv[]) {
     std::cout << print_level << "\033[0m (default)" << std::endl;
   }
 
-  isERROR = false;
   FileComparator comparator(count_level, hard_level, print_level);
   bool result = comparator.compareFiles(file1, file2);
   comparator.printSummary(file1, file2, argc, argv);
 
-  if (isERROR) {
+  if (comparator.getFlag().isERROR) {
     std::cout << "   \033[1;31mError found.\033[0m" << std::endl;
     return 1;
   }
