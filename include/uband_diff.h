@@ -76,6 +76,14 @@ struct Flags {
   bool files_are_close_enough = true;  // Files are same within user-defined threshold
 };
 
+struct DiffStats {
+  // track the maximum difference found
+  double max_non_zero = 0;
+  double max_non_trivial = 0;
+  double max_significant = 0;  // maximum significant difference
+};
+
+
 struct LineData {
   std::vector<double> values;
   std::vector<int> decimal_places;
@@ -96,11 +104,6 @@ struct SummaryParams {
   int fmt_wid;        // Formatting width for output alignment
 };
 
-struct DiffStats {
-  // track the maximum difference found
-  double max = 0;
-  double max_rounded = 0;
-};
 
 
 

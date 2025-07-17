@@ -310,7 +310,7 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
   size_t n_col1 = data1.values.size();
   size_t n_col2 = data2.values.size();
 
-  // print debug information if DEBUG2 is defined
+  // print line contents if DEBUG2 is defined
 #ifdef DEBUG2
   std::cout << "DEBUG2: Line " << counter.line_number << std::endl;
   std::cout << "   CONTENTS:" << std::endl;
@@ -590,6 +590,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // Calculate rounded values and process difference
   double rounded1 = round_to_decimals(column_data.value1, column_data.min_dp);
   double rounded2 = round_to_decimals(column_data.value2, column_data.min_dp);
+  // compare values (with rounding)
   double diff_rounded = std::abs(rounded1 - rounded2);
 
   process_rounded_values(diff_rounded, column_data.min_dp);
@@ -628,23 +629,21 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
 void FileComparator::process_raw_values(double value1, double value2) {
   // compare values (without rounding)
   double diff = std::abs(value1 - value2);
-  if (diff > differ.max) {
-    differ.max = diff;
+
+  // track the maximum difference
+  if (diff > differ.max_non_zero) {
+    differ.max_non_zero = diff;
   }
   // track number of differences
   if (diff > thresh.zero) {
     counter.diff_non_zero++;
     flag.has_non_zero_diff = true;
+    flag.files_are_same = false;
   }
 }
 
 void FileComparator::process_rounded_values(double rounded_diff,
                                             int minimum_deci) {
-  // compare values (with rounding)
-  if (rounded_diff > differ.max_rounded) {
-    differ.max_rounded = rounded_diff;
-  }
-
   // Define the threshold for non-trivial differences
   //
   // The smallest non-zero difference between values with N decimal
@@ -657,11 +656,23 @@ void FileComparator::process_rounded_values(double rounded_diff,
   if (double big_zero = pow(10, -minimum_deci) / 2; rounded_diff > big_zero) {
     counter.diff_non_trivial++;
     flag.has_non_trivial_diff = true;
+    flag.files_have_same_values = false;
+
+    // track the maximum non trivial difference
+    if (rounded_diff > differ.max_non_trivial) {
+      differ.max_non_trivial = rounded_diff;
+    }
   }
 
   if (rounded_diff > thresh.significant) {
     counter.diff_significant++;
     flag.has_significant_diff = true;
+    flag.files_are_close_enough = false;
+
+    // track the maximum significant difference
+    if (rounded_diff > differ.max_significant) {
+      differ.max_significant = rounded_diff;
+    }
   }
 }
 
@@ -921,8 +932,8 @@ void FileComparator::print_diff_like_summary(
               << std::endl;
   }
 
-  if (differ.max > thresh.zero) {
-    std::cout << "   Maximum difference: " << differ.max << std::endl;
+  if (differ.max_non_zero > thresh.zero) {
+    std::cout << "   Maximum difference: " << differ.max_non_zero << std::endl;
   }
 
   printbar(1);
@@ -969,7 +980,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << std::endl;
   }
 
-  std::cout << "   Maximum rounded difference: " << differ.max_rounded
+  std::cout << "   Maximum rounded difference: " << differ.max_non_trivial
             << std::endl;
   printbar(1);
 }
