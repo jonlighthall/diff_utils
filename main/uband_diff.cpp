@@ -26,9 +26,10 @@ int main(int argc, char* argv[]) {
   // argv[0] is the program name
   // argv[1] is the first file name
   // argv[2] is the second file name
-  // argv[3] is the threshold for differences (default: 0.05)
-  // argv[4] is the hard threshold for differences (default: 1.0)
-  //
+  // argv[3] is the threshold for significant differences (default: 0.05)
+  // argv[4] is the threshold for critical differences (default: 1.0)
+  // argv[5] is the threshold for printing entries in the differences table
+  // (default: 1.0) argv[6] is the debug level (default: 0)
 
   /* DEFAULTS */
   std::string file1 = "file1.txt";
@@ -36,6 +37,7 @@ int main(int argc, char* argv[]) {
   double count_level = 0.05;
   double hard_level = 10;
   double print_level = 1;  // print level for differences
+  int debug_level = 0;     // debug level
 
 #ifdef DEBUG2
   std::cout << "Debug mode 2 is ON" << std::endl;
@@ -121,7 +123,13 @@ int main(int argc, char* argv[]) {
     std::cout << print_level << "\033[0m (default)" << std::endl;
   }
 
-  FileComparator comparator(count_level, hard_level, print_level);
+  if (argc >= 7) {
+    std::cout << "   Debug level    : ";
+    debug_level = std::stoi(argv[6]);
+    std::cout << debug_level << std::endl;
+  }
+
+  FileComparator comparator(count_level, hard_level, print_level, debug_level);
   bool result = comparator.compare_files(file1, file2);
   comparator.print_summary(file1, file2, argc, argv);
 

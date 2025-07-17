@@ -13,9 +13,9 @@
 struct Thresholds {
   // user-defined thresholds
   // -------------------------------------------------------
-  double significant;   // lower threshold for significant difference (fail)
-  double critical;   // threshold for critical difference (exit)
-  double print;  // threshold for printing entry in table (print)
+  double significant;  // lower threshold for significant difference (fail)
+  double critical;     // threshold for critical difference (exit)
+  double print;        // threshold for printing entry in table (print)
 
   // fixed thresholds
   // -------------------------------------------------------
@@ -49,31 +49,36 @@ struct CountStats {
   size_t elem_number = 0;  // elements checked
 
   // non-zero differences found (independent of arguments)
-  size_t diff_non_zero = 0;  // based on value and format (strict)
-  size_t diff_non_trivial = 0;      // based on value only (format independent)
+  size_t diff_non_zero = 0;     // based on value and format (strict)
+  size_t diff_non_trivial = 0;  // based on value only (format independent)
 
   // differences found greater than user defined...
-  size_t diff_significant = 0;   // nominal threshold ("good enough")
-  size_t diff_marginal = 0;      // marginal threshold (pass and warn)
-  size_t diff_critical = 0;   // critical threshold (fail and exit)
-  size_t diff_print = 0;  // print threshold (for difference table)
+  size_t diff_significant = 0;  // nominal threshold ("good enough")
+  size_t diff_marginal = 0;     // marginal threshold (pass and warn)
+  size_t diff_critical = 0;     // critical threshold (fail and exit)
+  size_t diff_print = 0;        // print threshold (for difference table)
 };
 struct Flags {
   bool new_fmt = false;
   bool error_found = false;  // Global error flag
 
   // Counter-associated flags (correspond to CountStats)
-  bool has_non_zero_diff = false;     // Any non-zero difference found (format-dependent, like diff)
-  bool has_non_trivial_diff = false;    // Difference exceeds format precision threshold (format-independent)
-  bool has_significant_diff = false;         // Difference exceeds user-defined threshold
-  bool has_marginal_diff = false;          // Difference exceeds marginal threshold
-  bool has_critical_diff = false;         // Difference exceeds critical/hard threshold
-  bool has_printed_diff = false;        // Difference exceeds print threshold
+  bool has_non_zero_diff =
+      false;  // Any non-zero difference found (format-dependent, like diff)
+  bool has_non_trivial_diff = false;  // Difference exceeds format precision
+                                      // threshold (format-independent)
+  bool has_significant_diff =
+      false;                       // Difference exceeds user-defined threshold
+  bool has_marginal_diff = false;  // Difference exceeds marginal threshold
+  bool has_critical_diff = false;  // Difference exceeds critical/hard threshold
+  bool has_printed_diff = false;   // Difference exceeds print threshold
 
   // Overall comparison state flags
-  bool files_are_same = true;         // Files are identical
-  bool files_have_same_values = true;  // Files have same values within precision
-  bool files_are_close_enough = true;  // Files are same within user-defined threshold
+  bool files_are_same = true;  // Files are identical
+  bool files_have_same_values =
+      true;  // Files have same values within precision
+  bool files_are_close_enough =
+      true;  // Files are same within user-defined threshold
 };
 
 struct DiffStats {
@@ -82,7 +87,6 @@ struct DiffStats {
   double max_non_trivial = 0;
   double max_significant = 0;  // maximum significant difference
 };
-
 
 struct LineData {
   std::vector<double> values;
@@ -104,10 +108,11 @@ struct SummaryParams {
   int fmt_wid;        // Formatting width for output alignment
 };
 
-
-
-
-
+struct PrintLevel {
+    bool debug = false;  // Print debug messages
+    bool debug2 = false; // Print additional debug messages
+    bool debug3 = false; // Print even more debug messages
+};
 
 // Forward declarations for utility functions
 std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
@@ -117,8 +122,10 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
 class FileComparator {
  public:
   // Constructor
-  FileComparator(double user_thresh, double hard_thresh, double print_thresh)
-      : thresh{user_thresh, hard_thresh, print_thresh} {};
+  FileComparator(double user_thresh, double hard_thresh, double print_thresh,
+                 int debug_level = 0)
+      : thresh{user_thresh, hard_thresh, print_thresh},
+        print_lvl{debug_level >= 1, debug_level >= 2, debug_level >= 3} {};
 
   // ========================================================================
   // Public Interface
@@ -149,6 +156,7 @@ class FileComparator {
   DiffStats differ;
   CountStats counter;
   Thresholds thresh;
+  PrintLevel print_lvl;
 
   // ========================================================================
   // File Operations
@@ -173,7 +181,6 @@ class FileComparator {
   bool validate_and_track_column_format(size_t n_col1, size_t n_col2,
                                         std::vector<int>& dp_per_col,
                                         size_t& prev_n_col);
-  bool validate_decimal_places(int dp1, int dp2) const;
   bool validate_decimal_column_size(const std::vector<int>& dp_per_col,
                                     size_t column_index) const;
 
@@ -181,10 +188,11 @@ class FileComparator {
   // Decimal Places Management
   // ========================================================================
   // New methods for refactoring
-  bool initialize_decimal_places(int min_dp, size_t column_index,
-                                 std::vector<int>& dp_per_col);
-  bool update_decimal_places_format(int min_dp, size_t column_index,
-                                    std::vector<int>& dp_per_col);
+  bool initialize_decimal_place_format(const int min_dp,
+                                       const size_t column_index,
+                                       std::vector<int>& dp_per_col);
+  bool update_decimal_place_format(const int min_dp, const size_t column_index,
+                                   std::vector<int>& dp_per_col);
   double calculate_threshold(int decimal_places);
 
   // ========================================================================
