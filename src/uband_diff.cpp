@@ -140,7 +140,7 @@ bool FileComparator::compare_files(const std::string& file1,
   size_t prev_n_col = 0;
   std::vector<int> dp_per_col;
 
-  std::cout << "   ignore Threshold: \033[1;34m" << thresh.ignore
+  std::cout << "   Ignore threshold: \033[1;34m" << thresh.ignore
             << "\033[0m (maximum TL)" << std::endl;
 
   // Process files line by line
@@ -855,10 +855,12 @@ void FileComparator::print_format_info(const ColumnValues& column_data,
     std::cout << "   NEW FORMAT" << std::endl;
   }
   // print the format
-  std::cout << "DEBUG : Line " << counter.line_number << ", Column "
-            << column_index + 1 << std::endl;
-  std::cout << "   FORMAT: number of decimal places file1: " << column_data.dp1
-            << ", file2: " << column_data.dp2 << std::endl;
+  if (print_lvl.debug) {
+    std::cout << "DEBUG : Line " << counter.line_number << ", Column "
+              << column_index + 1 << std::endl;
+    std::cout << "   FORMAT: number of decimal places file1: "
+              << column_data.dp1 << ", file2: " << column_data.dp2 << std::endl;
+  }
 }
 
 void printbar(int indent = 0) {
