@@ -615,6 +615,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   if ((diff_rounded > thresh.hard) &&
       ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
     counter.diff_hard++;
+    flag.has_critical_diff = true;
     print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index);
     return false;
   }
@@ -630,6 +631,7 @@ void FileComparator::process_raw_values(double value1, double value2) {
   // track number of differences
   if (diff > thresh.zero) {
     counter.diff_non_zero++;
+    flag.has_non_zero_diff = true;
   }
 }
 
@@ -652,6 +654,7 @@ void FileComparator::process_rounded_values(double rounded_diff,
 
   if (rounded_diff > zero_prec) {
     counter.diff_prec++;
+    flag.has_non_trivial_diff = true;
   }
 
   // define epsilon for user-defined threshold
@@ -660,6 +663,7 @@ void FileComparator::process_rounded_values(double rounded_diff,
 
   if (rounded_diff > user_threshold) {
     counter.diff_user++;
+    flag.has_significant_diff = true;
   }
 }
 
@@ -725,6 +729,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
               << std::endl;
   }
   counter.diff_print++;
+  flag.has_printed_diff = true;
 
   /* PRINT DIFF TABLE ENTRY */
   // Use the values directly from the struct instead of recalculating
