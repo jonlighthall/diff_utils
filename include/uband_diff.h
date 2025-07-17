@@ -10,68 +10,11 @@
 
 // Data structures
 
-struct Flags {
-  bool new_fmt = false;
-  bool error_found = false;  // Global error flag
-
-  // Counter-associated flags (correspond to CountStats)
-  bool has_non_zero_diff = false;     // Any non-zero difference found (format-independent, like diff)
-  bool has_non_trivial_diff = false;    // Difference exceeds format precision threshold (format-dependent)
-  bool has_significant_diff = false;         // Difference exceeds user-defined threshold
-  bool has_critical_diff = false;         // Difference exceeds critical/hard threshold
-  bool has_printed_diff = false;        // Difference exceeds print threshold
-
-  // Overall comparison state flags
-  bool files_are_same = true;         // Files are identical
-  bool files_are_close_enough = true;  // Files are same within precision
-};
-
-struct LineData {
-  std::vector<double> values;
-  std::vector<int> decimal_places;
-};
-
-struct ColumnValues {
-  double value1;  // Value from first file at current column
-  double value2;  // Value from second file at current column
-  double range;   // First value in the line (used as range indicator)
-  int dp1;        // Decimal places for file1 value
-  int dp2;        // Decimal places for file2 value
-  int min_dp;     // Minimum decimal places (for rounding)
-};
-
-struct SummaryParams {
-  std::string file1;  // Path to first file
-  std::string file2;  // Path to second file
-  int fmt_wid;        // Formatting width for output alignment
-};
-
-struct DiffStats {
-  // track the maximum difference found
-  double max = 0;
-  double max_rounded = 0;
-};
-
-struct CountStats {
-  // number of...
-  size_t line_number = 0;  // lines read
-  size_t elem_number = 0;  // elements checked
-
-  // non-zero differences found (independent of arguments)
-  size_t diff_non_zero = 0;  // zero (non-zero differences)
-  size_t diff_prec = 0;      // format precision threshold
-
-  // differences found greater than user defined...
-  size_t diff_user = 0;   // nominal threshold ("good enough")
-  size_t diff_hard = 0;   // hard threshold (fail and exit)
-  size_t diff_print = 0;  // print threshold (for difference table)
-};
-
 struct Thresholds {
   // user-defined thresholds
   // -------------------------------------------------------
-  double user;   // lower threshold for significant difference (fail)
-  double hard;   // threshold for critical difference (exit)
+  double significant;   // lower threshold for significant difference (fail)
+  double critical;   // threshold for critical difference (exit)
   double print;  // threshold for printing entry in table (print)
 
   // fixed thresholds
@@ -100,6 +43,68 @@ struct Thresholds {
       -20 *
       log10(pow(2, -23));  // threshold for meaningless difference (no action)
 };
+struct CountStats {
+  // number of...
+  size_t line_number = 0;  // lines read
+  size_t elem_number = 0;  // elements checked
+
+  // non-zero differences found (independent of arguments)
+  size_t diff_non_zero = 0;  // based on value and format (strict)
+  size_t diff_non_trivial = 0;      // based on value only (format independent)
+
+  // differences found greater than user defined...
+  size_t diff_significant = 0;   // nominal threshold ("good enough")
+  size_t diff_marginal = 0;      // marginal threshold (pass and warn)
+  size_t diff_critical = 0;   // critical threshold (fail and exit)
+  size_t diff_print = 0;  // print threshold (for difference table)
+};
+struct Flags {
+  bool new_fmt = false;
+  bool error_found = false;  // Global error flag
+
+  // Counter-associated flags (correspond to CountStats)
+  bool has_non_zero_diff = false;     // Any non-zero difference found (format-dependent, like diff)
+  bool has_non_trivial_diff = false;    // Difference exceeds format precision threshold (format-independent)
+  bool has_significant_diff = false;         // Difference exceeds user-defined threshold
+  bool has_marginal_diff = false;          // Difference exceeds marginal threshold
+  bool has_critical_diff = false;         // Difference exceeds critical/hard threshold
+  bool has_printed_diff = false;        // Difference exceeds print threshold
+
+  // Overall comparison state flags
+  bool files_are_same = true;         // Files are identical
+  bool files_have_same_values = true;  // Files have same values within precision
+  bool files_are_close_enough = true;  // Files are same within user-defined threshold
+};
+
+struct LineData {
+  std::vector<double> values;
+  std::vector<int> decimal_places;
+};
+
+struct ColumnValues {
+  double value1;  // Value from first file at current column
+  double value2;  // Value from second file at current column
+  double range;   // First value in the line (used as range indicator)
+  int dp1;        // Decimal places for file1 value
+  int dp2;        // Decimal places for file2 value
+  int min_dp;     // Minimum decimal places (for rounding)
+};
+
+struct SummaryParams {
+  std::string file1;  // Path to first file
+  std::string file2;  // Path to second file
+  int fmt_wid;        // Formatting width for output alignment
+};
+
+struct DiffStats {
+  // track the maximum difference found
+  double max = 0;
+  double max_rounded = 0;
+};
+
+
+
+
 
 // Forward declarations for utility functions
 std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
@@ -184,7 +189,7 @@ class FileComparator {
   // ========================================================================
   bool process_difference(const ColumnValues& column_data, size_t column_index);
   void process_raw_values(double value1, double value2);
-  void process_rounded_values(double rounded_diff, double minimum_deci);
+  void process_rounded_values(double rounded_diff, int minimum_deci);
 
   // ========================================================================
   // Output & Formatting
