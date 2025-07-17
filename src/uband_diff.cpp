@@ -1040,11 +1040,7 @@ void FileComparator::print_summary(const std::string& file1,
     std::cout << "   Total elements checked: " << counter.elem_number
               << std::endl;
   }
-  std::cout << "SUMMARY:" << std::endl;
 
-  // Calculate the width for formatting
-  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
-  SummaryParams params{file1, file2, fmt_wid};
 
 // Print contents of flag struct
 std::cout << "FLAG STATUS:" << std::endl;
@@ -1069,9 +1065,15 @@ std::cout << "   diff_significant: " << counter.diff_significant << std::endl;
 std::cout << "   diff_critical: " << counter.diff_critical << std::endl;
 std::cout << "   diff_print: " << counter.diff_print << std::endl;
 
-//   if (!flag.files_have_same_values || print_lvl.debug) {
+ std::cout << "SUMMARY:" << std::endl;
+
+  // Calculate the width for formatting
+  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
+  SummaryParams params{file1, file2, fmt_wid};
+
+   if (flag.files_have_same_values || print_lvl.debug) {
     print_diff_like_summary(params);
-//   }
+   }
 
   print_rounded_summary(params);
   print_significant_summary(params);
