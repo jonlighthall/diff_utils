@@ -1046,7 +1046,33 @@ void FileComparator::print_summary(const std::string& file1,
   auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
   SummaryParams params{file1, file2, fmt_wid};
 
-  print_diff_like_summary(params);
+// Print contents of flag struct
+std::cout << "FLAG STATUS:" << std::endl;
+std::cout << "   error_found: " << flag.error_found << std::endl;
+std::cout << "   files_are_same: " << flag.files_are_same << std::endl;
+std::cout << "   files_have_same_values: " << flag.files_have_same_values << std::endl;
+std::cout << "   files_are_close_enough: " << flag.files_are_close_enough << std::endl;
+std::cout << "   has_non_zero_diff: " << flag.has_non_zero_diff << std::endl;
+std::cout << "   has_non_trivial_diff: " << flag.has_non_trivial_diff << std::endl;
+std::cout << "   has_significant_diff: " << flag.has_significant_diff << std::endl;
+std::cout << "   has_critical_diff: " << flag.has_critical_diff << std::endl;
+std::cout << "   has_printed_diff: " << flag.has_printed_diff << std::endl;
+std::cout << "   new_fmt: " << flag.new_fmt << std::endl;
+
+// Print contents of counter struct
+std::cout << "COUNTER STATUS:" << std::endl;
+std::cout << "   line_number: " << counter.line_number << std::endl;
+std::cout << "   elem_number: " << counter.elem_number << std::endl;
+std::cout << "   diff_non_zero: " << counter.diff_non_zero << std::endl;
+std::cout << "   diff_non_trivial: " << counter.diff_non_trivial << std::endl;
+std::cout << "   diff_significant: " << counter.diff_significant << std::endl;
+std::cout << "   diff_critical: " << counter.diff_critical << std::endl;
+std::cout << "   diff_print: " << counter.diff_print << std::endl;
+
+//   if (!flag.files_have_same_values || print_lvl.debug) {
+    print_diff_like_summary(params);
+//   }
+
   print_rounded_summary(params);
   print_significant_summary(params);
 
