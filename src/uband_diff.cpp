@@ -650,12 +650,6 @@ void FileComparator::processRoundedValues(double rounded_diff,
     differ.max_rounded = rounded_diff;
   }
 
-  //   double ieps = ithreshold * 0.1;
-  //   // Check precision threshold
-  //   if (double thresh_prec = ithreshold + ieps; diff_rounded > thresh_prec) {
-  //     counter.diff_prec++;
-  //   }
-
   const double zero_prec =
       pow(10, -(minimum_deci + 1));  // "zero" can be anything with more decimal
                                      // places than the minimum
@@ -737,9 +731,7 @@ void FileComparator::printTable(const LineData& data1, const LineData& data2,
   counter.diff_print++;
 
   /* PRINT DIFF TABLE ENTRY */
-  double val1 = data1.values[columnIndex];
-  double val2 = data2.values[columnIndex];
-  double rangeValue = data1.values[0];  // first value in the line is the range
+  ColumnValues value = extractColumnValues(data1, data2, columnIndex);
 
   // line
   std::cout << std::setw(col_widths[0]) << counter.lineNumber;
@@ -748,21 +740,21 @@ void FileComparator::printTable(const LineData& data1, const LineData& data2,
 
   // range (first value in the line)
   std::cout << std::fixed << std::setprecision(2) << std::setw(col_widths[2])
-            << rangeValue << " ";
+            << value.range << " ";
 
   // values in file1
-  if (val1 > thresh.ignore) {
+  if (value.file1 > thresh.ignore) {
     std::cout << "\033[1;34m";
   }
-  std::cout << formatNumber(val1, deci1, mxint, mxdec);
+  std::cout << formatNumber(value.file1, deci1, mxint, mxdec);
 
   std::cout << "\033[0m ";
 
   // values in file2
-  if (val2 > thresh.ignore) {
+  if (value.file2 > thresh.ignore) {
     std::cout << "\033[1;34m";
   }
-  std::cout << formatNumber(val2, deci2, mxint, mxdec);
+  std::cout << formatNumber(value.file2, deci2, mxint, mxdec);
   std::cout << "\033[0m" << " | ";
 
   // threshold
@@ -780,7 +772,7 @@ void FileComparator::printTable(const LineData& data1, const LineData& data2,
   }
 
   // difference
-  if (val1 > thresh.ignore || val2 > thresh.ignore) {
+  if (value.file1 > thresh.ignore || value.file2 > thresh.ignore) {
     std::cout << "\033[1;34m";
   } else if (diff_rounded > thresh.user && diff_rounded < thresh_prec) {
     std::cout << "\033[1;33m";
@@ -1108,4 +1100,13 @@ void FileComparator::printSummary(const std::string& file1,
                 << " are identical.\033[0m" << std::endl;
     }
   }
+}
+
+ColumnValues FileComparator::extractColumnValues(
+    const LineData& data1, const LineData& data2, size_t columnIndex) const {
+    return {
+        data1.values[columnIndex],  // val1
+        data2.values[columnIndex],  // val2
+        data1.values[0]             // rangeValue (first value in the line)
+    };
 }

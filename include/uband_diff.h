@@ -20,6 +20,12 @@ struct LineData {
   std::vector<int> decimal_places;
 };
 
+struct ColumnValues {
+  double file1;        // Value from first file at current column
+  double file2;        // Value from second file at current column
+  double range;  // First value in the line (used as range indicator)
+};
+
 struct DiffStats {
   // track the maximum difference found
   double max = 0;
@@ -136,6 +142,8 @@ class FileComparator {
   // ========================================================================
   // Output & Formatting
   // ========================================================================
+  ColumnValues extractColumnValues(
+      const LineData& data1, const LineData& data2, size_t columnIndex) const;
   void printTable(const LineData& data1, const LineData& data2,
                   size_t columnIndex, double line_threshold, int deci1,
                   int deci2, double diff_rounded);
