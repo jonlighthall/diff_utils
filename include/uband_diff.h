@@ -128,6 +128,15 @@ class FileComparator {
         print_lvl{debug_level >= 1, debug_level >= 2, debug_level >= 3} {};
 
   // ========================================================================
+  // Friend declarations for testing
+  // ========================================================================
+  friend class FileComparatorTest;
+  friend class FileComparatorTest_ExtractColumnValues_Test;
+  friend class FileComparatorTest_ProcessDifference_Test;
+  friend class FileComparatorTest_ParseLine_Test;
+  friend class FileComparatorTest_CompareFiles_Test;
+
+  // ========================================================================
   // Public Interface
   // ========================================================================
   bool compare_files(const std::string& file1, const std::string& file2);

@@ -143,6 +143,39 @@ printvars:
 	@echo "$@ done"
 	@echo
 #
+# =============================================================================
+# Testing Configuration
+# =============================================================================
+
+# Test configuration
+TESTDIR := tests
+TESTBINDIR := $(BINDIR)/tests
+
+# Google Test flags
+GTEST_CFLAGS = -isystem /usr/include/gtest
+GTEST_LIBS = -lgtest -pthread
+
+# Test sources
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.cpp)
+TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/test_%.o)
+# Single test executable
+TEST_EXECUTABLE = $(TESTBINDIR)/run_tests
+
+# Create test directory
+$(TESTBINDIR):
+	@mkdir -v $(TESTBINDIR)
+
+# Test compilation rule
+$(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
+	@echo "compiling test object $@..."
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(GTEST_CFLAGS) $(includes) $(warnings) $(debug) -c $< -o $@
+
+# Test linking rule - link all test objects with main library objects into single executable
+$(TEST_EXECUTABLE): $(TEST_OBJECTS) $(OBJS) | $(TESTBINDIR)
+	@echo "linking test executable $@..."
+	$(CXX) $(LDFLAGS) $^ $(GTEST_LIBS) -o $@
+
+#
 # generic recipes
 # Rules to build (link) each executable
 # Executables in the root directory
@@ -228,14 +261,6 @@ mostlyclean:
 	$(RM) $(OBJDIR)
 	$(RM) *.o *.obj
 	@echo "$(DIR.NAME) $@ done"
-clean: mostlyclean
-# remove binaries and executables
-	@/bin/echo -e "\nremoving compiled executable files..."
-# remove build files
-	$(RM) $(EXECS)
-# remove remaining binaries
-	$(RM) $(BINDIR)/*.exe
-	$(RM) $(BINDIR)
 	$(RM) *.exe
 	$(RM) *.out
 	@echo "$(DIR.NAME) $@ done"
@@ -279,3 +304,47 @@ run: all
 	else \
 		echo "No executables found to run"; \
 	fi
+
+
+
+# =============================================================================
+# Test Targets
+# =============================================================================
+
+.PHONY: test tests clean-tests
+test: tests
+	@echo "Running all tests..."
+	@echo "Running $(TEST_EXECUTABLE)..."
+	@if $(TEST_EXECUTABLE); then \
+		echo "PASSED: All tests"; \
+	else \
+		echo "FAILED: Some tests failed"; \
+		exit 1; \
+	fi
+
+tests: $(TEST_EXECUTABLE)
+
+clean-tests:
+	@echo "removing test files..."
+	$(RM) $(TESTBINDIR)
+	$(RM) $(OBJDIR)/test_*
+	@echo "test cleanup done"
+
+# Add test cleanup to main clean target
+clean: mostlyclean clean-tests
+
+# =============================================================================
+# Help Target
+# =============================================================================
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all       - build all executables (default)"
+	@echo "  clean     - remove all generated files"
+	@echo "  remake    - clean then build all"
+	@echo "  run       - build and run the first executable"
+	@echo "  test      - build and run all unit tests"
+	@echo "  tests     - build unit tests only"
+	@echo "  clean-tests - remove test files only"
+	@echo "  help      - show this help message"
