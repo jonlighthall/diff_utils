@@ -12,7 +12,18 @@
 
 struct Flags {
   bool new_fmt = false;
-  bool isERROR = false;  // Global error flag
+  bool error_found = false;  // Global error flag
+
+  // Counter-associated flags (correspond to CountStats)
+  bool has_non_zero_diff = false;     // Any non-zero difference found (format-independent, like diff)
+  bool has_non_trivial_diff = false;    // Difference exceeds format precision threshold (format-dependent)
+  bool has_significant_diff = false;         // Difference exceeds user-defined threshold
+  bool has_critical_diff = false;         // Difference exceeds critical/hard threshold
+  bool has_printed_diff = false;        // Difference exceeds print threshold
+
+  // Overall comparison state flags
+  bool files_are_same = true;         // Files are identical
+  bool files_are_close_enough = true;  // Files are same within precision
 };
 
 struct LineData {
@@ -122,10 +133,10 @@ class FileComparator {
   // Data Members
   // ========================================================================
   mutable Flags flag;
-  unsigned long this_fmt_line;
-  unsigned long this_fmt_column;
-  unsigned long last_fmt_line;
-  unsigned long this_line_ncols;
+  size_t this_fmt_line;
+  size_t this_fmt_column;
+  size_t last_fmt_line;
+  size_t this_line_ncols;
 
   DiffStats differ;
   CountStats counter;
@@ -135,25 +146,25 @@ class FileComparator {
   // File Operations
   // ========================================================================
   bool open_files(const std::string& file1, const std::string& file2,
-                 std::ifstream& infile1, std::ifstream& infile2) const;
+                  std::ifstream& infile1, std::ifstream& infile2) const;
   size_t get_file_length(const std::string& file) const;
   bool compare_file_lengths(const std::string& file1,
-                          const std::string& file2) const;
+                            const std::string& file2) const;
 
   // ========================================================================
   // Line/Column Processing
   // ========================================================================
   bool process_line(const LineData& data1, const LineData& data2,
-                   std::vector<int>& dp_per_col, size_t& prev_n_col);
+                    std::vector<int>& dp_per_col, size_t& prev_n_col);
   bool process_column(const LineData& data1, const LineData& data2,
-                     size_t column_index, std::vector<int>& dp_per_col);
+                      size_t column_index, std::vector<int>& dp_per_col);
 
   // ========================================================================
   // Validation & Format Management
   // ========================================================================
   bool validate_and_track_column_format(size_t n_col1, size_t n_col2,
-                                    std::vector<int>& dp_per_col,
-                                    size_t& prev_n_col);
+                                        std::vector<int>& dp_per_col,
+                                        size_t& prev_n_col);
   bool validate_decimal_places(int dp1, int dp2) const;
   bool validate_decimal_column_size(const std::vector<int>& dp_per_col,
                                     size_t column_index) const;
@@ -178,14 +189,16 @@ class FileComparator {
   // ========================================================================
   // Output & Formatting
   // ========================================================================
-  ColumnValues extract_column_values(const LineData& data1, const LineData& data2,
+  ColumnValues extract_column_values(const LineData& data1,
+                                     const LineData& data2,
                                      size_t column_index) const;
   void print_table(const ColumnValues& column_data, size_t column_index,
                    double line_threshold, double diff_rounded);
   std::string format_number(double value, int prec, int max_integer_width,
                             int max_decimals) const;
   void print_hard_threshold_error(double rounded1, double rounded2,
-                                  double diff_rounded, size_t column_index) const;
+                                  double diff_rounded,
+                                  size_t column_index) const;
   void print_format_info(const ColumnValues& column_data,
                          size_t column_index) const;
   void print_diff_like_summary(const SummaryParams& params) const;

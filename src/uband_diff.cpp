@@ -119,7 +119,7 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream, Fla
     return {real, imag, real_dp, imag_dp};
   } else {
     std::cerr << "Error reading complex number";
-    flag.isERROR = true;
+    flag.error_found = true;
     return {real, imag, -1, -1};  // Return -1 for decimal places on error
   }
 }
@@ -149,9 +149,6 @@ bool FileComparator::compare_files(const std::string& file1,
   size_t prev_n_col = 0;
   std::vector<int> dp_per_col;
 
-  // track if the files are the same
-  bool is_same = false;
-
   std::cout << "   Max TL: \033[1;34m" << thresh.ignore << "\033[0m"
             << std::endl;
 
@@ -172,7 +169,7 @@ bool FileComparator::compare_files(const std::string& file1,
   if (!compare_file_lengths(file1, file2)) {
     return false;
   }
-  return is_same;
+  return flag.files_are_close_enough && !flag.error_found;
 }
 
 LineData FileComparator::parse_line(const std::string& line) const {
@@ -199,7 +196,7 @@ LineData FileComparator::parse_line(const std::string& line) const {
       if (dp < 0) {
         std::cerr << "Error: Negative number of decimal places found in line: "
                   << line << std::endl;
-        flag.isERROR = true;
+        flag.error_found = true;
         return result;  // return empty result
       }
 
@@ -227,13 +224,13 @@ bool FileComparator::open_files(const std::string& file1,
   if (!infile1.is_open()) {
     std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
               << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     return false;
   }
   if (!infile2.is_open()) {
     std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
               << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     return false;
   }
   return true;
@@ -244,7 +241,7 @@ size_t FileComparator::get_file_length(const std::string& file) const {
   if (!infile.is_open()) {
     std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
               << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     return 0;
   }
   size_t length = 0;
@@ -305,7 +302,7 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
   if (data1.values.empty() || data2.values.empty()) {
     std::cerr << "Line " << counter.line_number << " has no values to compare!"
               << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     return false;
   }
   size_t n_col1 = data1.values.size();
@@ -436,7 +433,7 @@ bool FileComparator::validate_decimal_places(int dp1, int dp2) const {
   if (dp1 < 0 || dp2 < 0) {
     std::cerr << "Line " << counter.line_number
               << " has negative number of decimal places!" << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     return false;
   }
   return true;
@@ -460,7 +457,7 @@ bool FileComparator::validate_decimal_column_size(const std::vector<int>& dp_per
   if (dp_per_col.size() != column_index + 1) {
     std::cerr << "Warning: dp_per_col size mismatch at line "
               << counter.line_number << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     std::cerr << "Expected size: " << column_index + 1
               << ", Actual size: " << dp_per_col.size() << std::endl;
     std::cerr << "Please check the input files for consistency." << std::endl;
@@ -471,7 +468,7 @@ bool FileComparator::validate_decimal_column_size(const std::vector<int>& dp_per
     std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
               << ") insufficient for column " << column_index + 1 << " at line "
               << counter.line_number << std::endl;
-    flag.isERROR = true;
+    flag.error_found = true;
     std::cerr << "Please check the input files for consistency." << std::endl;
     std::cerr << "Expected at least " << column_index + 1 << " columns, but got "
               << dp_per_col.size() << std::endl;
@@ -777,7 +774,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << "\033[1;33m";
   } else if (diff_rounded > thresh.hard) {
     std::cout << "\033[1;31m";
-    flag.isERROR = true;
+    flag.error_found = true;
   } else {
     std::cout << "\033[0m";
   }
