@@ -122,8 +122,8 @@ int main(int argc, char* argv[]) {
   }
 
   FileComparator comparator(count_level, hard_level, print_level);
-  bool result = comparator.compareFiles(file1, file2);
-  comparator.printSummary(file1, file2, argc, argv);
+  bool result = comparator.compare_files(file1, file2);
+  comparator.print_summary(file1, file2, argc, argv);
 
   if (comparator.getFlag().isERROR) {
     std::cout << "   \033[1;31mError found.\033[0m" << std::endl;

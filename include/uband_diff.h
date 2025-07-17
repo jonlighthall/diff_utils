@@ -11,7 +11,7 @@
 // Data structures
 
 struct Flags {
-  bool new_fmt = false;;
+  bool new_fmt = false;
   bool isERROR = false;  // Global error flag
 };
 
@@ -43,32 +43,48 @@ struct DiffStats {
 
 struct CountStats {
   // number of...
-  long unsigned int lineNumber = 0;  // lines read
-  long unsigned int elemNumber = 0;  // elements checked
+  size_t line_number = 0;  // lines read
+  size_t elem_number = 0;  // elements checked
 
   // non-zero differences found (independent of arguments)
-  long unsigned int diff_non_zero = 0;  // zero (non-zero differences)
-  long unsigned int diff_prec = 0;      // format precision threshold
+  size_t diff_non_zero = 0;  // zero (non-zero differences)
+  size_t diff_prec = 0;      // format precision threshold
 
   // differences found greater than user defined...
-  long unsigned int diff_user = 0;   // nominal threshold ("good enough")
-  long unsigned int diff_hard = 0;   // hard threshold (fail and exit)
-  long unsigned int diff_print = 0;  // print threshold (for difference table)
+  size_t diff_user = 0;   // nominal threshold ("good enough")
+  size_t diff_hard = 0;   // hard threshold (fail and exit)
+  size_t diff_print = 0;  // print threshold (for difference table)
 };
 
 struct Thresholds {
   // user-defined thresholds
+  // -------------------------------------------------------
   double user;   // lower threshold for significant difference (fail)
   double hard;   // threshold for critical difference (exit)
   double print;  // threshold for printing entry in table (print)
 
   // fixed thresholds
+  // -------------------------------------------------------
+
   // define epsilon when threshold is zero
   const double zero = pow(2, -23);  // equal to single precision epsilon
 
+  // Define the maximum significant value of TL (Transmission Loss). This will
+  // be referred to as the marginal threshold. It is equal to the upper upper
+  // threshold given in the following reference. TL values above this threshold
+  // are considered insignificant.
+  //
+  //   https://doi.org/10.23919/OCEANS.2009.5422312
   const double marginal =
       110;  // upper threshold for significant difference (warning)
-  // define the maximum valid value for TL (Transmission Loss)
+
+  // Define the maximum numerically valid value for TL. The value given
+  // below is based on the smallest value that can be represented in single
+  // precision floating point format, corresponding to the smallest pressure
+  // magnitude that can be represented.
+  //
+  // Values below this threshold are considered numerically "meaningless" and
+  // will not trigger any action in the comparison.
   const double ignore =
       -20 *
       log10(pow(2, -23));  // threshold for meaningless difference (no action)
@@ -88,12 +104,12 @@ class FileComparator {
   // ========================================================================
   // Public Interface
   // ========================================================================
-  bool compareFiles(const std::string& file1, const std::string& file2);
-  LineData parseLine(const std::string& line) const;
-  /** @note the function parseLine() reads a line from the file and returns a
+  bool compare_files(const std::string& file1, const std::string& file2);
+  LineData parse_line(const std::string& line) const;
+  /** @note the function parse_line() reads a line from the file and returns a
    LineData object */
-  void printSummary(const std::string& file1, const std::string& file2,
-                    int argc, char* argv[]) const;
+  void print_summary(const std::string& file1, const std::string& file2,
+                     int argc, char* argv[]) const;
 
   // ========================================================================
   // Flag Access Methods
@@ -118,63 +134,63 @@ class FileComparator {
   // ========================================================================
   // File Operations
   // ========================================================================
-  bool openFiles(const std::string& file1, const std::string& file2,
+  bool open_files(const std::string& file1, const std::string& file2,
                  std::ifstream& infile1, std::ifstream& infile2) const;
-  long unsigned int getFileLength(const std::string& file) const;
-  bool compareFileLengths(const std::string& file1,
+  size_t get_file_length(const std::string& file) const;
+  bool compare_file_lengths(const std::string& file1,
                           const std::string& file2) const;
 
   // ========================================================================
   // Line/Column Processing
   // ========================================================================
-  bool processLine(const LineData& data1, const LineData& data2,
+  bool process_line(const LineData& data1, const LineData& data2,
                    std::vector<int>& dp_per_col, size_t& prev_n_col);
-  bool processColumn(const LineData& data1, const LineData& data2,
-                     size_t columnIndex, std::vector<int>& dp_per_col);
+  bool process_column(const LineData& data1, const LineData& data2,
+                     size_t column_index, std::vector<int>& dp_per_col);
 
   // ========================================================================
   // Validation & Format Management
   // ========================================================================
-  bool validateAndTrackColumnFormat(size_t n_col1, size_t n_col2,
+  bool validate_and_track_column_format(size_t n_col1, size_t n_col2,
                                     std::vector<int>& dp_per_col,
                                     size_t& prev_n_col);
-  bool validateDecimalPlaces(int dp1, int dp2) const;
-  bool ValidateDeciColumnSize(const std::vector<int>& dp_per_col,
-                              size_t columnIndex) const;
+  bool validate_decimal_places(int dp1, int dp2) const;
+  bool validate_decimal_column_size(const std::vector<int>& dp_per_col,
+                                    size_t column_index) const;
 
   // ========================================================================
   // Decimal Places Management
   // ========================================================================
   // New methods for refactoring
-  bool initializeDecimalPlaces(int min_dp, size_t columnIndex,
-                               std::vector<int>& dp_per_col);
-  bool updateDecimalPlacesFormat(int min_dp, size_t columnIndex,
+  bool initialize_decimal_places(int min_dp, size_t column_index,
                                  std::vector<int>& dp_per_col);
-  double calculateThreshold(int decimal_places);
+  bool update_decimal_places_format(int min_dp, size_t column_index,
+                                    std::vector<int>& dp_per_col);
+  double calculate_threshold(int decimal_places);
 
   // ========================================================================
   // Difference Processing
   // ========================================================================
-  bool processDifference(const ColumnValues& columnData, size_t columnIndex);
-  void processRawValues(double value1, double value2);
-  void processRoundedValues(double rounded_diff, double minimum_deci);
+  bool process_difference(const ColumnValues& column_data, size_t column_index);
+  void process_raw_values(double value1, double value2);
+  void process_rounded_values(double rounded_diff, double minimum_deci);
 
   // ========================================================================
   // Output & Formatting
   // ========================================================================
-  ColumnValues extractColumnValues(const LineData& data1, const LineData& data2,
-                                   size_t columnIndex) const;
-  void printTable(const ColumnValues& columnData, size_t columnIndex,
-                  double line_threshold, double diff_rounded);
-  std::string formatNumber(double value, int prec, int maxIntegerWidth,
-                           int maxDecimals) const;
-  void printHardThresholdError(double rounded1, double rounded2,
-                               double diff_rounded, size_t columnIndex) const;
-  void printFormatInfo(const ColumnValues& columnData,
-                       size_t columnIndex) const;
-  void printDiffLikeSummary(const SummaryParams& params) const;
-  void printRoundedSummary(const SummaryParams& params) const;
-  void printSignificantSummary(const SummaryParams& params) const;
+  ColumnValues extract_column_values(const LineData& data1, const LineData& data2,
+                                     size_t column_index) const;
+  void print_table(const ColumnValues& column_data, size_t column_index,
+                   double line_threshold, double diff_rounded);
+  std::string format_number(double value, int prec, int max_integer_width,
+                            int max_decimals) const;
+  void print_hard_threshold_error(double rounded1, double rounded2,
+                                  double diff_rounded, size_t column_index) const;
+  void print_format_info(const ColumnValues& column_data,
+                         size_t column_index) const;
+  void print_diff_like_summary(const SummaryParams& params) const;
+  void print_rounded_summary(const SummaryParams& params) const;
+  void print_significant_summary(const SummaryParams& params) const;
 };
 
 #endif  // UBAND_DIFF_H
