@@ -140,7 +140,7 @@ bool FileComparator::compare_files(const std::string& file1,
   size_t prev_n_col = 0;
   std::vector<int> dp_per_col;
 
-  std::cout << "   Ignore Threshold: \033[1;34m" << thresh.ignore
+  std::cout << "   ignore Threshold: \033[1;34m" << thresh.ignore
             << "\033[0m (maximum TL)" << std::endl;
 
   // Process files line by line
@@ -195,7 +195,6 @@ LineData FileComparator::parse_line(const std::string& line) const {
       if (validate_decimal_places(dp_imag, flag)) {
         result.decimal_places.push_back(dp_imag);
       }
-      result.decimal_places.push_back(dp_imag);
     } else {
       // if the character is not '(', it is a number
       stream.putback(ch);  // put back the character to the stream

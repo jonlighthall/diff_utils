@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
   std::cout << "   File2: " << file2 << std::endl;
 #endif
 
-  std::cout << "   Diff threshold : " << std::fixed << std::setprecision(3)
+  std::cout << "   Diff threshold  : " << std::fixed << std::setprecision(3)
             << std::setw(7) << std::right;
   if (argc >= 4) {
     count_level = std::stof(argv[3]);
@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
     std::cout << count_level << " (default)" << std::endl;
   }
 
-  std::cout << "   High threshold : \033[1;31m" << std::fixed
+  std::cout << "   High threshold  : \033[1;31m" << std::fixed
             << std::setprecision(3) << std::setw(7) << std::right;
   if (argc >= 5) {
     hard_level = std::stof(argv[4]);
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
     std::cout << hard_level << "\033[0m (default)" << std::endl;
   }
 
-  std::cout << "   Print threshold: " << std::fixed << std::setprecision(3)
+  std::cout << "   Print threshold : " << std::fixed << std::setprecision(3)
             << std::setw(7) << std::right;
   if (argc >= 6) {
     print_level = std::stof(argv[5]);
