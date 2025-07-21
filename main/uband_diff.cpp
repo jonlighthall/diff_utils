@@ -247,10 +247,10 @@ int main(int argc, char* argv[]) {
     std::cout << "   Debug level    : ";
     try {
       debug_level = std::stoi(argv[6]);
-      if (debug_level < 0) {
-        std::cerr << "\n\033[1;31mERROR:\033[0m Debug level must be non-negative." << std::endl;
+      if (debug_level < -1) {
+        std::cerr << "\n\033[1;31mERROR:\033[0m Debug level must be greater than or equal to -1." << std::endl;
         std::cerr << "       Got: " << argv[6] << " (parsed as " << debug_level << ")" << std::endl;
-        std::cerr << "       Valid range: [0, 10] (typical values: 0-3)" << std::endl;
+        std::cerr << "       Valid range: [-1, 10] (typical values: 0-3)" << std::endl;
         return 1;
       }
       if (debug_level > 10) {
@@ -272,6 +272,7 @@ int main(int argc, char* argv[]) {
   }
 
   FileComparator comparator(count_level, hard_level, print_level, debug_level);
+  comparator.print_settings();
   bool result = comparator.compare_files(file1, file2);
   comparator.print_summary(file1, file2, argc, argv);
 

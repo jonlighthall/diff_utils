@@ -109,9 +109,11 @@ struct SummaryParams {
 };
 
 struct PrintLevel {
-    bool debug = false;  // Print debug messages
-    bool debug2 = false; // Print additional debug messages
-    bool debug3 = false; // Print even more debug messages
+  int level = 0;           // Debug level for printing
+  bool diff_only = false;  // Print only differences
+  bool debug = false;      // Print debug messages
+  bool debug2 = false;     // Print additional debug messages
+  bool debug3 = false;     // Print even more debug messages
 };
 
 // Forward declarations for utility functions
@@ -124,8 +126,16 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : thresh{user_thresh, hard_thresh, print_thresh},
-        print_lvl{debug_level >= 1, debug_level >= 2, debug_level >= 3} {};
+      : flag{},
+        this_fmt_line(0),
+        this_fmt_column(0),
+        last_fmt_line(0),
+        this_line_ncols(0),
+        differ{},
+        counter{},
+        thresh{user_thresh, hard_thresh, print_thresh},
+        print{debug_level, debug_level > 0, debug_level >= 1, debug_level >= 2,
+              debug_level >= 3} {};
 
   // ========================================================================
   // Friend declarations for testing
@@ -145,6 +155,7 @@ class FileComparator {
    LineData object */
   void print_summary(const std::string& file1, const std::string& file2,
                      int argc, char* argv[]) const;
+  void print_settings() const;
 
   // ========================================================================
   // Flag Access Methods
@@ -165,7 +176,7 @@ class FileComparator {
   DiffStats differ;
   CountStats counter;
   Thresholds thresh;
-  PrintLevel print_lvl;
+  PrintLevel print;
 
   // ========================================================================
   // File Operations

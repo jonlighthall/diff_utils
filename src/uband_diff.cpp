@@ -282,7 +282,7 @@ bool FileComparator::compare_file_lengths(const std::string& file1,
 
     return false;
   }
-  if (print_lvl.debug) {
+  if (print.debug) {
     std::cout << "Files have the same number of lines: " << length1
               << std::endl;
     std::cout << "Files have the same number of elements: "
@@ -311,7 +311,7 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
   size_t n_col2 = data2.values.size();
 
   // print line contents if DEBUG2 is defined
-  if (print_lvl.debug2) {
+  if (print.debug2) {
     auto print_line_contents = [](const LineData& data, size_t n_col) {
       for (size_t i = 0; i < n_col; ++i) {
         int ndp = data.decimal_places[i];
@@ -393,7 +393,7 @@ bool FileComparator::validate_and_track_column_format(
   // Check if the number of columns has changed
   if (counter.line_number == 1) {
     prev_n_col = n_col1;  // initialize prev_n_col on first line
-    if (print_lvl.debug2) {
+    if (print.debug2) {
       std::cout << "   FORMAT: " << n_col1
                 << " columns (both files) - initialized" << std::endl;
     }
@@ -411,7 +411,7 @@ bool FileComparator::validate_and_track_column_format(
     std::cout << "format has changed" << std::endl;
   } else {
     if (counter.line_number > 1) {
-      if (print_lvl.debug3) {
+      if (print.debug3) {
         std::cout << "Line " << counter.line_number << " same column format"
                   << std::endl;
       }
@@ -424,14 +424,14 @@ bool FileComparator::validate_and_track_column_format(
 
 bool FileComparator::validate_decimal_column_size(
     const std::vector<int>& dp_per_col, size_t column_index) const {
-  if (print_lvl.debug3) {
+  if (print.debug3) {
     for (size_t j = 0; j < dp_per_col.size(); ++j) {
       std::cout << "   minimum decimal places in column " << j + 1 << " = "
                 << dp_per_col[j] << std::endl;
     }
   }
 
-  if (print_lvl.debug2) {
+  if (print.debug2) {
     std::cout << "   size of dp_per_col: " << dp_per_col.size();
     std::cout << ", column_index: " << column_index + 1 << std::endl;
   }
@@ -470,7 +470,7 @@ bool FileComparator::initialize_decimal_place_format(
 
   if (!validate_decimal_column_size(dp_per_col, column_index)) return false;
 
-  if (print_lvl.debug2) {
+  if (print.debug2) {
     std::cout << "FORMAT: Line " << counter.line_number << " initialization"
               << std::endl;
     std::cout << "   dp_per_col: ";
@@ -490,7 +490,7 @@ bool FileComparator::initialize_decimal_place_format(
 bool FileComparator::update_decimal_place_format(const int min_dp,
                                                  const size_t column_index,
                                                  std::vector<int>& dp_per_col) {
-  if (print_lvl.debug3) {
+  if (print.debug3) {
     std::cout << "not first line" << std::endl;
   }
 
@@ -498,17 +498,19 @@ bool FileComparator::update_decimal_place_format(const int min_dp,
   if (dp_per_col[column_index] != min_dp) {
     // If the minimum decimal places for this column is different from the
     // previous minimum decimal places, update it
-    if (print_lvl.debug3) {
+    if (print.debug3) {
       std::cout << "DEBUG3: different" << std::endl;
       std::cout << "DEBUG3: format has changed" << std::endl;
     }
     dp_per_col[column_index] = min_dp;
     flag.new_fmt = true;
     this_fmt_line = counter.line_number;
-    std::cout << this_fmt_line << ": FMT number of decimal places has changed"
-              << std::endl;
+    if (print.debug) {
+      std::cout << "FORMAT: Line " << this_fmt_line
+                << ": number of decimal places has changed" << std::endl;
+    }
   }
-  if (print_lvl.debug3 && dp_per_col[column_index] == min_dp) {
+  if (print.debug3 && dp_per_col[column_index] == min_dp) {
     // If the minimum decimal places for this column is the same as the
     // previous minimum decimal places, do nothing
     std::cout << "DEBUG3: same" << std::endl;
@@ -522,7 +524,7 @@ double FileComparator::calculate_threshold(int ndp) {
   // current element)
   double dp_threshold = std::pow(10, -ndp);
 
-  if (flag.new_fmt && print_lvl.debug) {
+  if (flag.new_fmt && print.debug && !print.diff_only) {
     if (this_fmt_line != last_fmt_line) {
       // group together all format specifications on the same line
       std::cout << "PRECISION: Line " << this_fmt_line;
@@ -545,7 +547,7 @@ double FileComparator::calculate_threshold(int ndp) {
               << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
   }
   if (thresh.significant < dp_threshold) {
-    if (print_lvl.debug && flag.new_fmt) {
+    if (print.debug && flag.new_fmt) {
       std::cout << "   \033[1;33mNOTE: " << dp_threshold
                 << " is greater than the specified threshold: "
                 << thresh.significant << "\033[0m" << std::endl;
@@ -576,10 +578,10 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
     std::cout << std::endl;
   } else {
     counter.elem_number++;
-    if (print_lvl.debug2) {
+    if (print.debug2) {
       auto line_num_width =
           static_cast<int>(std::to_string(this_line_ncols).length());
-      if (print_lvl.debug3) {
+      if (print.debug3) {
         std::cout << "ncols: " << this_line_ncols
                   << ", column_index: " << column_index + 1 << std::endl;
       }
@@ -672,7 +674,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // This function is called when a difference is found that exceeds the
   // print threshold
 
-  if (print_lvl.debug2) {
+  if (print.debug2) {
     std::cout << "   DIFF: Difference at line " << counter.line_number
               << ", column " << column_index + 1 << ": " << diff_rounded
               << " (threshold: " << line_threshold << ")" << std::endl;
@@ -826,6 +828,9 @@ void FileComparator::print_hard_threshold_error(double rounded1,
                                                 double rounded2,
                                                 double diff_rounded,
                                                 size_t column_index) const {
+  if (print.level < 0) {
+    return;
+  }
   std::cerr << "\033[1;31mLarge difference found at line "
             << counter.line_number << ", column " << column_index + 1
             << "\033[0m" << std::endl;
@@ -851,11 +856,11 @@ void FileComparator::print_hard_threshold_error(double rounded1,
 
 void FileComparator::print_format_info(const ColumnValues& column_data,
                                        size_t column_index) const {
-  if (print_lvl.debug2) {
+  if (print.debug2) {
     std::cout << "   NEW FORMAT" << std::endl;
   }
   // print the format
-  if (print_lvl.debug) {
+  if (print.debug) {
     std::cout << "DEBUG : Line " << counter.line_number << ", Column "
               << column_index + 1 << std::endl;
     std::cout << "   FORMAT: number of decimal places file1: "
@@ -880,7 +885,7 @@ void FileComparator::print_diff_like_summary(
   }
   if (counter.elem_number > counter.diff_non_zero) {
     const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
-    if (zero_diff > 0 && print_lvl.debug) {
+    if (zero_diff > 0 && print.debug) {
       std::cout << "   Exact matches        ( =" << 0.0
                 << "): " << std::setw(params.fmt_wid) << zero_diff << std::endl;
     }
@@ -894,7 +899,7 @@ void FileComparator::print_diff_like_summary(
             << " are different\033[0m" << std::endl;
 
   if (counter.diff_print < counter.diff_non_zero) {
-    if (print_lvl.debug) {
+    if (print.debug) {
       std::cout << "   Printed differences  ( >" << thresh.print
                 << "): " << std::setw(params.fmt_wid) << counter.diff_print
                 << std::endl;
@@ -1009,7 +1014,11 @@ void FileComparator::print_significant_summary(
 void FileComparator::print_summary(const std::string& file1,
                                    const std::string& file2, int argc,
                                    char* argv[]) const {
-  if (print_lvl.debug) {
+  if (print.level < 0) {
+    return;  // No summary to print if level is less than 0
+  }
+
+  if (print.debug) {
     std::cout << "ARGUMENTS:" << std::endl;
   }
   // print command line arguments
@@ -1018,7 +1027,7 @@ void FileComparator::print_summary(const std::string& file1,
     std::cout << " " << argv[i];
   }
   std::cout << std::endl;
-  if (print_lvl.debug) {
+  if (print.debug) {
     std::cout << "   File1: " << file1 << std::endl;
     std::cout << "   File2: " << file2 << std::endl;
 
@@ -1041,39 +1050,70 @@ void FileComparator::print_summary(const std::string& file1,
               << std::endl;
   }
 
+  // Print the status of flag and counter structs
+  auto print_flag_status = [&]() {
+    // Lambda to convert boolean to TRUE/FALSE string
+    auto boolToString = [](bool value) -> const char* {
+      return value ? "TRUE" : "FALSE";
+    };
 
-// Print contents of flag struct
-std::cout << "FLAG STATUS:" << std::endl;
-std::cout << "   error_found: " << flag.error_found << std::endl;
-std::cout << "   files_are_same: " << flag.files_are_same << std::endl;
-std::cout << "   files_have_same_values: " << flag.files_have_same_values << std::endl;
-std::cout << "   files_are_close_enough: " << flag.files_are_close_enough << std::endl;
-std::cout << "   has_non_zero_diff: " << flag.has_non_zero_diff << std::endl;
-std::cout << "   has_non_trivial_diff: " << flag.has_non_trivial_diff << std::endl;
-std::cout << "   has_significant_diff: " << flag.has_significant_diff << std::endl;
-std::cout << "   has_critical_diff: " << flag.has_critical_diff << std::endl;
-std::cout << "   has_printed_diff: " << flag.has_printed_diff << std::endl;
-std::cout << "   new_fmt: " << flag.new_fmt << std::endl;
+    // Print contents of flag struct
+    std::cout << "FLAG STATUS:" << std::endl;
+    std::cout << "   error_found: " << boolToString(flag.error_found)
+              << std::endl;
+    if (counter.elem_number > 0) {
+      std::cout << "   files_are_same: " << boolToString(flag.files_are_same)
+                << std::endl;
+      std::cout << "   files_have_same_values: "
+                << boolToString(flag.files_have_same_values) << std::endl;
+      std::cout << "   files_are_close_enough: "
+                << boolToString(flag.files_are_close_enough) << std::endl;
+      std::cout << "   has_non_zero_diff: "
+                << boolToString(flag.has_non_zero_diff) << std::endl;
+      std::cout << "   has_non_trivial_diff: "
+                << boolToString(flag.has_non_trivial_diff) << std::endl;
+      std::cout << "   has_significant_diff: "
+                << boolToString(flag.has_significant_diff) << std::endl;
+      std::cout << "   has_critical_diff: "
+                << boolToString(flag.has_critical_diff) << std::endl;
+      std::cout << "   has_printed_diff: "
+                << boolToString(flag.has_printed_diff) << std::endl;
+      std::cout << "   new_fmt: " << boolToString(flag.new_fmt) << std::endl;
+    }
+    // Print contents of counter struct
+    std::cout << "COUNTER STATUS:" << std::endl;
 
-// Print contents of counter struct
-std::cout << "COUNTER STATUS:" << std::endl;
-std::cout << "   line_number: " << counter.line_number << std::endl;
-std::cout << "   elem_number: " << counter.elem_number << std::endl;
-std::cout << "   diff_non_zero: " << counter.diff_non_zero << std::endl;
-std::cout << "   diff_non_trivial: " << counter.diff_non_trivial << std::endl;
-std::cout << "   diff_significant: " << counter.diff_significant << std::endl;
-std::cout << "   diff_critical: " << counter.diff_critical << std::endl;
-std::cout << "   diff_print: " << counter.diff_print << std::endl;
+    if (counter.elem_number == 0) {
+      std::cout << "   \033[1;31mNo elements were checked.\033[0m" << std::endl;
+      return;
+    }
 
- std::cout << "SUMMARY:" << std::endl;
+    std::cout << "   line_number: " << counter.line_number << std::endl;
+    std::cout << "   elem_number: " << counter.elem_number << std::endl;
+    std::cout << "   diff_non_zero: " << counter.diff_non_zero << std::endl;
+    std::cout << "   diff_non_trivial: " << counter.diff_non_trivial
+              << std::endl;
+    std::cout << "   diff_significant: " << counter.diff_significant
+              << std::endl;
+    std::cout << "   diff_critical: " << counter.diff_critical << std::endl;
+    std::cout << "   diff_print: " << counter.diff_print << std::endl;
+  };
+
+  print_flag_status();
+
+  std::cout << "SUMMARY:" << std::endl;
+
+  if (flag.error_found) {
+    return;
+  }
 
   // Calculate the width for formatting
   auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
   SummaryParams params{file1, file2, fmt_wid};
 
-   if (flag.files_have_same_values || print_lvl.debug) {
+  if (flag.files_have_same_values || print.debug) {
     print_diff_like_summary(params);
-   }
+  }
 
   print_rounded_summary(params);
   print_significant_summary(params);
@@ -1128,6 +1168,24 @@ std::cout << "   diff_print: " << counter.diff_print << std::endl;
                 << params.file2 << " are identical.\033[0m" << std::endl;
     }
   }
+}
+
+void FileComparator::print_settings() const {
+  std::cout << "SETTINGS: " << std::endl;
+#ifdef DEBUG
+  std::cout << "   File1: " << file1 << std::endl;
+  std::cout << "   File2: " << file2 << std::endl;
+#endif
+
+  std::cout << "   Diff threshold  : " << std::fixed << std::setprecision(3)
+            << std::setw(7) << std::right;
+  std::cout << thresh.significant << std::endl;
+
+  std::cout << "   User-defined thresholds:" << std::endl;
+  std::cout << "      Significant: " << thresh.significant << std::endl;
+  std::cout << "      Critical: " << thresh.critical << std::endl;
+  std::cout << "      Print: " << thresh.print << std::endl;
+  std::cout << "   Debug level: " << print.level << std::endl;
 }
 
 ColumnValues FileComparator::extract_column_values(const LineData& data1,
