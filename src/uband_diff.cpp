@@ -140,9 +140,6 @@ bool FileComparator::compare_files(const std::string& file1,
   size_t prev_n_col = 0;
   std::vector<int> dp_per_col;
 
-  std::cout << "   Ignore threshold: \033[1;34m" << thresh.ignore
-            << "\033[0m (maximum TL)" << std::endl;
-
   // Process files line by line
   while (std::getline(infile1, line1) && std::getline(infile2, line2)) {
     // increment the line number
@@ -1014,10 +1011,6 @@ void FileComparator::print_significant_summary(
 void FileComparator::print_summary(const std::string& file1,
                                    const std::string& file2, int argc,
                                    char* argv[]) const {
-  if (print.level < 0) {
-    return;  // No summary to print if level is less than 0
-  }
-
   if (print.debug) {
     std::cout << "ARGUMENTS:" << std::endl;
   }
@@ -1053,7 +1046,7 @@ void FileComparator::print_summary(const std::string& file1,
   // Print the status of flag and counter structs
   auto print_flag_status = [&]() {
     // Lambda to convert boolean to TRUE/FALSE string
-    auto boolToString = [](bool value) -> const char* {
+    auto boolToString = [](bool value)  {
       return value ? "TRUE" : "FALSE";
     };
 
@@ -1099,27 +1092,49 @@ void FileComparator::print_summary(const std::string& file1,
     std::cout << "   diff_print: " << counter.diff_print << std::endl;
   };
 
-  print_flag_status();
+  // Calculate the width for formatting
+  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
+  SummaryParams params{file1, file2, fmt_wid};
 
-  std::cout << "SUMMARY:" << std::endl;
+  // Print threshold differences
+  // =========================================================
 
+  if (counter.diff_non_zero > 0 || print.level > 0 || print.debug) {
+    print_settings(params.file1, params.file2);
+    print_flag_status();
+  } else {
+    std::cout << "no print" << std::endl;
+  }
+
+  if (counter.diff_non_zero > 0 || print.debug || flag.error_found) {
+    std::cout << "SUMMARY:" << std::endl;
+  }
+
+  // First, check if there was an error, the details should already be
+  //   printed (which will have zero diffs)
   if (flag.error_found) {
     return;
   }
 
-  // Calculate the width for formatting
-  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
-  SummaryParams params{file1, file2, fmt_wid};
+  if (counter.diff_print == 0) {
+    //     if (print.level >= 0 || print.debug) {
+    std::cout << "   ";
+  } else {
+    std::cout << "\033[1;32mXFiles " << params.file1 << " and " << params.file2
+              << " are identical.\033[0m" << std::endl;
+    return;
+  }
 
   if (flag.files_have_same_values || print.debug) {
     print_diff_like_summary(params);
   }
 
+  // if (flag.has_non_trivial_diff || print.debug) {
   print_rounded_summary(params);
+  // }
+
   print_significant_summary(params);
 
-  // Print threshold differences
-  // =========================================================
   if (counter.diff_print == 0) {
     std::cout << "\033[1;32m   Files " << params.file1 << " and "
               << params.file2 << " are identical within print threshold\033[0m"
@@ -1162,30 +1177,35 @@ void FileComparator::print_summary(const std::string& file1,
   } else {
     std::cout << "   No differences exceeding critical threshold found."
               << std::endl;
-
-    if (counter.diff_print == 0) {
-      std::cout << "\033[1;32m   Files " << params.file1 << " and "
-                << params.file2 << " are identical.\033[0m" << std::endl;
-    }
   }
 }
 
-void FileComparator::print_settings() const {
+void FileComparator::print_settings(const std::string& file1,
+                                    const std::string& file2) const {
   std::cout << "SETTINGS: " << std::endl;
-#ifdef DEBUG
-  std::cout << "   File1: " << file1 << std::endl;
-  std::cout << "   File2: " << file2 << std::endl;
-#endif
+  if (print.debug || print.level > 0) {
+    std::cout << "   Debug mode : " << (print.debug ? "ON" : "OFF")
+              << std::endl;
+    std::cout << "   Debug level: " << print.level << std::endl;
+    std::cout << "   Print mode : " << (print.diff_only ? "DIFF_ONLY" : "FULL")
+              << std::endl;
+    std::cout << "   File1: " << file1 << std::endl;
+    std::cout << "   File2: " << file2 << std::endl;
+  }
 
-  std::cout << "   Diff threshold  : " << std::fixed << std::setprecision(3)
-            << std::setw(7) << std::right;
-  std::cout << thresh.significant << std::endl;
-
-  std::cout << "   User-defined thresholds:" << std::endl;
-  std::cout << "      Significant: " << thresh.significant << std::endl;
-  std::cout << "      Critical: " << thresh.critical << std::endl;
-  std::cout << "      Print: " << thresh.print << std::endl;
-  std::cout << "   Debug level: " << print.level << std::endl;
+  std::cout << "   User-defined Thresholds " << std::endl;
+  std::cout << "      Significant: " << thresh.significant << " (count)"
+            << std::endl;
+  std::cout << "      Critical   : \033[1;31m" << thresh.critical
+            << "\033[0m (halt)" << std::endl;
+  std::cout << "      Print      : " << thresh.print << " (print)"
+            << std::endl;
+  std::cout << "   Fixed Thresholds " << std::endl;
+  std::cout << "      Zero       : " << thresh.zero << std::endl;
+  std::cout << "      Marginal   : \033[1;33m" << thresh.marginal << "\033[0m"
+            << std::endl;
+  std::cout << "      Ignore     : \033[1;34m" << thresh.ignore
+            << "\033[0m (maximum TL)" << std::endl;
 }
 
 ColumnValues FileComparator::extract_column_values(const LineData& data1,

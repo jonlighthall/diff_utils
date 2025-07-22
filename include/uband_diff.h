@@ -126,14 +126,7 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : flag{},
-        this_fmt_line(0),
-        this_fmt_column(0),
-        last_fmt_line(0),
-        this_line_ncols(0),
-        differ{},
-        counter{},
-        thresh{user_thresh, hard_thresh, print_thresh},
+      : thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level > 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
 
@@ -155,7 +148,7 @@ class FileComparator {
    LineData object */
   void print_summary(const std::string& file1, const std::string& file2,
                      int argc, char* argv[]) const;
-  void print_settings() const;
+  void print_settings(const std::string& file1, const std::string& file2) const;
 
   // ========================================================================
   // Flag Access Methods

@@ -111,8 +111,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::cout << "SETTINGS: " << std::endl;
-
   // Check if the user provided file names as arguments
   if (argc >= 3) {
     file1 = argv[1];  // first file name
@@ -160,8 +158,6 @@ int main(int argc, char* argv[]) {
 #endif
 
   // Parse and validate threshold arguments with error handling
-  std::cout << "   Diff threshold  : " << std::fixed << std::setprecision(3)
-            << std::setw(7) << std::right;
   if (argc >= 4) {
     try {
       count_level = std::stof(argv[3]);
@@ -171,23 +167,18 @@ int main(int argc, char* argv[]) {
         std::cerr << "       Valid range: [0, ∞)" << std::endl;
         return 1;
       }
-      std::cout << count_level << std::endl;
     } catch (const std::invalid_argument& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Invalid diff threshold format." << std::endl;
       std::cerr << "       Expected: floating-point number (e.g., 0.05, 1.5, 10)" << std::endl;
-      std::cerr << "       Got: '" << argv[3] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[3] << "' (" << e.what() << ")" << std::endl;
       return 1;
     } catch (const std::out_of_range& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Diff threshold value out of range." << std::endl;
-      std::cerr << "       Got: '" << argv[3] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[3] << "' (" << e.what() << ")" << std::endl;
       return 1;
     }
-  } else {
-    std::cout << count_level << " (default)" << std::endl;
   }
 
-  std::cout << "   High threshold  : \033[1;31m" << std::fixed
-            << std::setprecision(3) << std::setw(7) << std::right;
   if (argc >= 5) {
     try {
       hard_level = std::stof(argv[4]);
@@ -202,23 +193,18 @@ int main(int argc, char* argv[]) {
                   << ") is less than diff threshold (" << count_level << ")." << std::endl;
         std::cerr << "         This may lead to unexpected behavior." << std::endl;
       }
-      std::cout << hard_level << "\033[0m" << std::endl;
     } catch (const std::invalid_argument& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Invalid high threshold format." << std::endl;
       std::cerr << "       Expected: floating-point number (e.g., 1.0, 10.0, 100)" << std::endl;
-      std::cerr << "       Got: '" << argv[4] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[4] << "' (" << e.what() << ")" << std::endl;
       return 1;
     } catch (const std::out_of_range& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m High threshold value out of range." << std::endl;
-      std::cerr << "       Got: '" << argv[4] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[4] << "' (" << e.what() << ")" << std::endl;
       return 1;
     }
-  } else {
-    std::cout << hard_level << "\033[0m (default)" << std::endl;
   }
 
-  std::cout << "   Print threshold : " << std::fixed << std::setprecision(3)
-            << std::setw(7) << std::right;
   if (argc >= 6) {
     try {
       print_level = std::stof(argv[5]);
@@ -228,23 +214,20 @@ int main(int argc, char* argv[]) {
         std::cerr << "       Valid range: [0, ∞)" << std::endl;
         return 1;
       }
-      std::cout << print_level << "\033[0m" << std::endl;
+
     } catch (const std::invalid_argument& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Invalid print threshold format." << std::endl;
       std::cerr << "       Expected: floating-point number (e.g., 0.1, 1.0, 5.0)" << std::endl;
-      std::cerr << "       Got: '" << argv[5] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[5] << "' (" << e.what() << ")" << std::endl;
       return 1;
     } catch (const std::out_of_range& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Print threshold value out of range." << std::endl;
-      std::cerr << "       Got: '" << argv[5] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[5] << "' (" << e.what() << ")" << std::endl;
       return 1;
     }
-  } else {
-    std::cout << print_level << "\033[0m (default)" << std::endl;
   }
 
   if (argc >= 7) {
-    std::cout << "   Debug level    : ";
     try {
       debug_level = std::stoi(argv[6]);
       if (debug_level < -1) {
@@ -258,21 +241,19 @@ int main(int argc, char* argv[]) {
                   << ") is unusually high." << std::endl;
         std::cerr << "         Typical range: [0, 3]. Proceeding anyway..." << std::endl;
       }
-      std::cout << debug_level << std::endl;
     } catch (const std::invalid_argument& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Invalid debug level format." << std::endl;
       std::cerr << "       Expected: integer (e.g., 0, 1, 2, 3)" << std::endl;
-      std::cerr << "       Got: '" << argv[6] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[6] << "' (" << e.what() << ")" << std::endl;
       return 1;
     } catch (const std::out_of_range& e) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Debug level value out of range." << std::endl;
-      std::cerr << "       Got: '" << argv[6] << "'" << std::endl;
+      std::cerr << "       Got: '" << argv[6] << "' (" << e.what() << ")" << std::endl;
       return 1;
     }
   }
 
   FileComparator comparator(count_level, hard_level, print_level, debug_level);
-  comparator.print_settings();
   bool result = comparator.compare_files(file1, file2);
   comparator.print_summary(file1, file2, argc, argv);
 
