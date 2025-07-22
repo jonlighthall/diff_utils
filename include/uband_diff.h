@@ -238,7 +238,7 @@ class FileComparator {
   // ========================================================================
   // Summary Helper Functions (for cognitive complexity reduction)
   // ========================================================================
-  std::string format_boolean_status(bool value, bool showStatus, bool reversed) const;
+  std::string format_boolean_status(bool value, bool showStatus, bool reversed, bool soft) const;
   void print_arguments_and_files(const std::string& file1, const std::string& file2,
                                 int argc, char* argv[]) const;
   void print_statistics(const std::string& file1) const;
@@ -246,8 +246,6 @@ class FileComparator {
   void print_counter_info() const;
   void print_detailed_summary(const SummaryParams& params) const;
   void print_additional_diff_info(const SummaryParams& params) const;
-  void print_significant_not_printed_info(const SummaryParams& params) const;
-  void print_non_trivial_not_printed_info(const SummaryParams& params) const;
   void print_critical_threshold_info() const;
 };
 
