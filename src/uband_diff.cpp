@@ -1046,35 +1046,65 @@ void FileComparator::print_summary(const std::string& file1,
   // Print the status of flag and counter structs
   auto print_flag_status = [&]() {
     // Lambda to convert boolean to TRUE/FALSE string
-    auto boolToString = [](bool value)  {
-      return value ? "TRUE" : "FALSE";
+    auto boolToString = [](bool value, bool showStatus = false) {
+      std::ostringstream oss;
+      if (!showStatus) {
+        oss << (value ? "TRUE" : "FALSE");
+      } else {
+        if (value) {
+          oss << "TRUE "
+              << " \033[1;32m(PASS)\033[0m";
+        } else {
+          oss << "FALSE"
+              << " \033[1;31m(FAIL)\033[0m";
+        }
+      }
+      return oss.str();
+    };
+    // If reversed logic is needed, call as boolToString(val, true) and swap PASS/FAIL
+    auto boolToStringReversed = [](bool value, bool showStatus = false) {
+      std::ostringstream oss;
+      if (!showStatus) {
+        oss << (value ? "TRUE" : "FALSE");
+      } else {
+        if (value) {
+          oss << "TRUE "
+              << " \033[1;31m(FAIL)\033[0m";
+        } else {
+          oss << "FALSE"
+              << " \033[1;32m(PASS)\033[0m";
+        }
+      }
+      return oss.str();
     };
 
     // Print contents of flag struct
-    std::cout << "FLAG STATUS:" << std::endl;
-    std::cout << "   error_found: " << boolToString(flag.error_found)
+    std::cout << "FLAGS:" << std::endl;
+    std::cout << "   error_found: " << boolToStringReversed(flag.error_found,true)
               << std::endl;
     if (counter.elem_number > 0) {
-      std::cout << "   files_are_same: " << boolToString(flag.files_are_same)
+        std::cout << "   Pass/fail Status" << std::endl;
+      std::cout << "      files_are_same        : " << boolToString(flag.files_are_same, true)
                 << std::endl;
-      std::cout << "   files_have_same_values: "
-                << boolToString(flag.files_have_same_values) << std::endl;
-      std::cout << "   files_are_close_enough: "
-                << boolToString(flag.files_are_close_enough) << std::endl;
-      std::cout << "   has_non_zero_diff: "
-                << boolToString(flag.has_non_zero_diff) << std::endl;
-      std::cout << "   has_non_trivial_diff: "
-                << boolToString(flag.has_non_trivial_diff) << std::endl;
-      std::cout << "   has_significant_diff: "
-                << boolToString(flag.has_significant_diff) << std::endl;
-      std::cout << "   has_critical_diff: "
-                << boolToString(flag.has_critical_diff) << std::endl;
-      std::cout << "   has_printed_diff: "
-                << boolToString(flag.has_printed_diff) << std::endl;
+      std::cout << "      files_have_same_values: "
+                << boolToString(flag.files_have_same_values, true) << std::endl;
+      std::cout << "      files_are_close_enough: "
+                << boolToString(flag.files_are_close_enough, true) << std::endl;
+                std::cout << "   Counter status:" << std::endl;
+      std::cout << "     has_non_zero_diff   : "
+                << boolToStringReversed(flag.has_non_zero_diff) << std::endl;
+      std::cout << "     has_non_trivial_diff: "
+                << boolToStringReversed(flag.has_non_trivial_diff) << std::endl;
+      std::cout << "     has_significant_diff: "
+                << boolToStringReversed(flag.has_significant_diff, true) << std::endl;
+      std::cout << "     has_critical_diff   : "
+                << boolToStringReversed(flag.has_critical_diff, true) << std::endl;
+      std::cout << "     has_printed_diff    : "
+                << boolToStringReversed(flag.has_printed_diff) << std::endl;
       std::cout << "   new_fmt: " << boolToString(flag.new_fmt) << std::endl;
     }
     // Print contents of counter struct
-    std::cout << "COUNTER STATUS:" << std::endl;
+    std::cout << "COUNTERS:" << std::endl;
 
     if (counter.elem_number == 0) {
       std::cout << "   \033[1;31mNo elements were checked.\033[0m" << std::endl;
