@@ -313,8 +313,8 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
     auto print_line_contents = [](const LineData& data, size_t n_col) {
       for (size_t i = 0; i < n_col; ++i) {
         int ndp = data.decimal_places[i];
-        std::cout << " " << std::setprecision(ndp) << data.values[i] << "("
-                  << ndp << ")";
+        std::cout << " " << std::fixed << std::setprecision(ndp)
+                  << data.values[i] << "(" << ndp << ")";
       }
       std::cout << std::endl;
     };
@@ -546,9 +546,11 @@ double FileComparator::calculate_threshold(int ndp) {
   }
   if (thresh.significant < dp_threshold) {
     if (print.debug && flag.new_fmt) {
-      std::cout << "   \033[1;33mNOTE: " << dp_threshold
-                << " is greater than the specified threshold: "
-                << thresh.significant << "\033[0m" << std::endl;
+      if (thresh.significant > 0) {
+        std::cout << "   \033[1;33mNOTE: minimum non-zero difference ("
+                  << dp_threshold << ") is greater than significant threshold ("
+                  << thresh.significant << ")\033[0m" << std::endl;
+      }
     }
     return dp_threshold;
   }
@@ -684,7 +686,9 @@ void FileComparator::print_table(const ColumnValues& column_data,
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
   // define column widths
-  std::vector<int> col_widths = {5, 5, val_width, val_width, val_width, 5, 4};
+  //                     // line | col | range | file1 | file2 | thres | diff
+  std::vector<int> col_widths = {5,         5,         val_width, val_width,
+                                 val_width, val_width, val_width};
 
   auto padLeft = [](const std::string& str, int width) {
     if (static_cast<int>(str.length()) >= width) return str;
@@ -695,7 +699,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << "DIFFERENCES:" << std::endl;
     if (thresh.significant < thresh.print) {
       std::cout << "\033[1;33mWarning: Threshold for printing (" << thresh.print
-                << ") is less than the overall threshold ("
+                << ") is greater than the significant difference threshold ("
                 << thresh.significant
                 << "). Some significant differences may not be "
                 << "printed.\033[0m" << std::endl;
@@ -741,7 +745,6 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   // values in file1
   print_value_color(column_data.value1);
-
   std::cout << format_number(column_data.value1, column_data.dp1, mxint, mxdec);
 
   std::cout << "\033[0m ";
@@ -752,11 +755,13 @@ void FileComparator::print_table(const ColumnValues& column_data,
   std::cout << "\033[0m" << " | ";
 
   // threshold
-  if (line_threshold > thresh.significant) {
-    std::cout << "\033[1;33m";
+  if (line_threshold > thresh.significant && thresh.significant > 0) {
+    std::cout << "\033[1;35m";
   }
-  std::cout << std::setw(col_widths[5]) << std::setprecision(3)
-            << line_threshold << "\033[0m | ";
+  std::cout << format_number(
+      line_threshold > thresh.significant ? thresh.significant : line_threshold,
+      column_data.min_dp, mxint, mxdec);
+  std::cout << "\033[0m | ";
 
   // Lambda to print color based on diff and thresholds
   auto print_diff_color = [this](double value1, double value2, double rdiff) {
@@ -766,7 +771,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
       std::cout << "\033[0m";  // Reset color for trivial differences
     }
     // Determine color based on thresholds
-    if (double max_value = std::max(value1, value2); max_value > thresh.ignore) {
+    if (double max_value = std::max(value1, value2);
+        max_value > thresh.ignore) {
       std::cout << "\033[1;34m";  // Blue
     } else if (max_value > thresh.marginal) {
       std::cout << "\033[1;33m";  // Yellow
@@ -779,12 +785,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   // difference
   print_diff_color(column_data.value1, column_data.value2, diff_rounded);
-  std::cout << std::setw(col_widths[6]) << diff_rounded << "\033[0m";
-
-  // std::cout << " > " << line_threshold << " : " << (diff_rounded -
-  // line_threshold)
-  //           << " -> " << fabs(diff_rounded - line_threshold) << " > " <<
-  //           ieps;
+  std::cout << format_number(diff_rounded, column_data.min_dp, mxint, mxdec);
+  std::cout << "\033[0m";
 }
 
 std::string FileComparator::format_number(double value, int prec,
@@ -837,6 +839,7 @@ void FileComparator::print_hard_threshold_error(double rounded1,
   std::cerr << "\033[1;31mLarge difference found at line "
             << counter.line_number << ", column " << column_index + 1
             << "\033[0m" << std::endl;
+  flag.error_found = true;
 
   if (counter.line_number > 0) {
     std::cout << "   First " << counter.line_number - 1 << " lines match"
@@ -909,8 +912,15 @@ void FileComparator::print_diff_like_summary(
                 << std::endl;
     }
   }
-  std::cout << "   Non-zero differences ( >" << 0.0
-            << "): " << std::setw(params.fmt_wid) << counter.diff_non_zero
+  std::cout << "   Non-zero differences ( >" << thresh.zero << "): ";
+  if (counter.diff_non_zero > 0) {
+    std::cout << "\033[1;33m";
+  } else if (counter.diff_significant > 0) {
+    std::cout << "\033[1;31m";
+  } else {
+    std::cout << "\033[1;32m";
+  }
+  std::cout << std::setw(params.fmt_wid) << counter.diff_non_zero << "\033[0m"
             << std::endl;
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
@@ -937,9 +947,28 @@ void FileComparator::print_diff_like_summary(
   if (differ.max_non_zero > thresh.zero) {
     std::cout << "   Maximum difference: " << differ.max_non_zero << std::endl;
     if (differ.max_non_zero > thresh.significant) {
-      std::cout
-          << "\033[1;31m   Max diff is greater than the significant threshold: "
-          << thresh.significant << "\033[0m" << std::endl;
+      if (counter.diff_significant > 0) {
+        std::cout << "\033[1;31m";
+      } else {
+        std::cout << "\033[1;33m";
+      }
+      std::cout << "   Max diff is greater than the significant threshold: "
+                << thresh.significant << "\033[0m" << std::endl;
+      if (counter.diff_non_trivial == 0) {
+        printbar(1);
+        if (differ.max_non_trivial <= thresh.significant) {
+          std::cout << "   Maximum rounded difference: "
+                    << differ.max_non_trivial << std::endl;
+          std::cout << "\033[1;32m   Max diff is less than or equal to the "
+                       "significant threshold: "
+                    << thresh.significant << "\033[0m" << std::endl;
+        }
+      } else {
+        std::cout << "\033[1;32m   Max diff is less or equal to than the "
+                     "significant threshold: "
+                  << thresh.significant << "\033[0m" << std::endl;
+      }
+
     } else {
       std::cout
           << "\033[1;32m   Max diff is less than the significant threshold: "
@@ -957,9 +986,8 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
     std::cout << "\033[1;32m   Files " << params.file1 << " and "
               << params.file2
               << " are equivalent"
-            //   << " with trivial differences due to formatting"
-              << "\033[0m"
-              << std::endl;
+              //   << " with trivial differences due to formatting"
+              << "\033[0m" << std::endl;
     return;
   }
   if (counter.diff_significant > 0 && print.level < 1) {
@@ -990,8 +1018,8 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
     std::cout << "\033[1;32m";
   }
 
-  std::cout << std::setw(params.fmt_wid)
-            << counter.diff_non_trivial << "\033[0m" << std::endl;
+  std::cout << std::setw(params.fmt_wid) << counter.diff_non_trivial
+            << "\033[0m" << std::endl;
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are non-trivially different\033[0m" << std::endl;
@@ -1038,8 +1066,8 @@ void FileComparator::print_significant_summary(
     return;
   }
   std::cout << "   Significant differences   ( >" << thresh.significant
-            << "): \033[1;31m" << std::setw(params.fmt_wid) << counter.diff_significant
-            << "\033[0m" << std::endl;
+            << "): \033[1;31m" << std::setw(params.fmt_wid)
+            << counter.diff_significant << "\033[0m" << std::endl;
   if (counter.diff_non_trivial > counter.diff_significant) {
     size_t zero_diff = counter.diff_non_trivial - counter.diff_significant;
     if (zero_diff > 0) {
@@ -1134,7 +1162,7 @@ void FileComparator::print_statistics(const std::string& file1) const {
   if (flag.file_end_reached) {
     std::cout << " (all)" << std::endl;
   } else {
-    std::cout << " (file end not reached)" << std::endl;
+    std::cout << " \033[1;31m(file end not reached)\033[0m" << std::endl;
   }
 }
 
@@ -1160,21 +1188,21 @@ void FileComparator::print_flag_status() const {
               << std::endl;
 
     std::cout << "   Counter status:" << std::endl;
-    std::cout << "     has_non_zero_diff   : "
+    std::cout << "      has_non_zero_diff   : "
               << format_boolean_status(flag.has_non_zero_diff, true, true,
                                        flag.files_are_close_enough)
               << std::endl;
-    std::cout << "     has_non_trivial_diff: "
+    std::cout << "      has_non_trivial_diff: "
               << format_boolean_status(flag.has_non_trivial_diff, true, true,
                                        flag.files_are_close_enough)
               << std::endl;
-    std::cout << "     has_significant_diff: "
+    std::cout << "      has_significant_diff: "
               << format_boolean_status(flag.has_significant_diff, true, true)
               << std::endl;
-    std::cout << "     has_critical_diff   : "
+    std::cout << "      has_critical_diff   : "
               << format_boolean_status(flag.has_critical_diff, true, true)
               << std::endl;
-    std::cout << "     has_printed_diff    : "
+    std::cout << "      has_printed_diff    : "
               << format_boolean_status(flag.has_printed_diff, true, true,
                                        thresh.print <= thresh.significant)
               << std::endl;
@@ -1322,7 +1350,7 @@ void FileComparator::print_settings(const std::string& file1,
     std::cout << "   Debug mode : " << (print.debug ? "ON" : "OFF")
               << std::endl;
     std::cout << "   Debug level: " << print.level << std::endl;
-    std::cout << "   Print mode : " << (print.diff_only ? "DIFF_ONLY" : "FULL")
+    std::cout << "   Print mode : " << (print.diff_only ? "DIFF" : "FULL")
               << std::endl;
     std::cout << "   File1: " << file1 << std::endl;
     std::cout << "   File2: " << file2 << std::endl;
