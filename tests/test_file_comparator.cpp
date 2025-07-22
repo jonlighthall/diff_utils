@@ -7,6 +7,7 @@
 
 class FileComparatorTest : public ::testing::Test {
 protected:
+    // Keep SetUp() and TearDown() protected (required by Google Test)
     void SetUp() override {
         // Set up test with default thresholds
         comparator = std::make_unique<FileComparator>(0.05, 10.0, 1.0);
@@ -23,7 +24,7 @@ protected:
     std::unique_ptr<FileComparator> comparator;
 
     // Helper function to create test files
-    void createTestFile(const std::string& filename, const std::vector<std::string>& lines) {
+    void createTestFile(const std::string& filename, const std::vector<std::string>& lines) const {
         std::ofstream file(filename);
         for (const auto& line : lines) {
             file << line << std::endl;
@@ -32,7 +33,7 @@ protected:
     }
 
     // Helper function to clean up test files
-    void cleanup_test_files() {
+    void cleanup_test_files() const {
         std::vector<std::string> test_files = {
             "test_file1.txt", "test_file2.txt",
             "test_identical1.txt", "test_identical2.txt",
@@ -160,7 +161,8 @@ TEST_F(FileComparatorTest, CompareComplexNumbers) {
 
 // Test extract_column_values function
 TEST_F(FileComparatorTest, ExtractColumnValues) {
-    LineData data1, data2;
+    LineData data1;
+    LineData data2;
     data1.values = {1.23, 4.56, 7.89};
     data1.decimal_places = {2, 2, 2};
     data2.values = {1.24, 4.57, 7.90};
