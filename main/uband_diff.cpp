@@ -233,10 +233,12 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return false;
     }
     if (args.stop_level < args.count_level) {
-      std::cerr << "\n\033[1;33mWARNING:\033[0m High threshold ("
-                << args.stop_level << ") is less than diff threshold ("
-                << args.count_level << ")." << std::endl;
-      std::cerr << "         This may lead to unexpected behavior."
+    std::cerr << "\033[1;33mWARNING:\033[0m Critical threshold ("
+            << "\033[1;31m" << args.stop_level << "\033[0m"
+            << ") is less than significant threshold ("
+            << "\033[1;36m" << args.count_level << "\033[0m"
+            << ")." << std::endl;
+      std::cerr << "         Difference table will not be printed."
                 << std::endl;
     }
   }
