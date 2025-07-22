@@ -152,6 +152,7 @@ bool FileComparator::compare_files(const std::string& file1,
       return false;
     }
   }
+  flag.file_end_reached = true;
 
   // Validate file lengths and return result
   if (!compare_file_lengths(file1, file2)) {
@@ -876,8 +877,11 @@ void FileComparator::print_diff_like_summary(
   // Diff-like differences
   // =========================================================
   if (counter.diff_non_zero == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and "
-              << params.file2 << " are identical\033[0m" << std::endl;
+    if (print.level >= 0) {
+      std::cout << "   ";
+    }
+    std::cout << "\033[1;32mFiles " << params.file1 << " and " << params.file2
+              << " are identical\033[0m" << std::endl;
     return;
   }
   if (counter.elem_number > counter.diff_non_zero) {
@@ -1008,9 +1012,31 @@ void FileComparator::print_significant_summary(
   printbar(1);
 }
 
-void FileComparator::print_summary(const std::string& file1,
-                                   const std::string& file2, int argc,
-                                   char* argv[]) const {
+// Helper function for boolean formatting
+std::string FileComparator::format_boolean_status(bool value, bool showStatus,
+                                                  bool reversed) const {
+  std::ostringstream oss;
+  if (!showStatus) {
+    oss << (value ? "TRUE" : "FALSE");
+  } else {
+    bool pass_condition = reversed ? !value : value;
+    if (pass_condition) {
+      oss << (value ? "TRUE" : "FALSE") << " \033[1;32m(PASS)\033[0m";
+    } else {
+      oss << (value ? "TRUE" : "FALSE") << " \033[1;31m(FAIL)\033[0m";
+    }
+  }
+  return oss.str();
+}
+
+// Helper function to print command line arguments and file info
+void FileComparator::print_arguments_and_files(const std::string& file1,
+                                               const std::string& file2,
+                                               int argc, char* argv[]) const {
+  if (print.level < 1) {
+    return;
+  }
+
   if (print.debug) {
     std::cout << "ARGUMENTS:" << std::endl;
   }
@@ -1023,179 +1049,187 @@ void FileComparator::print_summary(const std::string& file1,
   if (print.debug) {
     std::cout << "   File1: " << file1 << std::endl;
     std::cout << "   File2: " << file2 << std::endl;
-
-    std::cout << "STATISTICS:" << std::endl;
-    std::cout << "   Total lines compared: " << counter.line_number;
-
-    // Check if all lines were compared
-    if (size_t length1 = get_file_length(file1);
-        length1 == counter.line_number) {
-      std::cout << " (all)" << std::endl;
-    } else {
-      std::cout << " of " << length1 << std::endl;
-      // print how many lines were not compared
-      size_t missing_lines = length1 - counter.line_number;
-      std::cout << "\033[1;31m   " << missing_lines
-                << " lines were not compared\033[0m" << std::endl;
-    }
-
-    std::cout << "   Total elements checked: " << counter.elem_number
-              << std::endl;
   }
+}
 
-  // Print the status of flag and counter structs
-  auto print_flag_status = [&]() {
-    // Lambda to convert boolean to TRUE/FALSE string
-    auto boolToString = [](bool value, bool showStatus = false) {
-      std::ostringstream oss;
-      if (!showStatus) {
-        oss << (value ? "TRUE" : "FALSE");
-      } else {
-        if (value) {
-          oss << "TRUE "
-              << " \033[1;32m(PASS)\033[0m";
-        } else {
-          oss << "FALSE"
-              << " \033[1;31m(FAIL)\033[0m";
-        }
-      }
-      return oss.str();
-    };
-    // If reversed logic is needed, call as boolToString(val, true) and swap PASS/FAIL
-    auto boolToStringReversed = [](bool value, bool showStatus = false) {
-      std::ostringstream oss;
-      if (!showStatus) {
-        oss << (value ? "TRUE" : "FALSE");
-      } else {
-        if (value) {
-          oss << "TRUE "
-              << " \033[1;31m(FAIL)\033[0m";
-        } else {
-          oss << "FALSE"
-              << " \033[1;32m(PASS)\033[0m";
-        }
-      }
-      return oss.str();
-    };
-
-    // Print contents of flag struct
-    std::cout << "FLAGS:" << std::endl;
-    std::cout << "   error_found: " << boolToStringReversed(flag.error_found,true)
-              << std::endl;
-    if (counter.elem_number > 0) {
-        std::cout << "   Pass/fail Status" << std::endl;
-      std::cout << "      files_are_same        : " << boolToString(flag.files_are_same, true)
-                << std::endl;
-      std::cout << "      files_have_same_values: "
-                << boolToString(flag.files_have_same_values, true) << std::endl;
-      std::cout << "      files_are_close_enough: "
-                << boolToString(flag.files_are_close_enough, true) << std::endl;
-                std::cout << "   Counter status:" << std::endl;
-      std::cout << "     has_non_zero_diff   : "
-                << boolToStringReversed(flag.has_non_zero_diff) << std::endl;
-      std::cout << "     has_non_trivial_diff: "
-                << boolToStringReversed(flag.has_non_trivial_diff) << std::endl;
-      std::cout << "     has_significant_diff: "
-                << boolToStringReversed(flag.has_significant_diff, true) << std::endl;
-      std::cout << "     has_critical_diff   : "
-                << boolToStringReversed(flag.has_critical_diff, true) << std::endl;
-      std::cout << "     has_printed_diff    : "
-                << boolToStringReversed(flag.has_printed_diff) << std::endl;
-      std::cout << "   new_fmt: " << boolToString(flag.new_fmt) << std::endl;
-    }
-    // Print contents of counter struct
-    std::cout << "COUNTERS:" << std::endl;
-
-    if (counter.elem_number == 0) {
-      std::cout << "   \033[1;31mNo elements were checked.\033[0m" << std::endl;
-      return;
-    }
-
-    std::cout << "   line_number: " << counter.line_number << std::endl;
-    std::cout << "   elem_number: " << counter.elem_number << std::endl;
-    std::cout << "   diff_non_zero: " << counter.diff_non_zero << std::endl;
-    std::cout << "   diff_non_trivial: " << counter.diff_non_trivial
-              << std::endl;
-    std::cout << "   diff_significant: " << counter.diff_significant
-              << std::endl;
-    std::cout << "   diff_critical: " << counter.diff_critical << std::endl;
-    std::cout << "   diff_print: " << counter.diff_print << std::endl;
-  };
-
-  // Calculate the width for formatting
-  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
-  SummaryParams params{file1, file2, fmt_wid};
-
-  // Print threshold differences
-  // =========================================================
-
-  if (counter.diff_non_zero > 0 || print.level > 0 || print.debug) {
-    print_settings(params.file1, params.file2);
-    print_flag_status();
-  } else {
-    std::cout << "no print" << std::endl;
-  }
-
-  if (counter.diff_non_zero > 0 || print.debug || flag.error_found) {
-    std::cout << "SUMMARY:" << std::endl;
-  }
-
-  // First, check if there was an error, the details should already be
-  //   printed (which will have zero diffs)
-  if (flag.error_found) {
+// Helper function to print statistics
+void FileComparator::print_statistics(const std::string& file1) const {
+  if (print.level < 0) {
     return;
   }
+  std::cout << "STATISTICS:" << std::endl;
+  std::cout << "   Total lines compared: " << counter.line_number;
 
+  // Check if all lines were compared
+  if (size_t length1 = get_file_length(file1); length1 == counter.line_number) {
+    std::cout << " (all)" << std::endl;
+  } else {
+    std::cout << " of " << length1 << std::endl;
+    // print how many lines were not compared
+    size_t missing_lines = length1 - counter.line_number;
+    std::cout << "\033[1;31m   " << missing_lines
+              << " lines were not compared\033[0m" << std::endl;
+  }
+
+  std::cout << "   Total elements checked: " << counter.elem_number;
+  if (flag.file_end_reached) {
+    std::cout << " (all)" << std::endl;
+  } else {
+    std::cout << " (file end not reached)" << std::endl;
+  }
+}
+
+// Helper function to print flag status
+void FileComparator::print_flag_status() const {
+  if (print.level < 1) {
+    return;
+  }
+  std::cout << "FLAGS:" << std::endl;
+  std::cout << "   error_found: "
+            << format_boolean_status(flag.error_found, true, true) << std::endl;
+
+  if (counter.elem_number > 0) {
+    std::cout << "   Pass/fail Status" << std::endl;
+    std::cout << "      files_are_same        : "
+              << format_boolean_status(flag.files_are_same, true, false)
+              << std::endl;
+    std::cout << "      files_have_same_values: "
+              << format_boolean_status(flag.files_have_same_values, true, false)
+              << std::endl;
+    std::cout << "      files_are_close_enough: "
+              << format_boolean_status(flag.files_are_close_enough, true, false)
+              << std::endl;
+
+    std::cout << "   Counter status:" << std::endl;
+    std::cout << "     has_non_zero_diff   : "
+              << format_boolean_status(flag.has_non_zero_diff, false, true)
+              << std::endl;
+    std::cout << "     has_non_trivial_diff: "
+              << format_boolean_status(flag.has_non_trivial_diff, false, true)
+              << std::endl;
+    std::cout << "     has_significant_diff: "
+              << format_boolean_status(flag.has_significant_diff, true, true)
+              << std::endl;
+    std::cout << "     has_critical_diff   : "
+              << format_boolean_status(flag.has_critical_diff, true, true)
+              << std::endl;
+    std::cout << "     has_printed_diff    : "
+              << format_boolean_status(flag.has_printed_diff, false, true)
+              << std::endl;
+    std::cout << "   new_fmt: "
+              << format_boolean_status(flag.new_fmt, false, false) << std::endl;
+  }
+}
+
+// Helper function to print counter information
+void FileComparator::print_counter_info() const {
+  if (print.level < 0) {
+    return;
+  }
+  std::cout << "COUNTERS:" << std::endl;
+
+  if (counter.elem_number == 0) {
+    std::cout << "   \033[1;31mNo elements were checked.\033[0m" << std::endl;
+    return;
+  }
+  // Get the width of elem_number for alignment
+  auto width = static_cast<int>(std::to_string(counter.elem_number).length());
+  // Print all counters with aligned colons
+  std::cout << "   line_number      : " << std::setw(width)
+            << counter.line_number << std::endl;
+  std::cout << "   elem_number      : " << std::setw(width)
+            << counter.elem_number << std::endl;
+  std::cout << "   diff_non_zero    : " << std::setw(width)
+            << counter.diff_non_zero << std::endl;
+  if (counter.diff_non_zero == 0) {
+    return;
+  }
+  std::cout << "   diff_non_trivial : " << std::setw(width)
+            << counter.diff_non_trivial << std::endl;
+  if (counter.diff_non_trivial == 0) {
+    return;
+  }
+  std::cout << "   diff_significant : " << std::setw(width)
+            << counter.diff_significant << std::endl;
+  if (counter.diff_significant == 0) {
+    return;
+  }
+  std::cout << "   diff_print       : " << std::setw(width)
+            << counter.diff_print << std::endl;
   if (counter.diff_print == 0) {
-    //     if (print.level >= 0 || print.debug) {
-    std::cout << "   ";
-  } else {
-    std::cout << "\033[1;32mXFiles " << params.file1 << " and " << params.file2
-              << " are identical.\033[0m" << std::endl;
     return;
   }
+  std::cout << "   diff_critical    : " << std::setw(width)
+            << counter.diff_critical << std::endl;
+}
 
-  if (flag.files_have_same_values || print.debug) {
+// Helper function to print detailed summary sections
+void FileComparator::print_detailed_summary(const SummaryParams& params) const {
+  // step through flags, printing only one summary section
+  if (flag.files_are_same) {
     print_diff_like_summary(params);
+    return;
+  } else if (flag.files_have_same_values) {
+    print_rounded_summary(params);
+    return;
+  } else if (flag.files_are_close_enough) {
+    print_significant_summary(params);
+  } else {
+    std::cout << "\033[1;31m   Files " << params.file1 << " and "
+              << params.file2 << " are different\033[0m" << std::endl;
   }
+}
 
-  // if (flag.has_non_trivial_diff || print.debug) {
-  print_rounded_summary(params);
-  // }
-
-  print_significant_summary(params);
-
+// Helper function to print additional difference information
+void FileComparator::print_additional_diff_info(
+    const SummaryParams& params) const {
+  // Handle case with no printed differences
   if (counter.diff_print == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and "
-              << params.file2 << " are identical within print threshold\033[0m"
-              << std::endl;
     return;
   }
+  std::cout << "\033[1;32m   Files " << params.file1 << " and " << params.file2
+            << " are identicalD within print threshold\033[0m" << std::endl;
+
   std::cout << "   Printed differences      ( >" << thresh.print
-            << "): " << std::setw(fmt_wid) << counter.diff_print << std::endl;
+            << "): " << std::setw(params.fmt_wid) << counter.diff_print
+            << std::endl;
 
   if (thresh.significant < thresh.print) {
-    if (counter.diff_significant > counter.diff_print) {
-      size_t not_printed_signif = counter.diff_significant - counter.diff_print;
-      if (not_printed_signif > 0) {
-        std::cout << "\033[1;31m   Not printed differences  (<=" << thresh.print
-                  << "): " << std::setw(fmt_wid) << not_printed_signif
-                  << "\033[0m" << std::endl;
-      }
-    }
+    print_significant_not_printed_info(params);
   } else {
-    if (counter.diff_non_trivial > counter.diff_print) {
-      size_t not_printed = counter.diff_non_trivial - counter.diff_print;
-      if (not_printed > 0) {
-        std::cout << "   Not printed differences  (<=" << thresh.print
-                  << "): " << std::setw(fmt_wid) << not_printed << std::endl;
-      }
+    print_non_trivial_not_printed_info(params);
+  }
+  printbar(1);
+}
+
+// Helper function for significant differences not printed
+void FileComparator::print_significant_not_printed_info(
+    const SummaryParams& params) const {
+  if (counter.diff_significant > counter.diff_print) {
+    size_t not_printed_signif = counter.diff_significant - counter.diff_print;
+    if (not_printed_signif > 0) {
+      std::cout << "\033[1;31m   Not printed differences  (<=" << thresh.print
+                << "): " << std::setw(params.fmt_wid) << not_printed_signif
+                << "\033[0m" << std::endl;
     }
   }
+}
 
-  printbar(1);
-  // Hard threshold differences
-  // =========================================================
+// Helper function for non-trivial differences not printed
+void FileComparator::print_non_trivial_not_printed_info(
+    const SummaryParams& params) const {
+  if (counter.diff_non_trivial > counter.diff_print) {
+    size_t not_printed = counter.diff_non_trivial - counter.diff_print;
+    if (not_printed > 0) {
+      std::cout << "   Not printed differences  (<=" << thresh.print
+                << "): " << std::setw(params.fmt_wid) << not_printed
+                << std::endl;
+    }
+  }
+}
+
+// Helper function to print critical threshold information
+void FileComparator::print_critical_threshold_info() const {
   if (counter.diff_critical == 0) {
     return;
   }
@@ -1210,8 +1244,40 @@ void FileComparator::print_summary(const std::string& file1,
   }
 }
 
+// Simplified main print_summary function
+void FileComparator::print_summary(const std::string& file1,
+                                   const std::string& file2, int argc,
+                                   char* argv[]) const {
+  print_arguments_and_files(file1, file2, argc, argv);
+
+  auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
+  SummaryParams params{file1, file2, fmt_wid};
+  print_settings(params.file1, params.file2);
+  print_statistics(file1);
+  print_flag_status();
+  print_counter_info();
+
+  // Print summary header if needed
+  if ((!print.diff_only || print.debug || flag.error_found) &&
+      (print.level >= 0)) {
+    std::cout << "SUMMARY:" << std::endl;
+  }
+
+  // Early return for errors
+  if (flag.error_found) {
+    return;
+  }
+
+  print_detailed_summary(params);
+  print_additional_diff_info(params);
+  print_critical_threshold_info();
+}
+
 void FileComparator::print_settings(const std::string& file1,
                                     const std::string& file2) const {
+  if (print.level < 0) {
+    return;
+  }
   std::cout << "SETTINGS: " << std::endl;
   if (print.debug || print.level > 0) {
     std::cout << "   Debug mode : " << (print.debug ? "ON" : "OFF")
@@ -1228,8 +1294,7 @@ void FileComparator::print_settings(const std::string& file1,
             << std::endl;
   std::cout << "      Critical   : \033[1;31m" << thresh.critical
             << "\033[0m (halt)" << std::endl;
-  std::cout << "      Print      : " << thresh.print << " (print)"
-            << std::endl;
+  std::cout << "      Print      : " << thresh.print << " (print)" << std::endl;
   std::cout << "   Fixed Thresholds " << std::endl;
   std::cout << "      Zero       : " << thresh.zero << std::endl;
   std::cout << "      Marginal   : \033[1;33m" << thresh.marginal << "\033[0m"
