@@ -128,7 +128,7 @@ class FileComparator {
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
       : thresh{user_thresh, hard_thresh, print_thresh},
-        print{debug_level, debug_level > 0, debug_level >= 1, debug_level >= 2,
+        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
 
   // ========================================================================
