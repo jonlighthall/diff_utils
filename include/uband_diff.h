@@ -88,7 +88,7 @@ struct DiffStats {
   double max_non_trivial = 0;
   double max_significant = 0;  // maximum significant difference
 
-  int ndp_non_zero = 0;  // number of decimal places for non-zero values
+  int ndp_non_zero = 0;     // number of decimal places for non-zero values
   int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
   int ndp_significant = 0;  // number of decimal places
 };
@@ -255,6 +255,14 @@ class FileComparator {
   void print_detailed_summary(const SummaryParams& params) const;
   void print_additional_diff_info(const SummaryParams& params) const;
   void print_critical_threshold_info() const;
+
+  // Diff-like summary helper functions
+  void print_identical_files_message(const SummaryParams& params) const;
+  void print_exact_matches_info(const SummaryParams& params) const;
+  void print_non_zero_differences_info(const SummaryParams& params) const;
+  void print_difference_counts(const SummaryParams& params) const;
+  void print_maximum_difference_analysis(const SummaryParams& params) const;
+  std::string get_count_color(size_t count) const;
 };
 
 #endif  // UBAND_DIFF_H

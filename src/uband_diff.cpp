@@ -545,12 +545,10 @@ double FileComparator::calculate_threshold(int ndp) {
               << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
   }
   if (thresh.significant < dp_threshold) {
-    if (print.debug && flag.new_fmt) {
-      if (thresh.significant > 0) {
-        std::cout << "   \033[1;33mNOTE: minimum non-zero difference ("
-                  << dp_threshold << ") is greater than significant threshold ("
-                  << thresh.significant << ")\033[0m" << std::endl;
-      }
+    if (print.debug && flag.new_fmt && thresh.significant > 0) {
+      std::cout << "   \033[1;33mNOTE: minimum non-zero difference ("
+                << dp_threshold << ") is greater than significant threshold ("
+                << thresh.significant << ")\033[0m" << std::endl;
     }
     return dp_threshold;
   }
@@ -898,52 +896,52 @@ void printbar(int indent = 0) {
             << std::endl;
 }
 
-void FileComparator::print_diff_like_summary(
-    const SummaryParams& params) const {
-  // Diff-like differences
-  // =========================================================
-  // print diff-like return if files are identical
-  if (counter.diff_non_zero == 0) {
-    if (print.level >= 0) {
-      std::cout << "   ";
-    }
-    std::cout << "\033[1;32mFiles " << params.file1 << " and " << params.file2
-              << " are identical\033[0m" << std::endl;
-    return;
-  }
-  if (counter.diff_non_trivial > 0 && print.level < 1) {
-    return;
-  }
-  // print summary of differences if files are not identical
-  if (counter.elem_number > counter.diff_non_zero) {
-    const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
-    if (zero_diff > 0 && print.debug) {
-      std::cout << "   Exact matches        ( =" << 0.0 << "): ";
-      if (zero_diff > 0) {
-        std::cout << "\033[1;32m";
-      } else if (counter.diff_significant > 0) {
-        std::cout << "\033[1;31m";
-      } else {
-        std::cout << "\033[1;33m";
-      }
-      std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m"
-                << std::endl;
-    }
-  }
-  std::cout << "   Non-zero differences ( >" << thresh.zero << "): ";
-  if (counter.diff_non_zero > 0) {
-    std::cout << "\033[1;33m";
+// Helper function to get color based on count values
+std::string FileComparator::get_count_color(size_t count) const {
+  if (count > 0) {
+    return "\033[1;33m";  // Yellow for non-zero counts
   } else if (counter.diff_significant > 0) {
-    std::cout << "\033[1;31m";
+    return "\033[1;31m";  // Red if there are significant differences
   } else {
-    std::cout << "\033[1;32m";
+    return "\033[1;32m";  // Green otherwise
   }
-  std::cout << std::setw(params.fmt_wid) << counter.diff_non_zero << "\033[0m"
-            << std::endl;
+}
+
+// Helper function to print identical files message
+void FileComparator::print_identical_files_message(const SummaryParams& params) const {
+  if (print.level >= 0) {
+    std::cout << "   ";
+  }
+  std::cout << "\033[1;32mFiles " << params.file1 << " and " << params.file2
+            << " are identical\033[0m" << std::endl;
+}
+
+// Helper function to print exact matches information
+void FileComparator::print_exact_matches_info(const SummaryParams& params) const {
+  if (counter.elem_number <= counter.diff_non_zero) {
+    return;  // No exact matches to report
+  }
+
+  const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
+  if (zero_diff > 0 && print.debug) {
+    std::cout << "   Exact matches        ( =" << 0.0 << "): ";
+    std::cout << get_count_color(zero_diff);
+    std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m" << std::endl;
+  }
+}
+
+// Helper function to print non-zero differences information
+void FileComparator::print_non_zero_differences_info(const SummaryParams& params) const {
+  std::cout << "   Non-zero differences ( >" << thresh.zero << "): ";
+  std::cout << get_count_color(counter.diff_non_zero);
+  std::cout << std::setw(params.fmt_wid) << counter.diff_non_zero << "\033[0m" << std::endl;
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are different\033[0m" << std::endl;
+}
 
+// Helper function to print difference counts (printed vs not printed)
+void FileComparator::print_difference_counts(const SummaryParams& params) const {
   if (counter.diff_print < counter.diff_non_zero) {
     if (print.debug) {
       std::cout << "   Printed differences  ( >" << thresh.print
@@ -957,59 +955,80 @@ void FileComparator::print_diff_like_summary(
                 << std::endl;
     }
   } else {
-    std::cout << "   All non-zero "
-                 "differences are printed."
-              << std::endl;
+    std::cout << "   All non-zero differences are printed." << std::endl;
+  }
+}
+
+// Helper function to analyze and print maximum difference information
+void FileComparator::print_maximum_difference_analysis(const SummaryParams& params) const {
+  if (differ.max_non_zero <= thresh.zero) {
+    return;  // No significant maximum difference to analyze
   }
 
-  if (differ.max_non_zero > thresh.zero) {
-    std::cout << "   Maximum difference: "
-              << format_number(differ.max_non_zero, differ.ndp_non_zero,
-                               static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
-                               differ.ndp_non_zero)
-              << std::endl;
-    if (differ.max_non_zero > thresh.significant) {
-      if (counter.diff_significant > 0) {
-        std::cout << "\033[1;31m";
-      } else {
-        std::cout << "\033[1;33m";
-      }
-      std::cout << "   Max diff is greater than the significant threshold: "
-                << thresh.significant << "\033[0m" << std::endl;
-      if (counter.diff_non_trivial == 0) {
-        printbar(1);
-        if (differ.max_non_trivial <= thresh.significant) {
-          std::cout << "   Maximum rounded difference: "
-                    << differ.max_non_trivial << std::endl;
+  // Print maximum difference
+  std::cout << "   Maximum difference: "
+            << format_number(differ.max_non_zero, differ.ndp_non_zero,
+                             static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
+                             differ.ndp_non_zero)
+            << std::endl;
 
-          if (fabs(differ.max_non_trivial - thresh.significant) < thresh.zero) {
-            std::cout << "\033[1;33m   Max diff is equal to the "
-                         "significant threshold: "
-                      << thresh.significant << "\033[0m" << std::endl;
-          } else {
-            std::cout << "\033[1;32m   Max diff is less than the "
-                         "significant threshold: "
-                      << thresh.significant << "\033[0m" << std::endl;
-          }
-        }
-      } else {
-        std::cout << "\033[1;32m   Max diff is less or equal to than the "
-                     "significant threshold: "
-                  << thresh.significant << "\033[0m" << std::endl;
-      }
+  // Analyze maximum difference relative to significant threshold
+  if (differ.max_non_zero > thresh.significant) {
+    std::string color = (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
+    std::cout << color << "   Max diff is greater than the significant threshold: "
+              << thresh.significant << "\033[0m" << std::endl;
 
+    // Handle special case when no non-trivial differences exist
+    if (counter.diff_non_trivial == 0) {
+      printbar(1);
+      if (differ.max_non_trivial <= thresh.significant) {
+        std::cout << "   Maximum rounded difference: " << differ.max_non_trivial << std::endl;
+
+        bool equal_to_threshold =
+            fabs(differ.max_non_trivial - thresh.significant) < thresh.zero;
+        std::string result_color = equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
+        std::string comparison = equal_to_threshold ? "equal to" : "less than";
+
+        std::cout << result_color << "   Max diff is " << comparison
+                  << " the significant threshold: " << thresh.significant
+                  << "\033[0m" << std::endl;
+      }
     } else {
-      if (fabs(differ.max_non_zero - thresh.significant) < thresh.zero) {
-        std::cout << "\033[1;33m   Max diff is equal to the "
-                     "significant threshold: "
-                  << thresh.significant << "\033[0m" << std::endl;
-      } else {
-        std::cout
-            << "\033[1;32m   Max diff is less than the significant threshold: "
-            << thresh.significant << "\033[0m" << std::endl;
-      }
+      std::cout << "\033[1;32m   Max diff is less or equal to than the "
+                   "significant threshold: " << thresh.significant
+                << "\033[0m" << std::endl;
     }
+  } else {
+    // Maximum difference is within threshold
+    bool equal_to_threshold =
+        fabs(differ.max_non_zero - thresh.significant) < thresh.zero;
+    std::string result_color = equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
+    std::string comparison = equal_to_threshold ? "equal to" : "less than";
+
+    std::cout << result_color << "   Max diff is " << comparison
+              << " the significant threshold: " << thresh.significant
+              << "\033[0m" << std::endl;
   }
+}
+
+// Simplified main print_diff_like_summary function
+void FileComparator::print_diff_like_summary(const SummaryParams& params) const {
+  // Handle identical files case
+  if (counter.diff_non_zero == 0) {
+    print_identical_files_message(params);
+    return;
+  }
+
+  // Early return for non-trivial differences at low print levels
+  if (counter.diff_non_trivial > 0 && print.level < 1) {
+    return;
+  }
+
+  // Print summary sections for files with differences
+  print_exact_matches_info(params);
+  print_non_zero_differences_info(params);
+  print_difference_counts(params);
+  print_maximum_difference_analysis(params);
 
   printbar(1);
 }
