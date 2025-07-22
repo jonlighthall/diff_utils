@@ -61,7 +61,7 @@ struct CountStats {
 struct Flags {
   bool new_fmt = false;
   bool file_end_reached = false;  // Indicates if the end of file was reached
-  bool error_found = false;  // Global error flag
+  bool error_found = false;       // Global error flag
 
   // Counter-associated flags (correspond to CountStats)
   bool has_non_zero_diff =
@@ -87,6 +87,10 @@ struct DiffStats {
   double max_non_zero = 0;
   double max_non_trivial = 0;
   double max_significant = 0;  // maximum significant difference
+
+  int ndp_non_zero = 0;  // number of decimal places for non-zero values
+  int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
+  int ndp_significant = 0;  // number of decimal places
 };
 
 struct LineData {
@@ -213,8 +217,10 @@ class FileComparator {
   // Difference Processing
   // ========================================================================
   bool process_difference(const ColumnValues& column_data, size_t column_index);
-  void process_raw_values(double value1, double value2);
-  void process_rounded_values(double rounded_diff, int minimum_deci);
+  void process_raw_values(const ColumnValues& column_data);
+  void process_rounded_values(const ColumnValues& column_data,
+                              size_t column_index, double rounded_diff,
+                              int minimum_deci);
 
   // ========================================================================
   // Output & Formatting
@@ -238,9 +244,11 @@ class FileComparator {
   // ========================================================================
   // Summary Helper Functions (for cognitive complexity reduction)
   // ========================================================================
-  std::string format_boolean_status(bool value, bool showStatus, bool reversed, bool soft) const;
-  void print_arguments_and_files(const std::string& file1, const std::string& file2,
-                                int argc, char* argv[]) const;
+  std::string format_boolean_status(bool value, bool showStatus, bool reversed,
+                                    bool soft) const;
+  void print_arguments_and_files(const std::string& file1,
+                                 const std::string& file2, int argc,
+                                 char* argv[]) const;
   void print_statistics(const std::string& file1) const;
   void print_flag_status() const;
   void print_counter_info() const;

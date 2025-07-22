@@ -346,7 +346,7 @@ bool FileComparator::process_column(const LineData& data1,
                                     const LineData& data2, size_t column_index,
                                     std::vector<int>& dp_per_col) {
   ColumnValues column_data = extract_column_values(data1, data2, column_index);
-  process_raw_values(column_data.value1, column_data.value2);
+  process_raw_values(column_data);
 
   // Handle decimal places initialization and updates
   if (counter.line_number == 1) {
@@ -568,7 +568,8 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // compare values (with rounding)
   double diff_rounded = std::abs(rounded1 - rounded2);
 
-  process_rounded_values(diff_rounded, column_data.min_dp);
+  process_rounded_values(column_data, column_index, diff_rounded,
+                         column_data.min_dp);
 
   double ithreshold = calculate_threshold(column_data.min_dp);
 
@@ -603,13 +604,14 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   return true;
 }
 
-void FileComparator::process_raw_values(double value1, double value2) {
+void FileComparator::process_raw_values(const ColumnValues& column_data) {
   // compare values (without rounding)
-  double diff = std::abs(value1 - value2);
+  double diff = std::abs(column_data.value1 - column_data.value2);
 
   // track the maximum difference
   if (diff > differ.max_non_zero) {
     differ.max_non_zero = diff;
+    differ.ndp_non_zero = column_data.min_dp;
   }
   // track number of differences
   if (diff > thresh.zero) {
@@ -619,7 +621,9 @@ void FileComparator::process_raw_values(double value1, double value2) {
   }
 }
 
-void FileComparator::process_rounded_values(double rounded_diff,
+void FileComparator::process_rounded_values(const ColumnValues& column_data,
+                                            size_t column_index,
+                                            double rounded_diff,
                                             int minimum_deci) {
   // Define the threshold for non-trivial differences
   //
@@ -638,17 +642,27 @@ void FileComparator::process_rounded_values(double rounded_diff,
     // track the maximum non trivial difference
     if (rounded_diff > differ.max_non_trivial) {
       differ.max_non_trivial = rounded_diff;
+      differ.ndp_non_trivial = column_data.min_dp;
     }
   }
 
-  if (rounded_diff > thresh.significant) {
+  if (rounded_diff > thresh.significant &&
+      column_data.value1 < thresh.ignore &&
+      column_data.value2 < thresh.ignore) {
     counter.diff_significant++;
     flag.has_significant_diff = true;
     flag.files_are_close_enough = false;
 
+    if (column_data.value1 < thresh.marginal &&
+        column_data.value2 < thresh.marginal) {
+      counter.diff_marginal++;
+      flag.has_marginal_diff = true;
+    }
+
     // track the maximum significant difference
     if (rounded_diff > differ.max_significant) {
       differ.max_significant = rounded_diff;
+      differ.ndp_significant = column_data.min_dp;
     }
   }
 }
@@ -757,11 +771,12 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // threshold
   if (line_threshold > thresh.significant && thresh.significant > 0) {
     std::cout << "\033[1;35m";
+    std::cout << format_number(thresh.significant, column_data.min_dp, mxint, mxdec);
+    std::cout << "\033[0m | ";
+  } else {
+    std::cout << format_number(line_threshold, column_data.min_dp, mxint, mxdec);
+    std::cout << " | ";
   }
-  std::cout << format_number(
-      line_threshold > thresh.significant ? thresh.significant : line_threshold,
-      column_data.min_dp, mxint, mxdec);
-  std::cout << "\033[0m | ";
 
   // Lambda to print color based on diff and thresholds
   auto print_diff_color = [this](double value1, double value2, double rdiff) {
@@ -814,12 +829,15 @@ std::string FileComparator::format_number(double value, int prec,
   int padding_width = max_integer_width - intWidth;
   // Prevent negative padding
   if (padding_width < 0) {
-    std::cout << std::endl
-              << "max_integer_width: " << max_integer_width << std::endl
-              << "intWidth: " << intWidth << std::endl
-              << "padding_width: " << padding_width << std::endl;
+    if (print.level > 0) {
+      std::cout << std::endl
+                << "max_integer_width: " << max_integer_width << std::endl
+                << "intWidth: " << intWidth << std::endl
+                << "padding_width: " << padding_width << std::endl;
+
     std::cerr << "Error: Negative padding width in format_number: "
               << padding_width << std::endl;
+    }
     padding_width = 0;  // Prevent negative padding
   }
 
@@ -945,7 +963,11 @@ void FileComparator::print_diff_like_summary(
   }
 
   if (differ.max_non_zero > thresh.zero) {
-    std::cout << "   Maximum difference: " << differ.max_non_zero << std::endl;
+    std::cout << "   Maximum difference: "
+              << format_number(differ.max_non_zero, differ.ndp_non_zero,
+                               static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
+                               differ.ndp_non_zero)
+              << std::endl;
     if (differ.max_non_zero > thresh.significant) {
       if (counter.diff_significant > 0) {
         std::cout << "\033[1;31m";
@@ -959,9 +981,16 @@ void FileComparator::print_diff_like_summary(
         if (differ.max_non_trivial <= thresh.significant) {
           std::cout << "   Maximum rounded difference: "
                     << differ.max_non_trivial << std::endl;
-          std::cout << "\033[1;32m   Max diff is less than or equal to the "
-                       "significant threshold: "
-                    << thresh.significant << "\033[0m" << std::endl;
+
+          if (fabs(differ.max_non_trivial - thresh.significant) < thresh.zero) {
+            std::cout << "\033[1;33m   Max diff is equal to the "
+                         "significant threshold: "
+                      << thresh.significant << "\033[0m" << std::endl;
+          } else {
+            std::cout << "\033[1;32m   Max diff is less than the "
+                         "significant threshold: "
+                      << thresh.significant << "\033[0m" << std::endl;
+          }
         }
       } else {
         std::cout << "\033[1;32m   Max diff is less or equal to than the "
@@ -970,9 +999,15 @@ void FileComparator::print_diff_like_summary(
       }
 
     } else {
-      std::cout
-          << "\033[1;32m   Max diff is less than the significant threshold: "
-          << thresh.significant << "\033[0m" << std::endl;
+      if (fabs(differ.max_non_zero - thresh.significant) < thresh.zero) {
+        std::cout << "\033[1;33m   Max diff is equal to the "
+                     "significant threshold: "
+                  << thresh.significant << "\033[0m" << std::endl;
+      } else {
+        std::cout
+            << "\033[1;32m   Max diff is less than the significant threshold: "
+            << thresh.significant << "\033[0m" << std::endl;
+      }
     }
   }
 
@@ -1040,18 +1075,38 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << std::endl;
   }
 
-  std::cout << "   Maximum rounded difference: " << differ.max_non_trivial
+  std::cout << "   Maximum rounded difference: "
+            << format_number(
+                   differ.max_non_trivial, differ.ndp_non_trivial,
+                   static_cast<int>(
+                       std::round(std::log10(differ.max_non_trivial)) + 2),
+                   differ.ndp_non_trivial)
             << std::endl;
   if (differ.max_non_trivial > thresh.significant) {
     std::cout
         << "\033[1;31m   Max diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
   } else {
-    std::cout
-        << "\033[1;32m   Max diff is less than the significant threshold: "
-        << thresh.significant << "\033[0m" << std::endl;
+    if (fabs(differ.max_non_trivial - thresh.significant) < thresh.zero) {
+      std::cout << "\033[1;33m   Max diff is equal to the "
+                   "significant threshold: "
+                << format_number(
+                       thresh.significant, differ.ndp_non_trivial,
+                       static_cast<int>(
+                           std::round(std::log10(thresh.significant)) + 2),
+                       differ.ndp_non_trivial)
+                << "\033[0m" << std::endl;
+    } else {
+      std::cout << "\033[1;32m   Max diff is less than the "
+                   "significant threshold: "
+                << format_number(
+                       thresh.significant, differ.ndp_non_trivial,
+                       static_cast<int>(
+                           std::round(std::log10(thresh.significant)) + 2),
+                       differ.ndp_non_trivial)
+                << "\033[0m" << std::endl;
+    }
   }
-
   printbar(1);
 }
 
@@ -1074,6 +1129,28 @@ void FileComparator::print_significant_summary(
       std::cout << "   Insignificant differences (<=" << thresh.significant
                 << "): " << std::setw(params.fmt_wid) << zero_diff << std::endl;
     }
+  }
+
+  if (differ.max_significant > thresh.significant) {
+    std::cout << "   Maximum significant difference: "
+              << format_number(
+                     differ.max_significant, differ.ndp_significant,
+                     static_cast<int>(
+                         std::round(std::log10(differ.max_significant)) + 2),
+                     differ.ndp_significant)
+              << std::endl;
+    std::cout << "\033[1;31m   Max diff is greater than the significant "
+                 "threshold: "
+              << thresh.significant << "\033[0m" << std::endl;
+  } else {
+    std::cout << "\033[1;32m   Max diff is less than or equal to the "
+                 "significant threshold: "
+              << format_number(
+                     thresh.significant, differ.ndp_significant,
+                     static_cast<int>(
+                         std::round(std::log10(thresh.significant)) + 2),
+                     differ.ndp_significant)
+              << "\033[0m" << std::endl;
   }
   std::cout << "\033[1;31m   Files " << params.file1 << " and " << params.file2
             << " are significantly different\033[0m" << std::endl;
