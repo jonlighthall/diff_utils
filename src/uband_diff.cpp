@@ -158,6 +158,22 @@ bool FileComparator::compare_files(const std::string& file1,
   if (!compare_file_lengths(file1, file2)) {
     return false;
   }
+
+  std::cout << "File comparison completed successfully." << std::endl;
+  if (print.debug || print.level >= 0) {
+    std::cout << "Total lines processed: " << counter.line_number << std::endl;
+    std::cout << "Total elements checked: " << counter.elem_number << std::endl;
+    std::cout << "Maximum non-zero difference: " << differ.max_non_zero
+              << " (NDP: " << differ.ndp_non_zero << ")" << std::endl;
+    std::cout << "Maximum non-trivial difference: " << differ.max_non_trivial
+              << " (NDP: " << differ.ndp_non_trivial << ")" << std::endl;
+    std::cout << "Maximum significant difference: " << differ.max_significant
+              << " (NDP: " << differ.ndp_significant << ")" << std::endl;
+  }
+
+  print.level=1;
+  print_flag_status();
+
   return flag.files_are_close_enough && !flag.error_found;
 }
 
@@ -280,7 +296,7 @@ bool FileComparator::compare_file_lengths(const std::string& file1,
 
     return false;
   }
-  if (print.debug) {
+  if (print.debug || print.level >= 0) {
     std::cout << "Files have the same number of lines: " << length1
               << std::endl;
     std::cout << "Files have the same number of elements: "
@@ -349,7 +365,8 @@ bool FileComparator::process_column(const LineData& data1,
   process_raw_values(column_data);
 
   // Handle decimal places initialization and updates
-  if (counter.line_number == 1) {
+  // Initialize if this is the first line OR if the format has changed (vector was cleared)
+  if (counter.line_number == 1 || column_index >= dp_per_col.size()) {
     if (!initialize_decimal_place_format(column_data.min_dp, column_index,
                                          dp_per_col)) {
       return false;
@@ -398,7 +415,7 @@ bool FileComparator::validate_and_track_column_format(
   }
 
   if (prev_n_col > 0 && n_col1 != prev_n_col) {
-    std::cerr << "\033[1;31mNote: Number of columns changed at line "
+    std::cout << "\033[1;33mNote: Number of columns changed at line "
               << counter.line_number << " (previous: " << prev_n_col
               << ", current: " << n_col1 << ")\033[0m" << std::endl;
     dp_per_col.clear();
@@ -490,6 +507,15 @@ bool FileComparator::update_decimal_place_format(const int min_dp,
                                                  std::vector<int>& dp_per_col) {
   if (print.debug3) {
     std::cout << "not first line" << std::endl;
+  }
+
+  // Safety check: ensure the vector is large enough for this column
+  if (column_index >= dp_per_col.size()) {
+    std::cerr << "Error: dp_per_col size (" << dp_per_col.size()
+              << ") insufficient for column " << column_index + 1
+              << " at line " << counter.line_number << std::endl;
+    flag.error_found = true;
+    return false;
   }
 
   // check if the minimum decimal places for this column has changed
