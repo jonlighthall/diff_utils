@@ -10,9 +10,10 @@
  *
  * Usage: uband_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
  *   file1, file2 - Input files to compare
- *   sig_thresh   - difference threshold for counting significant errors (default: 0.05)
- *   crit_thresh  - difference threshold for interruption (default: 10.0)
- *   print_thresh - difference threshold for printing table (default: 1.0)
+ *   sig_thresh   - difference threshold for counting significant errors
+ * (default: 0.05) crit_thresh  - difference threshold for interruption
+ * (default: 10.0) print_thresh - difference threshold for printing table
+ * (default: 1.0)
  */
 
 #include "uband_diff.h"
@@ -228,6 +229,13 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
     return false;
   }
 
+    int decimal_places = 0;
+    std::string thresh_str(argv[3]);
+    auto dot_pos = thresh_str.find('.');
+    if (dot_pos != std::string::npos) {
+      decimal_places = static_cast<int>(thresh_str.size() - dot_pos - 1);
+    }
+
   if (argc >= 5) {
     if (!parse_threshold_argument(argv[4], args.stop_level, "High threshold")) {
       return false;
@@ -302,9 +310,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // Print the value of the "close enough" flag
-std::cout << "\033[1;32mFiles are equivalent within tolerance.\033[0m" << std::endl;
-  if (args.debug_level >= 0) {
+  if (args.debug_level > 0) {
     std::cout << "   Close enough flag: " << std::boolalpha
               << comparator.getFlag().files_are_close_enough << std::endl;
   }
@@ -316,11 +322,11 @@ std::cout << "\033[1;32mFiles are equivalent within tolerance.\033[0m" << std::e
     return 0;
   } else {
     if (args.debug_level >= 0) {
-    std::cout << "\033[1;31mFiles differ significantly.\033[0m" << std::endl;
+      std::cout << "\033[1;31mFiles differ significantly.\033[0m" << std::endl;
 
       if (comparator.getFlag().files_are_close_enough) {
         std::cout << "\033[1;33mFiles are probably close enough (within "
-                     "thresholds).\033[0m"
+                     "tolerance).\033[0m"
                   << std::endl;
         return 0;
       }

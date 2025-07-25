@@ -552,7 +552,7 @@ double FileComparator::calculate_threshold(int ndp) {
     auto line_num_width =
         static_cast<int>(std::to_string(this_line_ncols).length());
     // indent the column format specification under the line number
-    std::cout << "   Column " << std::setw(line_num_width) << this_fmt_column
+    std::cout << "      Column " << std::setw(line_num_width) << this_fmt_column
               << ": ";
     std::cout << ndp << " decimal places or 10^(" << -ndp
               << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
@@ -565,7 +565,7 @@ double FileComparator::calculate_threshold(int ndp) {
   if (ndp > differ.ndp_max) {
     differ.ndp_max = ndp;
     if (print.level > 0) {
-      std::cout << "   Maximum decimal places so far: " << differ.ndp_max
+      std::cout << "      Maximum decimal places so far: " << differ.ndp_max
                 << std::endl;
     }
   }
@@ -918,9 +918,9 @@ void FileComparator::print_format_info(const ColumnValues& column_data,
   }
   // print the format
   if (print.debug) {
-    std::cout << "DEBUG : Line " << counter.line_number << ", Column "
+    std::cout << "   DEBUG : Line " << counter.line_number << ", Column "
               << column_index + 1 << std::endl;
-    std::cout << "   FORMAT: number of decimal places file1: "
+    std::cout << "      FORMAT: number of decimal places file1: "
               << column_data.dp1 << ", file2: " << column_data.dp2 << std::endl;
   }
 }
@@ -1209,9 +1209,10 @@ void FileComparator::print_significant_summary(
   };
 
   // Print significant differences count
+  if (print.level >= 0) {
   std::cout << "   Significant differences   ( >" << thresh.significant
             << "): ";
-  if (print.level >= 0) {
+
     std::cout << "\033[1;31m" << std::setw(params.fmt_wid)
               << counter.diff_significant << "\033[0m";
 
@@ -1265,7 +1266,8 @@ void FileComparator::print_significant_summary(
 
       std::cout
           << "\033[1;31m   Max diff is greater than the significant threshold: "
-          << std::setprecision(differ.ndp_significant) << thresh.significant << "\033[0m" << std::endl;
+          << std::setprecision(differ.ndp_significant) << thresh.significant
+          << "\033[0m" << std::endl;
     } else {
       std::cout << "\033[1;32m   Max diff is less than or equal to the "
                    "significant threshold: "
@@ -1280,8 +1282,13 @@ void FileComparator::print_significant_summary(
 
   // Print file comparison result
   if (print.level >= 0) std::cout << "   ";
-  std::cout << "\033[1;31mFiles " << params.file1 << " and " << params.file2
-            << " are significantly different\033[0m" << std::endl;
+  if (differ.ndp_significant > differ.ndp_single_precision) {
+    std::cout << "\033[1;33mFiles " << params.file1 << " and " << params.file2
+              << " are equivalent within the limits of single precision\033[0m" << std::endl;
+  } else {
+    std::cout << "\033[1;31mFiles " << params.file1 << " and " << params.file2
+              << " are significantly different\033[0m" << std::endl;
+  }
 
   // Print printed vs not printed differences
   if (counter.diff_print < counter.diff_significant) {
