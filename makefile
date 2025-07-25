@@ -243,6 +243,9 @@ $(BINDIR):
 	@mkdir -v $(BINDIR)
 $(OBJDIR):
 	@mkdir -v $(OBJDIR)
+
+diff: $(BINDIR)/uband_diff
+
 #
 # recipes without outputs
 .PHONY: mostlyclean clean force out realclean distclean reset
