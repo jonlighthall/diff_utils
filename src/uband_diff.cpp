@@ -1159,6 +1159,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                 << "\033[0m" << std::endl;
     }
   }
+
   printbar(1);
 }
 
@@ -1184,20 +1185,24 @@ void FileComparator::print_significant_summary(
 
       if (counter.elem_number > 0) {
         double percent = 100.0 * count / counter.elem_number;
-        std::cout << " (" << std::fixed << std::setprecision(2) << percent << "%)";
+        std::cout << " (" << std::fixed << std::setprecision(2) << percent
+                  << "%)";
       }
       std::cout << std::endl;
     }
   };
 
   // Print significant differences count
-  std::cout << "   Significant differences   ( >" << thresh.significant << "): ";
+  std::cout << "   Significant differences   ( >" << thresh.significant
+            << "): ";
   if (print.level >= 0) {
-    std::cout << "\033[1;31m" << std::setw(params.fmt_wid) << counter.diff_significant << "\033[0m";
+    std::cout << "\033[1;31m" << std::setw(params.fmt_wid)
+              << counter.diff_significant << "\033[0m";
 
     if (counter.elem_number > 0) {
       double percent = 100.0 * counter.diff_significant / counter.elem_number;
-      std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2) << percent << "%)";
+      std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
+                << percent << "%)";
 
       // Check if probably OK
       constexpr double threshold_percent = 2.0;
@@ -1214,10 +1219,12 @@ void FileComparator::print_significant_summary(
 
   // Print insignificant differences if any
   if (counter.diff_non_trivial > counter.diff_significant) {
-    size_t insignificant_count = counter.diff_non_trivial - counter.diff_significant;
+    size_t insignificant_count =
+        counter.diff_non_trivial - counter.diff_significant;
     if (insignificant_count > 0) {
       print_count_with_percent("Insignificant differences (<=" +
-                             std::to_string(thresh.significant) + ")", insignificant_count);
+                                   std::to_string(thresh.significant) + ")",
+                               insignificant_count);
     }
   }
 
@@ -1225,17 +1232,23 @@ void FileComparator::print_significant_summary(
   if (print.level >= 0) {
     if (differ.max_significant > thresh.significant) {
       std::cout << "   \033[4;35mMaximum significant difference: "
-                << format_number(differ.max_significant, differ.ndp_significant,
-                               static_cast<int>(std::round(std::log10(differ.max_significant)) + 2),
-                               differ.ndp_significant)
+                << format_number(
+                       differ.max_significant, differ.ndp_significant,
+                       static_cast<int>(
+                           std::round(std::log10(differ.max_significant)) + 2),
+                       differ.ndp_significant)
                 << "\033[0m" << std::endl;
-      std::cout << "\033[1;31m   Max diff is greater than the significant threshold: "
-                << thresh.significant << "\033[0m" << std::endl;
+      std::cout
+          << "\033[1;31m   Max diff is greater than the significant threshold: "
+          << thresh.significant << "\033[0m" << std::endl;
     } else {
-      std::cout << "\033[1;32m   Max diff is less than or equal to the significant threshold: "
-                << format_number(thresh.significant, differ.ndp_significant,
-                               static_cast<int>(std::round(std::log10(thresh.significant)) + 2),
-                               differ.ndp_significant)
+      std::cout << "\033[1;32m   Max diff is less than or equal to the "
+                   "significant threshold: "
+                << format_number(
+                       thresh.significant, differ.ndp_significant,
+                       static_cast<int>(
+                           std::round(std::log10(thresh.significant)) + 2),
+                       differ.ndp_significant)
                 << "\033[0m" << std::endl;
     }
   }
@@ -1247,8 +1260,9 @@ void FileComparator::print_significant_summary(
 
   // Print printed vs not printed differences
   if (counter.diff_print < counter.diff_significant) {
-    print_count_with_percent("Printed differences       ( >" +
-                           std::to_string(thresh.print) + ")", counter.diff_print);
+    print_count_with_percent(
+        "Printed differences       ( >" + std::to_string(thresh.print) + ")",
+        counter.diff_print);
 
     size_t not_printed_signif = counter.diff_significant - counter.diff_print;
     if (not_printed_signif > 0) {
@@ -1530,12 +1544,12 @@ void FileComparator::print_settings(const std::string& file1,
             << "\033[0m (halt)" << std::endl;
   std::cout << "      Print      : " << thresh.print << " (print)" << std::endl;
   if (print.level > 0) {
-  std::cout << "   Fixed Thresholds " << std::endl;
-  std::cout << "      Zero       : " << thresh.zero << std::endl;
-  std::cout << "      Marginal   : \033[1;33m" << thresh.marginal << "\033[0m"
-            << std::endl;
-  std::cout << "      Ignore     : \033[1;34m" << thresh.ignore
-            << "\033[0m (maximum TL)" << std::endl;
+    std::cout << "   Fixed Thresholds " << std::endl;
+    std::cout << "      Zero       : " << thresh.zero << std::endl;
+    std::cout << "      Marginal   : \033[1;33m" << thresh.marginal << "\033[0m"
+              << std::endl;
+    std::cout << "      Ignore     : \033[1;34m" << thresh.ignore
+              << "\033[0m (maximum TL)" << std::endl;
   }
 }
 
