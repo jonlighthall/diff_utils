@@ -1159,7 +1159,6 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                 << "\033[0m" << std::endl;
     }
   }
-
   printbar(1);
 }
 
@@ -1173,91 +1172,94 @@ void FileComparator::print_significant_summary(
               << std::endl;
     return;
   }
-  if (print.level >= 0) {
-    std::cout << "   Significant differences   ( >" << thresh.significant
-              << "): \033[1;31m" << std::setw(params.fmt_wid)
-              << counter.diff_significant << "\033[0m";
-  }
-  // Print percentage if total elements > 0
-  if (counter.elem_number > 0) {
-    double percent = 100.0 * counter.diff_significant / counter.elem_number;
-     if (print.level >= 0) std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
-              << percent << "%)";
-    double threshold_percent = 2.0;
-    if (percent < threshold_percent) {
-      std::cout << " \033[1;33mProbably OK: error percent less than "
-                << threshold_percent << "%  \033[0m" << std::endl;
-      flag.files_are_close_enough = true;
-      print_flag_status();
-    } else {
-      std::cout << std::endl;
-    }
-  }
 
-  if (counter.diff_non_trivial > counter.diff_significant) {
-    size_t zero_diff = counter.diff_non_trivial - counter.diff_significant;
-    if (zero_diff > 0) {
-      std::cout << "   Insignificant differences (<=" << thresh.significant
-                << "): " << std::setw(params.fmt_wid) << zero_diff;
-      // Print percentage if total elements > 0
+  // Helper lambda for printing count with percentage
+  auto print_count_with_percent = [&](const std::string& label, size_t count,
+                                      const std::string& color = "") {
+    if (print.level >= 0) {
+      std::cout << "   " << label << ": ";
+      if (!color.empty()) std::cout << color;
+      std::cout << std::setw(params.fmt_wid) << count;
+      if (!color.empty()) std::cout << "\033[0m";
+
       if (counter.elem_number > 0) {
-        double percent = 100.0 * zero_diff / counter.elem_number;
-        std::cout << " (" << std::fixed << std::setprecision(2) << percent
-                  << "%)";
+        double percent = 100.0 * count / counter.elem_number;
+        std::cout << " (" << std::fixed << std::setprecision(2) << percent << "%)";
       }
       std::cout << std::endl;
     }
+  };
+
+  // Print significant differences count
+  std::cout << "   Significant differences   ( >" << thresh.significant << "): ";
+  if (print.level >= 0) {
+    std::cout << "\033[1;31m" << std::setw(params.fmt_wid) << counter.diff_significant << "\033[0m";
+
+    if (counter.elem_number > 0) {
+      double percent = 100.0 * counter.diff_significant / counter.elem_number;
+      std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2) << percent << "%)";
+
+      // Check if probably OK
+      constexpr double threshold_percent = 2.0;
+      if (percent < threshold_percent) {
+        std::cout << " \033[1;33mProbably OK: error percent less than "
+                  << threshold_percent << "%  \033[0m" << std::endl;
+        flag.files_are_close_enough = true;
+        print_flag_status();
+      } else {
+        std::cout << std::endl;
+      }
+    }
   }
+
+  // Print insignificant differences if any
+  if (counter.diff_non_trivial > counter.diff_significant) {
+    size_t insignificant_count = counter.diff_non_trivial - counter.diff_significant;
+    if (insignificant_count > 0) {
+      print_count_with_percent("Insignificant differences (<=" +
+                             std::to_string(thresh.significant) + ")", insignificant_count);
+    }
+  }
+
+  // Print maximum difference analysis
   if (print.level >= 0) {
     if (differ.max_significant > thresh.significant) {
       std::cout << "   \033[4;35mMaximum significant difference: "
-                << format_number(
-                       differ.max_significant, differ.ndp_significant,
-                       static_cast<int>(
-                           std::round(std::log10(differ.max_significant)) + 2),
-                       differ.ndp_significant)
+                << format_number(differ.max_significant, differ.ndp_significant,
+                               static_cast<int>(std::round(std::log10(differ.max_significant)) + 2),
+                               differ.ndp_significant)
                 << "\033[0m" << std::endl;
-      std::cout << "\033[1;31m   Max diff is greater than the significant "
-                   "threshold: "
+      std::cout << "\033[1;31m   Max diff is greater than the significant threshold: "
                 << thresh.significant << "\033[0m" << std::endl;
     } else {
-      std::cout << "\033[1;32m   Max diff is less than or equal to the "
-                   "significant threshold: "
-                << format_number(
-                       thresh.significant, differ.ndp_significant,
-                       static_cast<int>(
-                           std::round(std::log10(thresh.significant)) + 2),
-                       differ.ndp_significant)
+      std::cout << "\033[1;32m   Max diff is less than or equal to the significant threshold: "
+                << format_number(thresh.significant, differ.ndp_significant,
+                               static_cast<int>(std::round(std::log10(thresh.significant)) + 2),
+                               differ.ndp_significant)
                 << "\033[0m" << std::endl;
     }
   }
-    if (print.level >= 0) std::cout << "   ";
+
+  // Print file comparison result
+  if (print.level >= 0) std::cout << "   ";
   std::cout << "\033[1;31mFiles " << params.file1 << " and " << params.file2
             << " are significantly different\033[0m" << std::endl;
 
+  // Print printed vs not printed differences
   if (counter.diff_print < counter.diff_significant) {
-    std::cout << "   Printed differences       ( >" << thresh.print
-              << "): " << std::setw(params.fmt_wid) << counter.diff_print;
-    // Print percentage if total elements > 0
-    if (counter.elem_number > 0) {
-      double percent = 100.0 * counter.diff_print / counter.elem_number;
-      std::cout << " (" << std::fixed << std::setprecision(2) << percent
-                << "%)";
-    }
-    std::cout << std::endl;
+    print_count_with_percent("Printed differences       ( >" +
+                           std::to_string(thresh.print) + ")", counter.diff_print);
+
     size_t not_printed_signif = counter.diff_significant - counter.diff_print;
     if (not_printed_signif > 0) {
       std::cout << "\033[1;31m   Not printed differences   (<=" << thresh.print
                 << "): " << std::setw(params.fmt_wid) << not_printed_signif
                 << "\033[0m" << std::endl;
     }
-  } else {
-    if (print.level >= 0) {
-      std::cout << "   All significant "
-                   "differences are printed."
-                << std::endl;
-    }
+  } else if (print.level >= 0) {
+    std::cout << "   All significant differences are printed." << std::endl;
   }
+
   if (print.level >= 0) printbar(1);
 }
 
