@@ -158,22 +158,6 @@ bool FileComparator::compare_files(const std::string& file1,
   if (!compare_file_lengths(file1, file2)) {
     return false;
   }
-
-  std::cout << "File comparison completed successfully." << std::endl;
-  if (print.debug || print.level >= 0) {
-    std::cout << "Total lines processed: " << counter.line_number << std::endl;
-    std::cout << "Total elements checked: " << counter.elem_number << std::endl;
-    std::cout << "Maximum non-zero difference: " << differ.max_non_zero
-              << " (NDP: " << differ.ndp_non_zero << ")" << std::endl;
-    std::cout << "Maximum non-trivial difference: " << differ.max_non_trivial
-              << " (NDP: " << differ.ndp_non_trivial << ")" << std::endl;
-    std::cout << "Maximum significant difference: " << differ.max_significant
-              << " (NDP: " << differ.ndp_significant << ")" << std::endl;
-  }
-
-  print.level=1;
-  print_flag_status();
-
   return flag.files_are_close_enough && !flag.error_found;
 }
 
@@ -365,7 +349,8 @@ bool FileComparator::process_column(const LineData& data1,
   process_raw_values(column_data);
 
   // Handle decimal places initialization and updates
-  // Initialize if this is the first line OR if the format has changed (vector was cleared)
+  // Initialize if this is the first line OR if the format has changed (vector
+  // was cleared)
   if (counter.line_number == 1 || column_index >= dp_per_col.size()) {
     if (!initialize_decimal_place_format(column_data.min_dp, column_index,
                                          dp_per_col)) {
@@ -512,8 +497,8 @@ bool FileComparator::update_decimal_place_format(const int min_dp,
   // Safety check: ensure the vector is large enough for this column
   if (column_index >= dp_per_col.size()) {
     std::cerr << "Error: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << column_index + 1
-              << " at line " << counter.line_number << std::endl;
+              << ") insufficient for column " << column_index + 1 << " at line "
+              << counter.line_number << std::endl;
     flag.error_found = true;
     return false;
   }
@@ -1019,8 +1004,8 @@ void FileComparator::print_maximum_difference_analysis(
     if (counter.diff_non_trivial == 0) {
       printbar(1);
       if (differ.max_non_trivial <= thresh.significant) {
-        std::cout << "   Maximum rounded difference: " << differ.max_non_trivial
-                  << std::endl;
+        std::cout << "   \033[4;35mMaximum rounded difference: "
+              << differ.max_non_trivial << "\033[0m" << std::endl;
 
         bool equal_to_threshold =
             fabs(differ.max_non_trivial - thresh.significant) < thresh.zero;
@@ -1118,6 +1103,13 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are non-trivially different\033[0m" << std::endl;
 
+  std::cout << "   \033[4;35mMaximum rounded difference: "
+            << format_number(
+                   differ.max_non_trivial, differ.ndp_non_trivial,
+                   static_cast<int>(
+                       std::round(std::log10(differ.max_non_trivial)) + 2),
+                   differ.ndp_non_trivial)
+            << "\033[0m" << std::endl;
   if (counter.diff_print < counter.diff_non_trivial) {
     std::cout << "   Printed differences     ( >" << thresh.print
               << "): " << std::setw(params.fmt_wid) << counter.diff_print
@@ -1134,13 +1126,6 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << std::endl;
   }
 
-  std::cout << "   Maximum rounded difference: "
-            << format_number(
-                   differ.max_non_trivial, differ.ndp_non_trivial,
-                   static_cast<int>(
-                       std::round(std::log10(differ.max_non_trivial)) + 2),
-                   differ.ndp_non_trivial)
-            << std::endl;
   if (differ.max_non_trivial > thresh.significant) {
     std::cout
         << "\033[1;31m   Max diff is greater than the significant threshold: "
@@ -1166,6 +1151,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                 << "\033[0m" << std::endl;
     }
   }
+
   printbar(1);
 }
 
@@ -1214,13 +1200,13 @@ void FileComparator::print_significant_summary(
   }
 
   if (differ.max_significant > thresh.significant) {
-    std::cout << "   Maximum significant difference: "
+    std::cout << "   \033[4;35mMaximum significant difference: "
               << format_number(
                      differ.max_significant, differ.ndp_significant,
                      static_cast<int>(
                          std::round(std::log10(differ.max_significant)) + 2),
                      differ.ndp_significant)
-              << std::endl;
+              << "\033[0m" << std::endl;
     std::cout << "\033[1;31m   Max diff is greater than the significant "
                  "threshold: "
               << thresh.significant << "\033[0m" << std::endl;

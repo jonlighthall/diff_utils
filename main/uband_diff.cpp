@@ -233,11 +233,11 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return false;
     }
     if (args.stop_level < args.count_level) {
-    std::cerr << "\033[1;33mWARNING:\033[0m Critical threshold ("
-            << "\033[1;31m" << args.stop_level << "\033[0m"
-            << ") is less than significant threshold ("
-            << "\033[1;36m" << args.count_level << "\033[0m"
-            << ")." << std::endl;
+      std::cerr << "\033[1;33mWARNING:\033[0m Critical threshold ("
+                << "\033[1;31m" << args.stop_level << "\033[0m"
+                << ") is less than significant threshold ("
+                << "\033[1;36m" << args.count_level << "\033[0m"
+                << ")." << std::endl;
       std::cerr << "         Difference table will not be printed."
                 << std::endl;
     }
@@ -302,6 +302,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  // Print the value of the "close enough" flag
+std::cout << "\033[1;32mFiles are equivalent within tolerance.\033[0m" << std::endl;
+  if (args.debug_level >= 0) {
+    std::cout << "   Close enough flag: " << std::boolalpha
+              << comparator.getFlag().files_are_close_enough << std::endl;
+  }
+
   if (result) {
     if (args.debug_level >= 0) {
       std::cout << "Files are identical within tolerance." << std::endl;
@@ -309,7 +316,14 @@ int main(int argc, char* argv[]) {
     return 0;
   } else {
     if (args.debug_level >= 0) {
-      std::cout << "Files differ significantly." << std::endl;
+    std::cout << "\033[1;31mFiles differ significantly.\033[0m" << std::endl;
+
+      if (comparator.getFlag().files_are_close_enough) {
+        std::cout << "\033[1;33mFiles are probably close enough (within "
+                     "thresholds).\033[0m"
+                  << std::endl;
+        return 0;
+      }
     }
     return 1;
   }
