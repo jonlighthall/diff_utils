@@ -91,6 +91,7 @@ struct DiffStats {
   int ndp_non_zero = 0;     // number of decimal places for non-zero values
   int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
   int ndp_significant = 0;  // number of decimal places
+  int ndp_max = 0;  // number of decimal places for maximum difference
 };
 
 struct LineData {

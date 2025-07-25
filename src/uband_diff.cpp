@@ -562,6 +562,12 @@ double FileComparator::calculate_threshold(int ndp) {
           << ") exceed single precision (7). Results may be unreliable.\033[0m"
           << std::endl;
     }
+    if (ndp > differ.ndp_max) {
+      differ.ndp_max = ndp;
+      std::cout << "   Maximum decimal places so far: " << differ.ndp_max
+                << std::endl;
+    }
+
   }
   if (thresh.significant < dp_threshold) {
     if (print.debug && flag.new_fmt && thresh.significant > 0) {
@@ -713,6 +719,11 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // define maximum display format for the values being printed
   int mxint = 5;                      // maximum integer width
   int mxdec = 7;                      // maximum decimal places
+
+if (mxdec < differ.ndp_max) {
+    mxdec = differ.ndp_max;  // use the maximum decimal places found so far
+  }
+
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
   // define column widths
@@ -1184,7 +1195,7 @@ void FileComparator::print_significant_summary(
       if (!color.empty()) std::cout << "\033[0m";
 
       if (counter.elem_number > 0) {
-        double percent = 100.0 * count / counter.elem_number;
+        double percent = 100.0 * static_cast<double>(count) / static_cast<double>(counter.elem_number);
         std::cout << " (" << std::fixed << std::setprecision(2) << percent
                   << "%)";
       }
@@ -1200,7 +1211,7 @@ void FileComparator::print_significant_summary(
               << counter.diff_significant << "\033[0m";
 
     if (counter.elem_number > 0) {
-      double percent = 100.0 * counter.diff_significant / counter.elem_number;
+      double percent = 100.0 * static_cast<double>(counter.diff_significant) / static_cast<double>(counter.elem_number);
       std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
                 << percent << "%)";
 
