@@ -92,6 +92,7 @@ struct DiffStats {
   int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
   int ndp_significant = 0;  // number of decimal places
   int ndp_max = 0;  // number of decimal places for maximum difference
+  const int ndp_single_precision = 7;  // number of decimal places for single precision
 };
 
 struct LineData {

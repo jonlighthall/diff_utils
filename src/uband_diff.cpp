@@ -556,18 +556,18 @@ double FileComparator::calculate_threshold(int ndp) {
               << ": ";
     std::cout << ndp << " decimal places or 10^(" << -ndp
               << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
-    if (ndp > 7) {
-      std::cout
-          << "\033[1;33m   Warning: Decimal places (" << ndp
-          << ") exceed single precision (7). Results may be unreliable.\033[0m"
-          << std::endl;
+    if (ndp > differ.ndp_single_precision) {
+      std::cout << "\033[1;33m   Warning: Decimal places (" << ndp
+                << ") exceed single precision (" << differ.ndp_single_precision
+                << "). Results may be unreliable.\033[0m" << std::endl;
     }
-    if (ndp > differ.ndp_max) {
-      differ.ndp_max = ndp;
+  }
+  if (ndp > differ.ndp_max) {
+    differ.ndp_max = ndp;
+    if (print.level > 0) {
       std::cout << "   Maximum decimal places so far: " << differ.ndp_max
                 << std::endl;
     }
-
   }
   if (thresh.significant < dp_threshold) {
     if (print.debug && flag.new_fmt && thresh.significant > 0) {
@@ -717,10 +717,10 @@ void FileComparator::print_table(const ColumnValues& column_data,
   }
 
   // define maximum display format for the values being printed
-  int mxint = 5;                      // maximum integer width
-  int mxdec = 7;                      // maximum decimal places
+  int mxint = 5;  // maximum integer width
+  int mxdec = 7;  // maximum decimal places
 
-if (mxdec < differ.ndp_max) {
+  if (mxdec < differ.ndp_max) {
     mxdec = differ.ndp_max;  // use the maximum decimal places found so far
   }
 
@@ -750,13 +750,17 @@ if (mxdec < differ.ndp_max) {
     std::cout << std::setw(col_widths[0]) << "line";
     std::cout << std::setw(col_widths[1]) << "col";
     std::cout << std::setw(col_widths[2]) << "range";
-    std::cout << std::setw(col_widths[3] + 2) << "file1";
-    std::cout << std::setw(col_widths[4] + 2) << "file2 |";
-    std::cout << padLeft(" thres |", col_widths[5] + 2);
-    std::cout << padLeft("diff", col_widths[6] + 2) << std::endl;
+    std::cout << std::setw(col_widths[3] + 1) << "file1";
+    std::cout << std::setw(col_widths[4] + 3) << "file2 |";
+    std::cout << padLeft(" thres |", col_widths[5] + 3);
+    std::cout << padLeft("diff", col_widths[6] + 1) << std::endl;
 
-    std::cout << "-------------------------------------------+-------+------"
-              << std::endl;
+    // Print horizontal line matching header width
+    int total_width = 0;
+    for (int w : col_widths) total_width += w;
+    // Add spaces for extra padding in header columns
+    total_width += 1 + 3 + 3 + 1;  // file1(+1), file2(+3), thres(+3), diff(+1)
+    std::cout << std::string(total_width, '-') << std::endl;
   }
   counter.diff_print++;
   flag.has_printed_diff = true;
@@ -1195,7 +1199,8 @@ void FileComparator::print_significant_summary(
       if (!color.empty()) std::cout << "\033[0m";
 
       if (counter.elem_number > 0) {
-        double percent = 100.0 * static_cast<double>(count) / static_cast<double>(counter.elem_number);
+        double percent = 100.0 * static_cast<double>(count) /
+                         static_cast<double>(counter.elem_number);
         std::cout << " (" << std::fixed << std::setprecision(2) << percent
                   << "%)";
       }
@@ -1211,7 +1216,8 @@ void FileComparator::print_significant_summary(
               << counter.diff_significant << "\033[0m";
 
     if (counter.elem_number > 0) {
-      double percent = 100.0 * static_cast<double>(counter.diff_significant) / static_cast<double>(counter.elem_number);
+      double percent = 100.0 * static_cast<double>(counter.diff_significant) /
+                       static_cast<double>(counter.elem_number);
       std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
                 << percent << "%)";
 
@@ -1248,10 +1254,18 @@ void FileComparator::print_significant_summary(
                        static_cast<int>(
                            std::round(std::log10(differ.max_significant)) + 2),
                        differ.ndp_significant)
-                << "\033[0m" << std::endl;
+                << "\033[0m";
+      if (differ.ndp_significant > differ.ndp_single_precision) {
+        std::cout << " \033[1;33mProbably OK: single precision exceeded"
+                  << "\033[0m" << std::endl;
+        // Set flag for files being close enough
+        flag.files_are_close_enough = true;
+        print_flag_status();
+      }
+
       std::cout
           << "\033[1;31m   Max diff is greater than the significant threshold: "
-          << thresh.significant << "\033[0m" << std::endl;
+          << std::setprecision(differ.ndp_significant) << thresh.significant << "\033[0m" << std::endl;
     } else {
       std::cout << "\033[1;32m   Max diff is less than or equal to the "
                    "significant threshold: "
