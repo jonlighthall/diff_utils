@@ -352,85 +352,13 @@ bool FileComparator::process_column(const LineData& data1,
 bool FileComparator::validate_and_track_column_format(
     size_t n_col1, size_t n_col2, std::vector<int>& dp_per_col,
     size_t& prev_n_col) {
-  // Check if both lines have the same number of columns
-  if (n_col1 != n_col2) {
-    std::cerr << "Line " << counter.line_number
-              << " has different number of columns!" << std::endl;
-    return false;
-  }
-
-  this_line_ncols = n_col1;
-
-  // Check if the number of columns has changed
-  if (counter.line_number == 1) {
-    prev_n_col = n_col1;  // initialize prev_n_col on first line
-    if (print.debug2) {
-      std::cout << "   FORMAT: " << n_col1
-                << " columns (both files) - initialized" << std::endl;
-    }
-  }
-
-  if (prev_n_col > 0 && n_col1 != prev_n_col) {
-    std::cout << "\033[1;33mNote: Number of columns changed at line "
-              << counter.line_number << " (previous: " << prev_n_col
-              << ", current: " << n_col1 << ")\033[0m" << std::endl;
-    dp_per_col.clear();
-    flag.new_fmt = true;
-    this_fmt_line = counter.line_number;
-    if (print.level > 0) {
-      std::cout << this_fmt_line << ": FMT number of columns has changed"
-                << std::endl;
-      std::cout << "format has changed" << std::endl;
-    }
-  } else {
-    if (counter.line_number > 1) {
-      if (print.debug3) {
-        std::cout << "Line " << counter.line_number << " same column format"
-                  << std::endl;
-      }
-      flag.new_fmt = false;
-    }
-  }
-  prev_n_col = n_col1;
-  return true;
+  return format_tracker_->validate_and_track_column_format(
+      n_col1, n_col2, dp_per_col, prev_n_col, counter.line_number, flag);
 }
 
 bool FileComparator::validate_decimal_column_size(
     const std::vector<int>& dp_per_col, size_t column_index) const {
-  if (print.debug3) {
-    for (size_t j = 0; j < dp_per_col.size(); ++j) {
-      std::cout << "   minimum decimal places in column " << j + 1 << " = "
-                << dp_per_col[j] << std::endl;
-    }
-  }
-
-  if (print.debug2) {
-    std::cout << "   size of dp_per_col: " << dp_per_col.size();
-    std::cout << ", column_index: " << column_index + 1 << std::endl;
-  }
-
-  // Validate vector size
-  if (dp_per_col.size() != column_index + 1) {
-    std::cerr << "Warning: dp_per_col size mismatch at line "
-              << counter.line_number << std::endl;
-    flag.error_found = true;
-    std::cerr << "Expected size: " << column_index + 1
-              << ", Actual size: " << dp_per_col.size() << std::endl;
-    std::cerr << "Please check the input files for consistency." << std::endl;
-    return false;
-  }
-
-  if (dp_per_col.size() <= column_index) {
-    std::cerr << "Warning: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << column_index + 1 << " at line "
-              << counter.line_number << std::endl;
-    flag.error_found = true;
-    std::cerr << "Please check the input files for consistency." << std::endl;
-    std::cerr << "Expected at least " << column_index + 1
-              << " columns, but got " << dp_per_col.size() << std::endl;
-    return false;
-  }
-  return true;
+  return format_tracker_->validate_decimal_column_size(dp_per_col, column_index, counter.line_number);
 }
 
 // ========================================================================
@@ -438,73 +366,27 @@ bool FileComparator::validate_decimal_column_size(
 // ========================================================================
 bool FileComparator::initialize_decimal_place_format(
     const int min_dp, const size_t column_index, std::vector<int>& dp_per_col) {
-  // initialize the dp_per_col vector with the minimum decimal places
-  dp_per_col.push_back(min_dp);
-
-  if (!validate_decimal_column_size(dp_per_col, column_index)) return false;
-
-  if (print.debug2) {
-    std::cout << "FORMAT: Line " << counter.line_number << " initialization"
-              << std::endl;
-    std::cout << "   dp_per_col: ";
-    for (const auto& d : dp_per_col) {
-      std::cout << d << " ";
-    }
-    std::cout << std::endl;
+  bool result = format_tracker_->initialize_decimal_place_format(min_dp, column_index, dp_per_col, counter.line_number, flag);
+  if (result) {
+    this_fmt_line = format_tracker_->get_format_line();
+    this_fmt_column = format_tracker_->get_format_column();
   }
-
-  // since this is an initialization, it is always a new format
-  flag.new_fmt = true;
-  this_fmt_line = counter.line_number;
-  this_fmt_column = column_index + 1;
-  return true;
+  return result;
 }
 
 bool FileComparator::update_decimal_place_format(const int min_dp,
                                                  const size_t column_index,
                                                  std::vector<int>& dp_per_col) {
-  if (print.debug3) {
-    std::cout << "not first line" << std::endl;
+  bool result = format_tracker_->update_decimal_place_format(min_dp, column_index, dp_per_col, counter.line_number, flag);
+  if (result && flag.new_fmt) {
+    this_fmt_line = format_tracker_->get_format_line();
   }
-
-  // Safety check: ensure the vector is large enough for this column
-  if (column_index >= dp_per_col.size()) {
-    std::cerr << "Error: dp_per_col size (" << dp_per_col.size()
-              << ") insufficient for column " << column_index + 1 << " at line "
-              << counter.line_number << std::endl;
-    flag.error_found = true;
-    return false;
-  }
-
-  // check if the minimum decimal places for this column has changed
-  if (dp_per_col[column_index] != min_dp) {
-    // If the minimum decimal places for this column is different from the
-    // previous minimum decimal places, update it
-    if (print.debug3) {
-      std::cout << "DEBUG3: different" << std::endl;
-      std::cout << "DEBUG3: format has changed" << std::endl;
-    }
-    dp_per_col[column_index] = min_dp;
-    flag.new_fmt = true;
-    this_fmt_line = counter.line_number;
-    if (print.debug) {
-      std::cout << "FORMAT: Line " << this_fmt_line
-                << ": number of decimal places has changed" << std::endl;
-    }
-  }
-  if (print.debug3 && dp_per_col[column_index] == min_dp) {
-    // If the minimum decimal places for this column is the same as the
-    // previous minimum decimal places, do nothing
-    std::cout << "DEBUG3: same" << std::endl;
-  }
-  return true;
+  return result;
 }
 
 double FileComparator::calculate_threshold(int ndp) {
-  // determine the smallest possible difference, base on the number of
-  // decimal places (equal to the minimum number of decimal places for the
-  // current element)
-  double dp_threshold = std::pow(10, -ndp);
+  // Use FormatTracker for the core threshold calculation
+  double dp_threshold = format_tracker_->calculate_threshold(ndp, thresh.significant);
 
   if (flag.new_fmt && print.debug && !print.diff_only) {
     if (this_fmt_line != last_fmt_line) {
@@ -549,9 +431,7 @@ double FileComparator::calculate_threshold(int ndp) {
     return dp_threshold;
   }
   return thresh.significant;
-}
-
-// ========================================================================
+}// ========================================================================
 // Difference Processing
 // ========================================================================
 bool FileComparator::process_difference(const ColumnValues& column_data,
