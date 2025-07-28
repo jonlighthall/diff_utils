@@ -221,7 +221,8 @@ bool FileComparator::compare_files(const std::string& file1,
                                    const std::string& file2) {
   std::ifstream infile1;
   std::ifstream infile2;
-  if (!open_files(file1, file2, infile1, infile2)) {
+
+  if (!file_reader_->open_files(file1, file2, infile1, infile2)) {
     return false;
   }
 
@@ -249,7 +250,7 @@ bool FileComparator::compare_files(const std::string& file1,
   flag.file_end_reached = true;
 
   // Validate file lengths and return result
-  if (!compare_file_lengths(file1, file2)) {
+  if (!file_reader_->compare_file_lengths(file1, file2)) {
     return false;
   }
   return flag.files_are_close_enough && !flag.error_found;
@@ -301,87 +302,6 @@ LineData FileComparator::parse_line(const std::string& line) const {
     }
   }
   return result;
-}
-
-// ========================================================================
-// File Operations
-// ========================================================================
-
-bool FileComparator::open_files(const std::string& file1,
-                                const std::string& file2,
-                                std::ifstream& infile1,
-                                std::ifstream& infile2) const {
-  infile1.open(file1);
-  infile2.open(file2);
-
-  if (!infile1.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file1 << "\033[0m"
-              << std::endl;
-    flag.error_found = true;
-    return false;
-  }
-  if (!infile2.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file2 << "\033[0m"
-              << std::endl;
-    flag.error_found = true;
-    return false;
-  }
-  return true;
-}
-
-size_t FileComparator::get_file_length(const std::string& file) const {
-  std::ifstream infile(file);
-  if (!infile.is_open()) {
-    std::cerr << "\033[1;31mError opening file: " << file << "\033[0m"
-              << std::endl;
-    flag.error_found = true;
-    return 0;
-  }
-  size_t length = 0;
-  std::string line;
-  while (std::getline(infile, line)) {
-    ++length;
-  }
-  infile.close();
-  return length;
-}
-
-bool FileComparator::compare_file_lengths(const std::string& file1,
-                                          const std::string& file2) const {
-  size_t length1 = get_file_length(file1);
-
-  // check if the file lengths are equal
-  // if the files have different lengths, this is a failure, not an error
-  if (size_t length2 = get_file_length(file2); length1 != length2) {
-    std::cerr << "\033[1;31mFiles have different lengths: " << file1 << " ("
-              << length1 << " lines) and " << file2 << " (" << length2
-              << " lines)\033[0m" << std::endl;
-
-    std::cerr << "\033[1;31mFiles have different number of lines!\033[0m"
-              << std::endl;
-    if (counter.line_number != length1 || counter.line_number != length2) {
-      std::cout << "   First " << counter.line_number << " lines ";
-      if (counter.diff_significant > 0) {
-        std::cout << "match" << std::endl;
-      } else {
-        std::cout << "checked" << std::endl;
-      }
-      std::cout << "   " << counter.elem_number << " elements checked"
-                << std::endl;
-    }
-    std::cerr << "   File1 has " << length1 << " lines " << std::endl;
-    std::cerr << "   File2 has " << length2 << " lines " << std::endl;
-
-    return false;
-  }
-  if (print.debug || print.level > 0) {
-    std::cout << "Files have the same number of lines: " << length1
-              << std::endl;
-    std::cout << "Files have the same number of elements: "
-              << counter.elem_number << std::endl;
-  }
-
-  return true;
 }
 
 // ========================================================================
@@ -1495,7 +1415,7 @@ void FileComparator::print_statistics(const std::string& file1) const {
   std::cout << "   Total lines compared: " << counter.line_number;
 
   // Check if all lines were compared
-  if (size_t length1 = get_file_length(file1); length1 == counter.line_number) {
+  if (size_t length1 = file_reader_->get_file_length(file1); length1 == counter.line_number) {
     std::cout << " (all)" << std::endl;
   } else {
     std::cout << " of " << length1 << std::endl;

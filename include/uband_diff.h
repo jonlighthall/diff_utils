@@ -8,6 +8,9 @@
 #include <tuple>
 #include <vector>
 
+#include "file_reader.h"
+#include <memory>
+
 // Data structures
 
 struct Thresholds {
@@ -133,7 +136,8 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : thresh{user_thresh, hard_thresh, print_thresh},
+      : file_reader_(std::make_unique<FileReader>()),
+        thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
 
@@ -165,6 +169,10 @@ class FileComparator {
 
  private:
   // ========================================================================
+  // Composition - Specialized classes for different responsibilities
+  // ========================================================================
+  std::unique_ptr<FileReader> file_reader_;
+  // ========================================================================
   // Data Members
   // ========================================================================
   mutable Flags flag;
@@ -178,14 +186,6 @@ class FileComparator {
   Thresholds thresh;
   PrintLevel print;
 
-  // ========================================================================
-  // File Operations
-  // ========================================================================
-  bool open_files(const std::string& file1, const std::string& file2,
-                  std::ifstream& infile1, std::ifstream& infile2) const;
-  size_t get_file_length(const std::string& file) const;
-  bool compare_file_lengths(const std::string& file1,
-                            const std::string& file2) const;
 
   // ========================================================================
   // Line/Column Processing
