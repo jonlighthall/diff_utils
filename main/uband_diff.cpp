@@ -10,10 +10,9 @@
  *
  * Usage: uband_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
  *   file1, file2 - Input files to compare
- *   sig_thresh   - difference threshold for counting significant errors
- * (default: 0.05) crit_thresh  - difference threshold for interruption
- * (default: 10.0) print_thresh - difference threshold for printing table
- * (default: 1.0)
+ *   sig_thresh   - difference threshold for counting significant errors (default: 0.05)
+ *   crit_thresh  - difference threshold for interruption (default: 10.0)
+ *   print_thresh - difference threshold for printing table (default: 1.0)
  */
 
 #include "uband_diff.h"
@@ -228,13 +227,6 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       !parse_threshold_argument(argv[3], args.count_level, "Diff threshold")) {
     return false;
   }
-
-    int decimal_places = 0;
-    std::string thresh_str(argv[3]);
-    auto dot_pos = thresh_str.find('.');
-    if (dot_pos != std::string::npos) {
-      decimal_places = static_cast<int>(thresh_str.size() - dot_pos - 1);
-    }
 
   if (argc >= 5) {
     if (!parse_threshold_argument(argv[4], args.stop_level, "High threshold")) {
