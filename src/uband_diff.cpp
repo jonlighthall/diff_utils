@@ -48,7 +48,7 @@
 // Global utility functions
 
 // Function to count decimal places in a string token
-auto stream_countDecimalPlaces = [](std::istringstream& stream) {
+int stream_countDecimalPlaces(std::istringstream& stream) {
   // Peek ahead to determine the format of the number
   std::streampos pos = stream.tellg();
   std::string token;
@@ -257,51 +257,8 @@ bool FileComparator::compare_files(const std::string& file1,
 }
 
 LineData FileComparator::parse_line(const std::string& line) const {
-  LineData result;
-  std::istringstream stream(line);
-  char ch;
-
-  auto validate_decimal_places = [line_number = counter.line_number](
-                                     const int ndp, Flags& flags) {
-    if (ndp < 0 || ndp > 10) {  // Arbitrary limit for decimal places
-      std::cerr << "Invalid number of decimal places found on line "
-                << line_number << ": " << ndp << ". Must be between 0 and 10."
-                << std::endl;
-      flags.error_found = true;
-      return false;
-    }
-    return true;
-  };
-
-  while (stream >> ch) {
-    // check if the numbers are complex and read them accordingly
-    // check if string starts with '('
-    if (ch == '(') {
-      // read the complex number
-      auto [real, imag, dp_real, dp_imag] = readComplex(stream, flag);
-      result.values.push_back(real);
-      result.values.push_back(imag);
-      // validate decimal places for real and imaginary parts
-      if (validate_decimal_places(dp_real, flag)) {
-        result.decimal_places.push_back(dp_real);
-      }
-      if (validate_decimal_places(dp_imag, flag)) {
-        result.decimal_places.push_back(dp_imag);
-      }
-    } else {
-      // if the character is not '(', it is a number
-      stream.putback(ch);  // put back the character to the stream
-      int dp = stream_countDecimalPlaces(
-          stream);  // count the number of decimal places
-      result.decimal_places.push_back(
-          dp);  // store the number of decimal places
-
-      double value;
-      stream >> value;
-      result.values.push_back(value);
-    }
-  }
-  return result;
+  // Delegate to LineParser
+  return line_parser_->parse_line(line, flag, counter.line_number);
 }
 
 // ========================================================================

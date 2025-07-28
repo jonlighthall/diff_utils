@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "file_reader.h"
+#include "line_parser.h"
 #include <memory>
 
 // Data structures
@@ -137,6 +138,7 @@ class FileComparator {
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
       : file_reader_(std::make_unique<FileReader>()),
+        line_parser_(std::make_unique<LineParser>()),
         thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
@@ -172,6 +174,8 @@ class FileComparator {
   // Composition - Specialized classes for different responsibilities
   // ========================================================================
   std::unique_ptr<FileReader> file_reader_;
+  std::unique_ptr<LineParser> line_parser_;
+
   // ========================================================================
   // Data Members
   // ========================================================================
@@ -185,7 +189,6 @@ class FileComparator {
   CountStats counter;
   Thresholds thresh;
   PrintLevel print;
-
 
   // ========================================================================
   // Line/Column Processing
