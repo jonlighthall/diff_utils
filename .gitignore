@@ -39,3 +39,6 @@ bin/
 
 # Git
 *.~*~
+
+# diff test files
+*.txt
