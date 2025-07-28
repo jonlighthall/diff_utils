@@ -3,14 +3,16 @@
  * @brief Implementation of file comparison utilities for numerical data with
  * support for complex numbers.
  *
- * This file provides the implementation for comparing two files containing
- * numerical data, including support for complex numbers in the format (real,
- * imag). The comparison is performed line by line and column by column, with
- * configurable thresholds for floating-point differences. The code tracks and
- * reports differences, handles changes in file format (such as column count or
- * precision), and prints detailed diagnostics for mismatches.
+ * @details This file provides the implementation for comparing two files
+ * containing numerical data, including support for complex numbers in the
+ * format (real, imag). As opposed to the standard utility diff, which compares
+ * text files line by line, this implementation focuses on the numerical values
+ * within the files. The comparison is performed line by line and column by
+ * column, with configurable thresholds for floating-point differences. The code
+ * tracks and reports differences, handles changes in file format (such as
+ * column count or precision), and prints detailed diagnostics for mismatches.
  *
- * Features:
+ * @Features:
  * - Supports real and complex number formats.
  * - Automatically detects and adapts to changes in column count and decimal
  * precision.
@@ -19,8 +21,17 @@
  * issues.
  * - Debugging macros for step-by-step tracing.
  *
- * @author J. Lighthall
+ * @author J.C. Lighthall
  * @date January 2025
+ *
+ * @note This program was developed from the Fortran code tldiff.f90 and it's
+ * derivatives cpddiff.f90, prsdiff.f90, and tsdiff.f90 (August 2022). It is
+ * intended to replace those utilities with a more modern C++ implementation.
+ *
+ * Development of this code was significantly assisted by GitHub Copilot (GPT-4,
+ * Claude Sonnet 4, etc.) for code translation, refactoring, optimization, and
+ * architectural improvements.
+ *
  */
 #include "uband_diff.h"
 
