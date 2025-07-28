@@ -265,6 +265,21 @@ class FileComparator {
   void print_difference_counts(const SummaryParams& params) const;
   void print_maximum_difference_analysis(const SummaryParams& params) const;
   std::string get_count_color(size_t count) const;
+
+  // Significant summary helper functions
+  void print_significant_differences_count(const SummaryParams& params) const;
+  void print_significant_percentage() const;
+  void print_insignificant_differences_count(const SummaryParams& params) const;
+  void print_maximum_significant_difference_analysis(const SummaryParams& params) const;
+  void print_maximum_significant_difference_details() const;
+  void print_max_diff_threshold_comparison_above() const;
+  void print_max_diff_threshold_comparison_below() const;
+  void print_file_comparison_result(const SummaryParams& params) const;
+  void print_significant_differences_printing_status(const SummaryParams& params) const;
+  void print_count_with_percent(const SummaryParams& params,
+                                const std::string& label,
+                                size_t count,
+                                const std::string& color = "") const;
 };
 
 #endif  // UBAND_DIFF_H
