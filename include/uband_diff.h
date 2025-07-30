@@ -11,6 +11,7 @@
 #include "file_reader.h"
 #include "line_parser.h"
 #include "format_tracker.h"
+#include "difference_analyzer.h"
 #include <memory>
 
 // Data structures
@@ -141,6 +142,7 @@ class FileComparator {
       : file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
         format_tracker_(std::make_unique<FormatTracker>(PrintLevel{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2, debug_level >= 3})),
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(Thresholds{user_thresh, hard_thresh, print_thresh, 0.0, 110.0, 138.5})),
         thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
@@ -178,6 +180,7 @@ class FileComparator {
   std::unique_ptr<FileReader> file_reader_;
   std::unique_ptr<LineParser> line_parser_;
   std::unique_ptr<FormatTracker> format_tracker_;
+  std::unique_ptr<DifferenceAnalyzer> difference_analyzer_;
 
   // ========================================================================
   // Data Members

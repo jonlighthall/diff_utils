@@ -431,23 +431,28 @@ double FileComparator::calculate_threshold(int ndp) {
     return dp_threshold;
   }
   return thresh.significant;
-}// ========================================================================
+}
+
+// ========================================================================
 // Difference Processing
 // ========================================================================
 bool FileComparator::process_difference(const ColumnValues& column_data,
                                         size_t column_index) {
-  // Calculate rounded values and process difference
-  double rounded1 = round_to_decimals(column_data.value1, column_data.min_dp);
-  double rounded2 = round_to_decimals(column_data.value2, column_data.min_dp);
-  // compare values (with rounding)
-  double diff_rounded = std::abs(rounded1 - rounded2);
+  // Process raw values first
+  difference_analyzer_->process_raw_values(column_data, counter, differ, flag);
 
-  process_rounded_values(column_data, column_index, diff_rounded,
-                         column_data.min_dp);
-
+  // Calculate threshold for this column
   double ithreshold = calculate_threshold(column_data.min_dp);
 
-  counter.elem_number++;
+  // Process the difference using DifferenceAnalyzer
+  bool result = difference_analyzer_->process_difference(column_data, column_index,
+                                                         ithreshold, counter, differ, flag);
+
+  // Calculate rounded values for printing
+  double rounded1 = DifferenceAnalyzer::round_to_decimals(column_data.value1, column_data.min_dp);
+  double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2, column_data.min_dp);
+  double diff_rounded = std::abs(rounded1 - rounded2);
+
   // Print differences if above plot threshold
   if (diff_rounded > thresh.print) {
     print_table(column_data, column_index, ithreshold, diff_rounded);
@@ -467,77 +472,20 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
     }
   }
 
-  // Check critical threshold
-  if ((diff_rounded > thresh.critical) &&
-      ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
-    counter.diff_critical++;
-    flag.has_critical_diff = true;
-    print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index);
-    return false;
-  }
-  return true;
+  return result;
 }
 
 void FileComparator::process_raw_values(const ColumnValues& column_data) {
-  // compare values (without rounding)
-  double diff = std::abs(column_data.value1 - column_data.value2);
-
-  // track the maximum difference
-  if (diff > differ.max_non_zero) {
-    differ.max_non_zero = diff;
-    differ.ndp_non_zero = column_data.min_dp;
-  }
-  // track number of differences
-  if (diff > thresh.zero) {
-    counter.diff_non_zero++;
-    flag.has_non_zero_diff = true;
-    flag.files_are_same = false;
-  }
+  difference_analyzer_->process_raw_values(column_data, counter, differ, flag);
 }
 
 void FileComparator::process_rounded_values(const ColumnValues& column_data,
                                             size_t column_index,
                                             double rounded_diff,
                                             int minimum_deci) {
-  // Define the threshold for non-trivial differences
-  //
-  // The smallest non-zero difference between values with N decimal
-  // places is 10^(-N). A difference less than that value is trivial and
-  // effectively zero. A difference greater than that value is not just due to
-  // rounding errors or numerical precision issues. This is a heuristic to avoid
-  // counting trivial differences as significant.
-
-  // set to half the threshold to avoid counting trivial differences
-  if (double big_zero = pow(10, -minimum_deci) / 2; rounded_diff > big_zero) {
-    counter.diff_non_trivial++;
-    flag.has_non_trivial_diff = true;
-    flag.files_have_same_values = false;
-
-    // track the maximum non trivial difference
-    if (rounded_diff > differ.max_non_trivial) {
-      differ.max_non_trivial = rounded_diff;
-      differ.ndp_non_trivial = column_data.min_dp;
-    }
-  }
-
-  if (rounded_diff > thresh.significant && column_data.value1 < thresh.ignore &&
-      column_data.value2 < thresh.ignore) {
-    counter.diff_significant++;
-    flag.has_significant_diff = true;
-    flag.files_are_close_enough = false;
-
-    if (column_data.value1 < thresh.marginal &&
-        column_data.value2 < thresh.marginal) {
-      counter.diff_marginal++;
-      flag.has_marginal_diff = true;
-    }
-
-    // track the maximum significant difference
-    if (rounded_diff > differ.max_significant) {
-      differ.max_significant = rounded_diff;
-      differ.ndp_significant = column_data.min_dp;
-    }
-  }
+  difference_analyzer_->process_rounded_values(column_data, column_index,
+                                               rounded_diff, minimum_deci,
+                                               counter, differ, flag);
 }
 
 // ========================================================================
@@ -738,28 +686,9 @@ void FileComparator::print_hard_threshold_error(double rounded1,
   if (print.level < 0) {
     return;
   }
-  std::cerr << "\033[1;31mLarge difference found at line "
-            << counter.line_number << ", column " << column_index + 1
-            << "\033[0m" << std::endl;
+  difference_analyzer_->print_hard_threshold_error(rounded1, rounded2, diff_rounded,
+                                                   column_index, counter);
   flag.error_found = true;
-
-  if (counter.line_number > 0) {
-    std::cout << "   First " << counter.line_number - 1 << " lines match"
-              << std::endl;
-  }
-  if (counter.elem_number > 0) {
-    std::cout << "   " << counter.elem_number << " element";
-    if (counter.elem_number > 1) std::cout << "s";
-    std::cout << " checked" << std::endl;
-  }
-
-  std::cout << counter.diff_print << " with differences between "
-            << thresh.significant << " and " << thresh.critical << std::endl;
-
-  std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
-  std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
-  std::cout << "    diff: \033[1;31m" << std::setw(7) << diff_rounded
-            << "\033[0m" << std::endl;
 }
 
 void FileComparator::print_format_info(const ColumnValues& column_data,
