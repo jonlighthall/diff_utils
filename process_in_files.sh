@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: ./process_in_files.sh <mode> <input_directory> [target_directory]
+# Usage: ./process_in_files.sh <mode> [directory]
 
 headtail_truncate() {
     local file="$1"
@@ -112,26 +112,28 @@ diff_files() {
 
 set -e
 mode="$1"
-indir="$2"
-targetdir="$3"
+directory="${2:-std}"
 
-if [[ -z "$mode" || -z "$indir" ]]; then
-    echo "Usage: $0 <mode> <input_directory> [target_directory]"
+# Validate mode
+if [[ -z "$mode" ]]; then
+    echo "Usage: $0 <mode> [directory]"
     echo "mode: make, test, or diff"
+    echo "directory: defaults to 'std' if not specified"
     exit 1
 fi
-# Default targetdir to indir if not specified
-if [[ -z "$targetdir" ]]; then
-    targetdir="$indir"
+
+if [[ ! -d "$directory" ]]; then
+    echo "Error: Directory '$directory' does not exist. Exiting."
+    exit 1
 fi
 
 PROG=./nspe.exe
 
-find "$indir" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}' | while read -r infile; do
+find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}' | while read -r infile; do
     # Check for required strings (case-insensitive)
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
         echo "Processing $infile..."
-    LOG_FILE="${targetdir}/$(basename "$infile" .in).log"
+        LOG_FILE="$directory/$(basename "$infile" .in).log"
         if [[ "$mode" == "test" ]]; then
 
             { time "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
@@ -141,11 +143,11 @@ find "$indir" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print 
         fi
         # Rename only one file per priority: 03, 02, 01
         for suffix in 03 02 01; do
-            src="$targetdir/$(basename "$infile" .in)_${suffix}.asc"
+            src="$directory/$(basename "$infile" .in)_${suffix}.asc"
             case $suffix in
-                01) dest="$targetdir/$(basename "$infile" .in).tl" ;;
-                02) dest="$targetdir/$(basename "$infile" .in).rtl" ;;
-                03) dest="$targetdir/$(basename "$infile" .in).ftl" ;;
+                01) dest="$directory/$(basename "$infile" .in).tl" ;;
+                02) dest="$directory/$(basename "$infile" .in).rtl" ;;
+                03) dest="$directory/$(basename "$infile" .in).ftl" ;;
             esac
             if [[ -f "$src" ]]; then
                 if [[ "$mode" == "make" ]]; then
@@ -155,14 +157,14 @@ find "$indir" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print 
                     # Call the function with src and dest, and optionally extra
                     diff_files "$src" "$dest"
                     elif [[  "$mode" == "test" ]]; then
-                        diff_files "$src" "$dest" >> "$LOG_FILE"
+                        diff_files "$src" "$dest" >> "$LOG_FILE" 2>&1
                 else
                     echo "Unknown mode: $mode"
                     exit 1
                 fi
                 # After renaming/diffing, delete files with same base name except .in and selected destination
                 basename_noext="$(basename "$infile" .in)"
-                for f in "$targetdir/$basename_noext"*; do
+                for f in "$directory/$basename_noext"*; do
                     # Skip .in, selected destination, and src file
                     if [[ "$f" == "$infile" || "$f" == "$dest" || "$f" == "$src" ]]; then
                         continue
