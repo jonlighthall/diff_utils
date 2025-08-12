@@ -1031,7 +1031,7 @@ void FileComparator::print_maximum_difference_analysis(
     std::string color =
         (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
     std::cout << color
-              << "   Max diff is greater than the significant threshold: "
+              << "   aMax diff is greater than the significant threshold: "
               << thresh.significant << "\033[0m" << std::endl;
 
     // Handle special case when no non-trivial differences exist
@@ -1047,12 +1047,12 @@ void FileComparator::print_maximum_difference_analysis(
             equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
         std::string comparison = equal_to_threshold ? "equal to" : "less than";
 
-        std::cout << result_color << "   Max diff is " << comparison
+        std::cout << result_color << "   bMax diff is " << comparison
                   << " the significant threshold: " << thresh.significant
                   << "\033[0m" << std::endl;
       }
     } else {
-      std::cout << "\033[1;32m   Max diff is less or equal to than the "
+      std::cout << "\033[1;32m   cMax diff is less or equal to than the "
                    "significant threshold: "
                 << thresh.significant << "\033[0m" << std::endl;
     }
@@ -1063,7 +1063,7 @@ void FileComparator::print_maximum_difference_analysis(
     std::string result_color = equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
     std::string comparison = equal_to_threshold ? "equal to" : "less than";
 
-    std::cout << result_color << "   Max diff is " << comparison
+    std::cout << result_color << "   dMax diff is " << comparison
               << " the significant threshold: " << thresh.significant
               << "\033[0m" << std::endl;
   }
@@ -1106,6 +1106,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   if (counter.diff_significant > 0 && print.level < 1) {
     return;
   }
+if (print.level > 0) {
 
   if (counter.diff_non_zero > counter.diff_non_trivial) {
     size_t zero_diff = counter.diff_non_zero - counter.diff_non_trivial;
@@ -1136,6 +1137,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are non-trivially different\033[0m" << std::endl;
+}
 
   std::cout << "   \033[4;35mMaximum rounded difference: "
             << format_number(
@@ -1145,12 +1147,14 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                    differ.ndp_non_trivial)
             << "\033[0m" << std::endl;
   if (counter.diff_print < counter.diff_non_trivial) {
+    if (print.level>0) {
     std::cout << "   Printed differences     ( >" << thresh.print
               << "): " << std::setw(params.fmt_wid) << counter.diff_print
               << std::endl;
+  }
     size_t not_printed = counter.diff_non_trivial - counter.diff_print;
     if (not_printed > 0) {
-      std::cout << "   Not printed differences (<=" << thresh.print
+      std::cout << "   Not printed differences (" << thresh.significant << " < TL <= " << thresh.print
                 << "): " << std::setw(params.fmt_wid) << not_printed
                 << std::endl;
     }
@@ -1162,11 +1166,11 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
 
   if (differ.max_non_trivial > thresh.significant) {
     std::cout
-        << "\033[1;31m   Max diff is greater than the significant threshold: "
+        << "\033[1;31m   vMax diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
   } else {
     if (fabs(differ.max_non_trivial - thresh.significant) < thresh.zero) {
-      std::cout << "\033[1;33m   Max diff is equal to the "
+      std::cout << "\033[1;33m   eMax diff is equal to the "
                    "significant threshold: "
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
@@ -1175,7 +1179,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                        differ.ndp_non_trivial)
                 << "\033[0m" << std::endl;
     } else {
-      std::cout << "\033[1;32m   Max diff is less than the "
+      std::cout << "\033[1;32m   fMax diff is less than the "
                    "significant threshold: "
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
@@ -1194,7 +1198,7 @@ void FileComparator::print_significant_summary(
   // User-defined threshold differences
   // =========================================================
   if (counter.diff_significant == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and "
+    std::cout << "\033[1;32mFiles " << params.file1 << " and "
               << params.file2 << " are equivalent within tolerance\033[0m"
               << std::endl;
     return;
@@ -1230,17 +1234,15 @@ void FileComparator::print_significant_percentage() const {
   double percent = 100.0 * static_cast<double>(counter.diff_significant) /
                    static_cast<double>(counter.elem_number);
   std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
-            << percent << "%)";
+            << percent << "%)" << std::endl;
 
   // Check if probably OK
   constexpr double threshold_percent = 2.0;
   if (percent < threshold_percent) {
-    std::cout << " \033[1;33mProbably OK: error percent less than "
+    std::cout << "   \033[1;33mProbably OK: error percent less than "
               << threshold_percent << "%  \033[0m" << std::endl;
     flag.files_are_close_enough = true;
     print_flag_status();
-  } else {
-    std::cout << std::endl;
   }
 }
 
@@ -1275,10 +1277,10 @@ void FileComparator::print_maximum_significant_difference_details() const {
                    static_cast<int>(
                        std::round(std::log10(differ.max_significant)) + 2),
                    differ.ndp_significant)
-            << "\033[0m";
+            << "\033[0m" << std::endl;
 
   if (differ.ndp_significant > differ.ndp_single_precision) {
-    std::cout << " \033[1;33mProbably OK: single precision exceeded"
+    std::cout << "   \033[1;33mProbably OK: single precision exceeded"
               << "\033[0m" << std::endl;
     // Set flag for files being close enough
     flag.files_are_close_enough = true;
