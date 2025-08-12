@@ -1031,7 +1031,7 @@ void FileComparator::print_maximum_difference_analysis(
     std::string color =
         (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
     std::cout << color
-              << "   aMax diff is greater than the significant threshold: "
+              << "   Max diff is greater than the significant threshold: "
               << thresh.significant << "\033[0m" << std::endl;
 
     // Handle special case when no non-trivial differences exist
@@ -1047,12 +1047,12 @@ void FileComparator::print_maximum_difference_analysis(
             equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
         std::string comparison = equal_to_threshold ? "equal to" : "less than";
 
-        std::cout << result_color << "   bMax diff is " << comparison
+        std::cout << result_color << "   Max diff is " << comparison
                   << " the significant threshold: " << thresh.significant
                   << "\033[0m" << std::endl;
       }
     } else {
-      std::cout << "\033[1;32m   cMax diff is less or equal to than the "
+      std::cout << "\033[1;32m   Max diff is less or equal to than the "
                    "significant threshold: "
                 << thresh.significant << "\033[0m" << std::endl;
     }
@@ -1063,7 +1063,7 @@ void FileComparator::print_maximum_difference_analysis(
     std::string result_color = equal_to_threshold ? "\033[1;33m" : "\033[1;32m";
     std::string comparison = equal_to_threshold ? "equal to" : "less than";
 
-    std::cout << result_color << "   dMax diff is " << comparison
+    std::cout << result_color << "   Max diff is " << comparison
               << " the significant threshold: " << thresh.significant
               << "\033[0m" << std::endl;
   }
@@ -1166,11 +1166,11 @@ if (print.level > 0) {
 
   if (differ.max_non_trivial > thresh.significant) {
     std::cout
-        << "\033[1;31m   vMax diff is greater than the significant threshold: "
+        << "\033[1;31m   Max diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
   } else {
     if (fabs(differ.max_non_trivial - thresh.significant) < thresh.zero) {
-      std::cout << "\033[1;33m   eMax diff is equal to the "
+      std::cout << "\033[1;33m   Max diff is equal to the "
                    "significant threshold: "
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
@@ -1179,7 +1179,7 @@ if (print.level > 0) {
                        differ.ndp_non_trivial)
                 << "\033[0m" << std::endl;
     } else {
-      std::cout << "\033[1;32m   fMax diff is less than the "
+      std::cout << "\033[1;32m   Max diff is less than the "
                    "significant threshold: "
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
