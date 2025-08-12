@@ -8,23 +8,26 @@ diff_files() {
     local opt2="${4:-}"
 
     echo "Diffing $src and $dest:"
-    if diff "$src" "$dest"; then
+    if diff --color=always --suppress-common-lines -yiEZbwB "$src" "$dest"; then
         echo -e "\e[32mOK\e[0m"
         return 0
     else
         echo "Difference found between $src and $dest"
+        echo -e "\e[31mdiff FAILED\e[0m"
         if command -v tldiff >/dev/null 2>&1; then
             echo "Trying tldiff..."
             if tldiff "$src" "$dest" $opt1 $opt2; then
                 echo -e "\e[32mtldiff OK\e[0m"
                 return 0
             else
+                echo -e "\e[31mtldiff FAILED\e[0m"
                 if command -v uband_diff >/dev/null 2>&1; then
                     echo "Trying uband_diff..."
                     if uband_diff "$src" "$dest" $opt1 $opt2; then
                         echo -e "\e[32muband_diff OK\e[0m"
                         return 0
                     else
+                        echo -e "\e[31muband_diff FAILED\e[0m"
                         echo "Error: Files differ after tldiff and uband_diff. Exiting."
                         exit 1
                     fi
