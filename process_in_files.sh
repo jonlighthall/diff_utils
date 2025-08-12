@@ -8,7 +8,12 @@ diff_files() {
     local opt2="${4:-}"
 
     echo "Diffing $src and $dest:"
-    if diff --color=always --suppress-common-lines -yiEZbwB "$src" "$dest"; then
+    set +e
+    diff --color=always --suppress-common-lines -yiEZbwB "$src" "$dest"
+    RETVAL=$?
+    echo "diff done with return code $RETVAL"
+
+    if [ $RETVAL -eq 0 ]; then
         echo -e "\e[32mOK\e[0m"
         return 0
     else
