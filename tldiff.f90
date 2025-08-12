@@ -65,7 +65,7 @@ program tldiff
   ! ranges are formatted as f12.2
   ! the minimum difference between ranges is therefore 0.01
   real(kind=srk),parameter :: rng_min_diff=0.01
-  ! TL is formmated as f6.1
+  ! TL is formatted as f6.1
   ! the minimum difference between ranges is therefore 0.1
   real(kind=srk),parameter :: tl_min_diff=0.1
 
@@ -231,7 +231,7 @@ endif
            nerr=nerr+1
            write(*,'(2i5,f9.2)',advance='no') i,j,r1(i)
 
-           ! check if TL is greater than maximum value
+           ! check if TL1 is greater than maximum value
            if(tl1(i,j).gt.tl_max_eps)then
               write(*,'(a,f7.1,a)',advance='no') ''//achar(27)//'[34m',tl1(i,j),''//achar(27)//'[0m'
            elseif(tl1(i,j).gt.tl_max_user)then
@@ -240,7 +240,7 @@ endif
               write(*,'(f7.1)',advance='no') tl1(i,j)
            endif
 
-           ! check if TL is greater than maximum value
+           ! check if TL2 is greater than maximum value
            if(tl2(i,j).gt.tl_max_eps)then
               write(*,'(a,f7.1,a,a)',advance='no') ''//achar(27)//'[34m',tl2(i,j),''//achar(27)//'[0m',' | '
            elseif(tl2(i,j).gt.tl_max_user)then

@@ -9,8 +9,12 @@ program tsdiff
   ! TL
   real(kind=srk), dimension(:,:), allocatable :: tl1,tl2
   real(kind=srk)::dtl,dtl_max=0
-  ! arguments
-  integer :: ln1,ln2,ln3
+   ! arguments
+   integer :: ln1,ln2,ln3
+   ! Command-line arguments:
+   !   1st argument: filename for first time series file (reference)
+   !   2nd argument: filename for second time series file (comparison)
+   !   3rd argument: pass/fail threshold for time-level difference (optional)
   ! file parameters
   integer :: io,ls,n1,n2,ns1,ns2,unit1,unit2
   character(len=256) :: dummy,fname1,fname2,tlthresh
@@ -27,9 +31,10 @@ program tsdiff
   real(kind=srk),parameter :: tl_red=0.1, comp_diff=0.001
   real(kind=srk),parameter :: tlmax=-20*log10(2.**(-23))
   ! ----------------------------------------------------------
-  call get_command_argument(1,fname1,ln1)
-  call get_command_argument(2,fname2,ln2)
-  call get_command_argument(3,tlthresh,ln3)
+   ! Get command-line arguments
+   call get_command_argument(1,fname1,ln1)   ! First file (reference)
+   call get_command_argument(2,fname2,ln2)   ! Second file (comparison)
+   call get_command_argument(3,tlthresh,ln3) ! Threshold (optional)
 100 format(a12,' = ',f7.3)
   print 100,'rng min dif',rng_min_diff
   print 100,'tl min dif',tl_min_diff
@@ -42,6 +47,7 @@ program tsdiff
   if (ln2.eq.0) then
      fname2='std/case2r.rtl'
   end if
+  ! If no second argument is provided, use default filename for comparison file
 
   if (ln3.gt.0) then
      read(tlthresh,*)tl_min_diff
@@ -159,7 +165,7 @@ program tsdiff
         ! compare to tl_min_diff
         if(dtl.gt.tl_min_diff) then
            if (nerr.eq.0) then ! print table header on first error
-              print'(/a)','   ix   iz    range    tl1    tl2      | diff'
+              print'(/a)','   ix   iz    range    tl1    tl2     | diff'
               print*, repeat('-',37),'+',repeat('-',6)
            endif
            nerr=nerr+1
