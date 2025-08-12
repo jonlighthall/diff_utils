@@ -308,9 +308,6 @@ int main(int argc, char* argv[]) {
   }
 
   if (result) {
-    if (args.debug_level >= 0) {
-      std::cout << "Files are identical within tolerance." << std::endl;
-    }
     return 0;
   } else {
     if (args.debug_level >= 0) {
