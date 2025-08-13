@@ -97,9 +97,10 @@ auto stream_countDecimalPlaces = [](std::istringstream& stream) {
 /**
  * @brief Reads a complex number from an input stream and returns its components
  *
- * This function parses complex numbers in the format "real, imag)" where the opening
- * parenthesis '(' has already been consumed by the calling code. It extracts both
- * the numeric values and accurately counts decimal places for precision tracking.
+ * This function parses complex numbers in the format "real, imag)" where the
+ * opening parenthesis '(' has already been consumed by the calling code. It
+ * extracts both the numeric values and accurately counts decimal places for
+ * precision tracking.
  *
  * @param stream Input string stream positioned after the opening '('
  * @param flag Reference to Flags struct for error reporting
@@ -119,9 +120,11 @@ auto stream_countDecimalPlaces = [](std::istringstream& stream) {
  * 4. Decimal place counting always returned 0 due to stream state issues
  *
  * New implementation improvements:
- * 1. Manual string parsing: Extracts remaining stream content as string for parsing
+ * 1. Manual string parsing: Extracts remaining stream content as string for
+ * parsing
  * 2. Direct substring extraction: Uses find() to locate comma and closing paren
- * 3. Preserved formatting: Keeps original text to accurately count decimal places
+ * 3. Preserved formatting: Keeps original text to accurately count decimal
+ * places
  * 4. Robust error handling: Validates format before processing
  * 5. Proper stream advancement: Correctly positions stream for next token
  *
@@ -143,17 +146,20 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
   size_t paren_pos = remaining.find(')');
 
   // Validate the basic structure of the complex number format
-  if (comma_pos == std::string::npos || paren_pos == std::string::npos || comma_pos >= paren_pos) {
+  if (comma_pos == std::string::npos || paren_pos == std::string::npos ||
+      comma_pos >= paren_pos) {
     std::cerr << "Error reading complex number";
     flag.error_found = true;
-    return {0.0, 0.0, -1, -1};  // Return -1 for decimal places to indicate error
+    return {0.0, 0.0, -1,
+            -1};  // Return -1 for decimal places to indicate error
   }
 
   // Extract the real and imaginary parts as strings to preserve formatting
   // Real part: from start to comma position
   // Imaginary part: from after comma to closing parenthesis
   std::string real_str = remaining.substr(0, comma_pos);
-  std::string imag_str = remaining.substr(comma_pos + 1, paren_pos - comma_pos - 1);
+  std::string imag_str =
+      remaining.substr(comma_pos + 1, paren_pos - comma_pos - 1);
 
   // Remove leading and trailing whitespace from both parts
   // This handles variations like "1.5, 2.0" vs "1.5,2.0" vs " 1.5 , 2.0 "
@@ -195,7 +201,8 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
 }
 
 /**
- * @brief Lambda function to round a double to a specified number of decimal places
+ * @brief Lambda function to round a double to a specified number of decimal
+ * places
  * @param value The floating-point value to round
  * @param precision Number of decimal places to round to
  * @return Rounded value
@@ -1181,38 +1188,38 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   if (counter.diff_significant > 0 && print.level < 1) {
     return;
   }
-if (print.level > 0) {
-
-  if (counter.diff_non_zero > counter.diff_non_trivial) {
-    size_t zero_diff = counter.diff_non_zero - counter.diff_non_trivial;
-    if (zero_diff > 0) {
-      std::cout << "   Trivial differences     ( >" << 0.0 << "): ";
+  if (print.level > 0) {
+    if (counter.diff_non_zero > counter.diff_non_trivial) {
+      size_t zero_diff = counter.diff_non_zero - counter.diff_non_trivial;
       if (zero_diff > 0) {
-        std::cout << "\033[1;32m";
-      } else if (counter.diff_significant > 0) {
-        std::cout << "\033[1;31m";
-      } else {
-        std::cout << "\033[1;33m";
+        std::cout << "   Trivial differences     ( >" << 0.0 << "): ";
+        if (zero_diff > 0) {
+          std::cout << "\033[1;32m";
+        } else if (counter.diff_significant > 0) {
+          std::cout << "\033[1;31m";
+        } else {
+          std::cout << "\033[1;33m";
+        }
+        std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m"
+                  << std::endl;
       }
-      std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m"
-                << std::endl;
     }
-  }
-  std::cout << "   Non-trivial differences      : ";
-  if (counter.diff_non_trivial > 0) {
-    std::cout << "\033[1;33m";
-  } else if (counter.diff_significant > 0) {
-    std::cout << "\033[1;31m";
-  } else {
-    std::cout << "\033[1;32m";
-  }
+    std::cout << "   Non-trivial differences      : ";
+    if (counter.diff_non_trivial > 0) {
+      std::cout << "\033[1;33m";
+    } else if (counter.diff_significant > 0) {
+      std::cout << "\033[1;31m";
+    } else {
+      std::cout << "\033[1;32m";
+    }
 
-  std::cout << std::setw(params.fmt_wid) << counter.diff_non_trivial
-            << "\033[0m" << std::endl;
+    std::cout << std::setw(params.fmt_wid) << counter.diff_non_trivial
+              << "\033[0m" << std::endl;
 
-  std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
-            << " are non-trivially different\033[0m" << std::endl;
-}
+    std::cout << "\033[1;33m   Files " << params.file1 << " and "
+              << params.file2 << " are non-trivially different\033[0m"
+              << std::endl;
+  }
 
   std::cout << "   \033[4;35mMaximum rounded difference: "
             << format_number(
@@ -1222,14 +1229,15 @@ if (print.level > 0) {
                    differ.ndp_non_trivial)
             << "\033[0m" << std::endl;
   if (counter.diff_print < counter.diff_non_trivial) {
-    if (print.level>0) {
-    std::cout << "   Printed differences     ( >" << thresh.print
-              << "): " << std::setw(params.fmt_wid) << counter.diff_print
-              << std::endl;
-  }
+    if (print.level > 0) {
+      std::cout << "   Printed differences     ( >" << thresh.print
+                << "): " << std::setw(params.fmt_wid) << counter.diff_print
+                << std::endl;
+    }
     size_t not_printed = counter.diff_non_trivial - counter.diff_print;
     if (not_printed > 0) {
-      std::cout << "   Not printed differences (" << thresh.significant << " < TL <= " << thresh.print
+      std::cout << "   Not printed differences (" << thresh.significant
+                << " < TL <= " << thresh.print
                 << "): " << std::setw(params.fmt_wid) << not_printed
                 << std::endl;
     }
@@ -1273,14 +1281,13 @@ void FileComparator::print_significant_summary(
   // User-defined threshold differences
   // =========================================================
   if (counter.diff_significant == 0) {
-    std::cout << "\033[1;32mFiles " << params.file1 << " and "
-              << params.file2 << " are equivalent within tolerance\033[0m"
-              << std::endl;
+    std::cout << "\033[1;32mFiles " << params.file1 << " and " << params.file2
+              << " are equivalent within tolerance\033[0m" << std::endl;
     return;
   }
 
   if (print.level < 0) {
-    return; // Early return for low print levels
+    return;  // Early return for low print levels
   }
 
   print_significant_differences_count(params);
@@ -1302,6 +1309,9 @@ void FileComparator::print_significant_differences_count(
 
   if (counter.elem_number > 0) {
     print_significant_percentage();
+        print_count_with_percent(
+    params, "\"Close enough\" matches (<=" + std::to_string(thresh.significant) + ")",
+        counter.elem_number - counter.diff_significant);
   }
 }
 
@@ -1327,10 +1337,12 @@ void FileComparator::print_insignificant_differences_count(
     return;
   }
 
-  size_t insignificant_count = counter.diff_non_trivial - counter.diff_significant;
+  size_t insignificant_count =
+      counter.diff_non_trivial - counter.diff_significant;
   if (insignificant_count > 0) {
-    print_count_with_percent(params, "Insignificant differences (<=" +
-                             std::to_string(thresh.significant) + ")",
+    print_count_with_percent(params,
+                             "Insignificant differences (<=" +
+                                 std::to_string(thresh.significant) + ")",
                              insignificant_count);
   }
 }
@@ -1364,9 +1376,10 @@ void FileComparator::print_maximum_significant_difference_details() const {
 }
 
 void FileComparator::print_max_diff_threshold_comparison_above() const {
-  std::cout << "\033[1;31m   Max diff is greater than the significant threshold: "
-            << std::setprecision(differ.ndp_significant) << thresh.significant
-            << "\033[0m" << std::endl;
+  std::cout
+      << "\033[1;31m   Max diff is greater than the significant threshold: "
+      << std::setprecision(differ.ndp_significant) << thresh.significant
+      << "\033[0m" << std::endl;
 }
 
 void FileComparator::print_max_diff_threshold_comparison_below() const {
@@ -1374,8 +1387,8 @@ void FileComparator::print_max_diff_threshold_comparison_below() const {
                "significant threshold: "
             << format_number(
                    thresh.significant, differ.ndp_significant,
-                   static_cast<int>(
-                       std::round(std::log10(thresh.significant)) + 2),
+                   static_cast<int>(std::round(std::log10(thresh.significant)) +
+                                    2),
                    differ.ndp_significant)
             << "\033[0m" << std::endl;
 }
@@ -1385,7 +1398,8 @@ void FileComparator::print_file_comparison_result(
   std::cout << "   ";
   if (differ.ndp_significant > differ.ndp_single_precision) {
     std::cout << "\033[1;33mFiles " << params.file1 << " and " << params.file2
-              << " are equivalent within the limits of single precision\033[0m" << std::endl;
+              << " are equivalent within the limits of single precision\033[0m"
+              << std::endl;
   } else {
     std::cout << "\033[1;31mFiles " << params.file1 << " and " << params.file2
               << " are significantly different\033[0m" << std::endl;
@@ -1395,7 +1409,8 @@ void FileComparator::print_file_comparison_result(
 void FileComparator::print_significant_differences_printing_status(
     const SummaryParams& params) const {
   if (counter.diff_print < counter.diff_significant) {
-    print_count_with_percent(params,
+    print_count_with_percent(
+        params,
         "Printed differences       ( >" + std::to_string(thresh.print) + ")",
         counter.diff_print);
 
@@ -1422,8 +1437,7 @@ void FileComparator::print_count_with_percent(const SummaryParams& params,
   if (counter.elem_number > 0) {
     double percent = 100.0 * static_cast<double>(count) /
                      static_cast<double>(counter.elem_number);
-    std::cout << " (" << std::fixed << std::setprecision(2) << percent
-              << "%)";
+    std::cout << " (" << std::fixed << std::setprecision(2) << percent << "%)";
   }
   std::cout << std::endl;
 }
@@ -1718,3 +1732,4 @@ ColumnValues FileComparator::extract_column_values(const LineData& data1,
 
   return {val1, val2, rangeValue, dp1, dp2, min_dp};
 }
+   
