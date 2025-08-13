@@ -169,7 +169,8 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
   imag_str.erase(imag_str.find_last_not_of(" \t") + 1);
 
   // Convert the cleaned strings to floating-point numbers
-  double real, imag;
+  double real;
+  double imag;
   try {
     real = std::stod(real_str);
     imag = std::stod(imag_str);
@@ -1732,4 +1733,3 @@ ColumnValues FileComparator::extract_column_values(const LineData& data1,
 
   return {val1, val2, rangeValue, dp1, dp2, min_dp};
 }
-   
