@@ -94,19 +94,19 @@ diff_files() {
                     else
                         echo -e "\e[31muband_diff FAILED\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        exit 1
+                        return 1
                     fi
                 else
-                    echo "Error: uband_diff not found and files differ. Exiting."
-                    exit 1
+                    echo "Error: uband_diff not found and files differ."
+                    return 1
                 fi
             fi
         else
-            echo "Error: tldiff not found and files differ. Exiting."
-            exit 1
+            echo "Error: tldiff not found and files differ."
+            return 1
         fi
-        echo "Files differ. Exiting."
-        exit 1
+        echo "Files differ."
+        return 1
     fi
 }
 
@@ -129,17 +129,25 @@ fi
 
 PROG=./nspe.exe
 
-find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}' | while read -r infile; do
+# Create array of files to process, sorted by size
+mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}')
+
+# Process each file
+for infile in "${infiles[@]}"; do
     # Check for required strings (case-insensitive)
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
         echo "Processing $infile..."
         LOG_FILE="$directory/$(basename "$infile" .in).log"
         if [[ "$mode" == "test" ]]; then
 
-            { time "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
-        elif ! "$PROG" "$infile"; then
-            echo "Error: nspe.exe failed for $infile. Exiting."
-            exit 1
+            { time timeout 300s "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
+        else
+            # Run nspe.exe in isolation to avoid interfering with the loop
+            timeout 300s "$PROG" "$infile"
+            if [[ $? -ne 0 ]]; then
+                echo "Error: nspe.exe failed for $infile. Continuing to next file."
+                continue
+            fi
         fi
         # Rename only one file per priority: 03, 02, 01
         for suffix in 03 02 01; do
@@ -157,7 +165,11 @@ find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{pr
                     # Call the function with src and dest, and optionally extra
                     diff_files "$src" "$dest"
                     elif [[  "$mode" == "test" ]]; then
-                        diff_files "$src" "$dest" >> "$LOG_FILE" 2>&1
+                        if diff_files "$src" "$dest" >> "$LOG_FILE" 2>&1; then
+                            echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
+                        else
+                            echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
+                        fi
                 else
                     echo "Unknown mode: $mode"
                     exit 1
