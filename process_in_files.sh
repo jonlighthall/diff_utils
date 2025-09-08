@@ -1,5 +1,19 @@
 #!/bin/bash
 # Usage: ./process_in_files.sh <mode> [directory]
+# =============================
+# EXPLANATION SECTION
+#
+# This script processes .in files in a directory using nspe.exe.
+#
+# Input options (first argument):
+#   make - Runs nspe.exe and renames output files to standard names (.tl, .rtl, .ftl)
+#   test - Runs nspe.exe, logs output, and compares results to reference files
+#   diff - Compares existing output files to reference files (does not run nspe.exe)
+#
+# PROMPT: To process files, run:
+#   ./process_in_files.sh <mode> [directory]
+# Where <mode> is 'make', 'test', or 'diff'. Directory defaults to 'std'.
+# =============================
 
 headtail_truncate() {
     local file="$1"
@@ -42,12 +56,20 @@ diff_files() {
         echo -e "\e[31mError: Destination file '$dest' does not exist. Exiting.\e[0m"
         exit 1
     fi
+    if [[ ! -s "$src" ]]; then
+        echo -e "\e[31mError: Source file '$src' is empty. Exiting.\e[0m"
+        exit 1
+    fi
+    if [[ ! -s "$dest" ]]; then
+        echo -e "\e[31mError: Destination file '$dest' is empty. Exiting.\e[0m"
+        exit 1
+    fi
 
     printf '%*s\n' "$line_len" '' | tr ' ' '-'
     echo "Diffing $src and $dest:"
     set +e
     tmpfile_diff=$(mktemp)
-    diff --color=always --suppress-common-lines -yiEZbwB "$src" "$dest" > "$tmpfile_diff"
+    diff --color=always --suppress-common-lines -yiEZbwBs "$src" "$dest" > "$tmpfile_diff"
     RETVAL=$?
     echo "diff done with return code $RETVAL"
     diff_lines=$(wc -l < "$tmpfile_diff")
@@ -112,6 +134,32 @@ diff_files() {
 
 set -e
 mode="$1"
+# =============================
+# MODE EXPLANATION
+#
+# What do you want to do with respect to the reference output files?
+#
+# The script operates in three modes: 'make', 'test', and 'diff'.
+#
+# 'make':
+#   - Runs nspe.exe on each .in file
+#   - Renames output files (_01.asc, _02.asc, _03.asc) to standard names (.tl, .rtl, .ftl)
+#   - Cleans up extra files
+#   - Use when you want to generate and prepare outputs for reference
+#
+# 'test':
+#   - Runs nspe.exe on each .in file
+#   - Logs output to a .log file
+#   - Compares output files to reference files using diff_files
+#   - Reports PASS/FAIL for each test
+#   - Use to verify correctness of outputs by running fresh simulations
+#
+# 'diff':
+#   - Does NOT run nspe.exe
+#   - Compares existing output files (_01.asc, _02.asc, _03.asc) to reference files (.tl, .rtl, .ftl)
+#   - Shows differences using diff_files
+#   - Use to manually inspect differences between existing outputs and references
+# =============================
 directory="${2:-std}"
 
 # Validate mode
@@ -132,22 +180,38 @@ PROG=./nspe.exe
 # Create array of files to process, sorted by size
 mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}')
 
-# Process each file
+if [[ ${#infiles[@]} -eq 0 ]]; then
+    echo
+    echo -e "\e[31mNo input files (*.in) found in directory: $directory\e[0m"
+
+    exit 1
+fi
+pass_files=()
+fail_files=()
 for infile in "${infiles[@]}"; do
     # Check for required strings (case-insensitive)
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
-        echo "Processing $infile..."
+            echo -e "\n=============================="
+            echo "Processing input file: $infile"
+            echo "Mode: $mode"
+            echo "=============================="
         LOG_FILE="$directory/$(basename "$infile" .in).log"
-        if [[ "$mode" == "test" ]]; then
 
-            { time timeout 300s "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
-        else
-            # Run nspe.exe in isolation to avoid interfering with the loop
-            timeout 300s "$PROG" "$infile"
-            if [[ $? -ne 0 ]]; then
-                echo "Error: nspe.exe failed for $infile. Continuing to next file."
-                continue
+        # Run nspe.exe for 'make' and 'test' modes, but not for 'diff' mode
+        if [[ "$mode" == "make" || "$mode" == "test" ]]; then
+            if [[ "$mode" == "test" ]]; then
+                echo "[TEST MODE] Running: $PROG $infile"
+                { time timeout 300s "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
+            else
+                echo "[MAKE MODE] Running: $PROG $infile"
+                timeout 300s "$PROG" "$infile"
+                if [[ $? -ne 0 ]]; then
+                    echo "Error: nspe.exe failed for $infile. Continuing to next file."
+                    continue
+                fi
             fi
+        else
+            echo "[DIFF MODE] Skipping nspe.exe execution, comparing existing files..."
         fi
         # Rename only one file per priority: 03, 02, 01
         for suffix in 03 02 01; do
@@ -157,19 +221,35 @@ for infile in "${infiles[@]}"; do
                 02) dest="$directory/$(basename "$infile" .in).rtl" ;;
                 03) dest="$directory/$(basename "$infile" .in).ftl" ;;
             esac
-            if [[ -f "$src" ]]; then
+            if [[ -f "$src" && -s "$src" ]]; then
                 if [[ "$mode" == "make" ]]; then
+                    # MAKE mode: Only rename files, no comparison
                     mv "$src" "$dest"
                     echo "Renamed $src to $dest"
-                elif [[ "$mode" == "diff" ]]; then
-                    # Call the function with src and dest, and optionally extra
-                    diff_files "$src" "$dest"
-                    elif [[  "$mode" == "test" ]]; then
+                elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
+                    # TEST and DIFF modes: Compare files
+                    echo "Comparing $src to $dest for $infile..."
+                    if [[ "$mode" == "test" ]]; then
+                        # TEST mode: Log comparison results
                         if diff_files "$src" "$dest" >> "$LOG_FILE" 2>&1; then
+                            echo -e "\e[32m[[PASS]]\e[0m $infile" # Print PASS to terminal
                             echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
+                            pass_files+=("$infile")
                         else
+                            echo -e "\e[31m[[FAIL]]\e[0m $infile" # Print FAIL to terminal
                             echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
+                            fail_files+=("$infile")
                         fi
+                    else
+                        # DIFF mode: Show comparison results to terminal only
+                        if diff_files "$src" "$dest"; then
+                            echo -e "\e[32m[[PASS]]\e[0m $infile" # Print PASS to terminal
+                            pass_files+=("$infile")
+                        else
+                            echo -e "\e[31m[[FAIL]]\e[0m $infile" # Print FAIL to terminal
+                            fail_files+=("$infile")
+                        fi
+                    fi
                 else
                     echo "Unknown mode: $mode"
                     exit 1
@@ -202,3 +282,26 @@ for infile in "${infiles[@]}"; do
         echo -e "\e[33mSkipping $infile (does not contain required strings)\e[0m"
     fi
 done
+
+# Print summary if in test or diff mode
+if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
+    echo -e "\n=============================="
+    if [[ "$mode" == "test" ]]; then
+        echo "Test Summary:"
+    else
+        echo "Diff Summary:"
+    fi
+    echo "=============================="
+    echo "Passed files: ${#pass_files[@]}"
+    for f in "${pass_files[@]}"; do
+        echo -e "  \e[32mPASS\e[0m $f"
+    done
+    echo "Failed files: ${#fail_files[@]}"
+    for f in "${fail_files[@]}"; do
+        echo -e "  \e[31mFAIL\e[0m $f"
+    done
+    if [[ ${#fail_files[@]} -eq 0 ]]; then
+        echo -e "\nAll files passed!"
+    fi
+    echo "=============================="
+fi
