@@ -191,30 +191,39 @@ fail_files=()
 missing_reference_files=()
 missing_output_files=()
 empty_files=()
+
+# Print mode header once at the beginning
+echo -e "\n=============================="
+echo "Processing directory: $directory"
+echo "Mode: $mode"
+if [[ "$mode" == "make" ]]; then
+    echo "Will run nspe.exe and rename output files to reference files (.tl, .rtl, .ftl)"
+elif [[ "$mode" == "test" ]]; then
+    echo "Will run nspe.exe and compare outputs to reference files"
+elif [[ "$mode" == "diff" ]]; then
+    echo "Will compare existing output files to reference files (no nspe.exe execution)"
+fi
+echo "=============================="
+
 for infile in "${infiles[@]}"; do
     # Check for required strings (case-insensitive)
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
-            echo -e "\n=============================="
-            echo "Processing input file: $infile"
-            echo "Mode: $mode"
-            echo "=============================="
+        echo "Processing: $infile"
         LOG_FILE="$directory/$(basename "$infile" .in).log"
 
         # Run nspe.exe for 'make' and 'test' modes, but not for 'diff' mode
         if [[ "$mode" == "make" || "$mode" == "test" ]]; then
             if [[ "$mode" == "test" ]]; then
-                echo "[TEST MODE] Running: $PROG $infile"
+                echo "  Running: $PROG $infile"
                 { time timeout 300s "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
             else
-                echo "[MAKE MODE] Running: $PROG $infile"
+                echo "  Running: $PROG $infile"
                 timeout 300s "$PROG" "$infile"
                 if [[ $? -ne 0 ]]; then
-                    echo "Error: nspe.exe failed for $infile. Continuing to next file."
+                    echo "  Error: nspe.exe failed for $infile. Continuing to next file."
                     continue
                 fi
             fi
-        else
-            echo "[DIFF MODE] Skipping nspe.exe execution, comparing existing files..."
         fi
         # Rename only one file per priority: 03, 02, 01
         for suffix in 03 02 01; do
@@ -229,13 +238,13 @@ for infile in "${infiles[@]}"; do
                 if [[ "$mode" == "diff" && ! -f "$src" ]]; then
                     # In diff mode, check if either src or dest files exist to provide meaningful feedback
                     if [[ -f "$dest" ]]; then
-                        echo -e "\e[33m[[MISSING OUTPUT]]\e[0m $infile - Output file '$src' does not exist"
-                        echo -e "\e[33mHint: Run 'test' mode first to generate output files\e[0m"
+                        echo -e "  \e[33m[[MISSING OUTPUT]]\e[0m Output file '$src' does not exist"
+                        echo -e "    \e[33mHint: Run 'test' mode first to generate output files\e[0m"
                         fail_files+=("$infile")
                         missing_output_files+=("$src")
                     else
-                        echo -e "\e[33m[[MISSING FILES]]\e[0m $infile - Both output '$src' and reference '$dest' do not exist"
-                        echo -e "\e[33mHint: Run 'make' mode first to generate reference files, then 'test' mode for output files\e[0m"
+                        echo -e "  \e[33m[[MISSING FILES]]\e[0m Both output '$src' and reference '$dest' do not exist"
+                        echo -e "    \e[33mHint: Run 'make' mode first to generate reference files, then 'test' mode for output files\e[0m"
                         fail_files+=("$infile")
                         missing_output_files+=("$src")
                         missing_reference_files+=("$dest")
@@ -248,18 +257,18 @@ for infile in "${infiles[@]}"; do
                 if [[ "$mode" == "make" ]]; then
                     # MAKE mode: Only rename files, no comparison
                     mv "$src" "$dest"
-                    echo "Renamed $src to $dest"
+                    echo "  Renamed $src to $dest"
                 elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                     # TEST and DIFF modes: Compare files
-                    echo "Comparing $src to $dest for $infile..."
+                    echo "  Comparing $src to $dest..."
 
                     # Check if reference file exists
                     if [[ ! -f "$dest" ]]; then
-                        echo -e "\e[33m[[MISSING REFERENCE]]\e[0m $infile - Reference file '$dest' does not exist"
+                        echo -e "  \e[33m[[MISSING REFERENCE]]\e[0m Reference file '$dest' does not exist"
                         if [[ "$mode" == "test" ]]; then
                             echo -e "\e[33m[[MISSING REFERENCE]]\e[0m Reference file '$dest' does not exist" >> "$LOG_FILE"
                         fi
-                        echo -e "\e[33mHint: Run 'make' mode first to generate reference files\e[0m"
+                        echo -e "    \e[33mHint: Run 'make' mode first to generate reference files\e[0m"
                         fail_files+=("$infile")
                         missing_reference_files+=("$dest")
                         continue
@@ -267,7 +276,7 @@ for infile in "${infiles[@]}"; do
 
                     # Check if reference file is empty
                     if [[ ! -s "$dest" ]]; then
-                        echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m $infile - Reference file '$dest' is empty"
+                        echo -e "  \e[33m[[EMPTY REFERENCE]]\e[0m Reference file '$dest' is empty"
                         if [[ "$mode" == "test" ]]; then
                             echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m Reference file '$dest' is empty" >> "$LOG_FILE"
                         fi
@@ -278,8 +287,8 @@ for infile in "${infiles[@]}"; do
 
                     # For diff mode, also check if source file exists (since we're not running nspe.exe)
                     if [[ "$mode" == "diff" && ! -f "$src" ]]; then
-                        echo -e "\e[33m[[MISSING OUTPUT]]\e[0m $infile - Output file '$src' does not exist"
-                        echo -e "\e[33mHint: Run 'test' mode first to generate output files\e[0m"
+                        echo -e "  \e[33m[[MISSING OUTPUT]]\e[0m Output file '$src' does not exist"
+                        echo -e "    \e[33mHint: Run 'test' mode first to generate output files\e[0m"
                         fail_files+=("$infile")
                         missing_output_files+=("$src")
                         continue
@@ -287,7 +296,7 @@ for infile in "${infiles[@]}"; do
 
                     # For diff mode, check if source file is empty
                     if [[ "$mode" == "diff" && ! -s "$src" ]]; then
-                        echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m $infile - Output file '$src' is empty"
+                        echo -e "  \e[33m[[EMPTY OUTPUT]]\e[0m Output file '$src' is empty"
                         fail_files+=("$infile")
                         empty_files+=("$src")
                         continue
@@ -297,21 +306,21 @@ for infile in "${infiles[@]}"; do
                     if [[ "$mode" == "test" ]]; then
                         # TEST mode: Log comparison results
                         if diff_files "$src" "$dest" >> "$LOG_FILE" 2>&1; then
-                            echo -e "\e[32m[[PASS]]\e[0m $infile" # Print PASS to terminal
+                            echo -e "  \e[32m[[PASS]]\e[0m" # Print PASS to terminal
                             echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
                             pass_files+=("$infile")
                         else
-                            echo -e "\e[31m[[FAIL]]\e[0m $infile" # Print FAIL to terminal
+                            echo -e "  \e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                             echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
                             fail_files+=("$infile")
                         fi
                     else
                         # DIFF mode: Show comparison results to terminal only
                         if diff_files "$src" "$dest"; then
-                            echo -e "\e[32m[[PASS]]\e[0m $infile" # Print PASS to terminal
+                            echo -e "  \e[32m[[PASS]]\e[0m" # Print PASS to terminal
                             pass_files+=("$infile")
                         else
-                            echo -e "\e[31m[[FAIL]]\e[0m $infile" # Print FAIL to terminal
+                            echo -e "  \e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                             fail_files+=("$infile")
                         fi
                     fi
