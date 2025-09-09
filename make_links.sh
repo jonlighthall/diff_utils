@@ -33,7 +33,7 @@ for my_link in cpddiff \
     prsdiff \
     tldiff \
     tsdiff \
-    uband_diff ; do
+    uband_diff; do
 
     # define target (source)
     target=${target_dir}/${my_link}${ext}
