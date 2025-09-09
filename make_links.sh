@@ -11,10 +11,7 @@ if [ -e "$fpretty" ]; then
 fi
 
 # determine if script is being sourced or executed
-if (return 0 2>/dev/null); then
-    RUN_TYPE="sourcing"
-else
-    RUN_TYPE="executing"
+if ! (return 0 2>/dev/null); then
     # exit on errors
     set -e
 fi
@@ -35,7 +32,8 @@ ext=''
 for my_link in cpddiff \
     prsdiff \
     tldiff \
-    tsdiff; do
+    tsdiff \
+    uband_diff; do
 
     # define target (source)
     target=${target_dir}/${my_link}${ext}
