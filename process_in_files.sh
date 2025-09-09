@@ -282,10 +282,10 @@ for infile in "${infiles[@]}"; do
             done
             
             # Show warning if any existing files found
-            if [[ ${#existing_files[@]} -gt 0 ]]; then
-                echo -e "   \e[33mWarning: Existing output files will be overwritten:\e[0m"
+            if [[ ${#existing_files[@]} -gt 0 ]] && [[ "$mode" != "test" ]]; then
+                echo -e "   \e[90mWarning: Existing output files will be overwritten:\e[0m"
                 for existing_file in "${existing_files[@]}"; do
-                    echo -e "   \e[33m  - $(basename "$existing_file")\e[0m"
+                    echo -e "     \e[90m- $(basename "$existing_file")\e[0m"
                 done
             fi
             
@@ -306,7 +306,9 @@ for infile in "${infiles[@]}"; do
             # check PROG exit status
             if [[ $RETVAL -eq 0 ]]; then
                 echo -e "\e[32mOK\e[0m"
-                echo "   Success: nspe.exe completed successfully for $infile"
+                if [[ "$mode" != "test" ]]; then
+                    echo "   Success: nspe.exe completed successfully for $infile"
+                fi
             else
                 echo -e "\e[31mFAIL\e[0m"
                 echo -e "   \e[31mError: nspe.exe failed with exit code $RETVAL for $infile\e[0m"
@@ -455,7 +457,9 @@ for infile in "${infiles[@]}"; do
                         # Only delete files
                         if [[ -f "$f" ]]; then
                             rm "$f"
-                            echo "   Deleted $f"
+                            if [[ "$mode" != "test" ]]; then
+                                echo "   Deleted $f"
+                            fi
                         fi
                     done
                     found_files=true
