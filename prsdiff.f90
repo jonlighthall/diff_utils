@@ -4,8 +4,6 @@ program prsdiff
   ! Aug 2022 JCL
   use file_diff_utils
   implicit none
-  ! range
-  real(kind=srk), dimension(:), allocatable :: r1,r2
   ! pressure
   real(kind=srk), dimension(:,:), allocatable :: pi1,pi2,pr1,pr2,tl1,tl2
   complex(kind=srk), dimension(:,:), allocatable :: p1,p2

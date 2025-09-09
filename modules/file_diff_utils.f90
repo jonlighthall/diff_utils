@@ -10,6 +10,9 @@ module file_diff_utils
   ! Define precision consistently across all programs
   integer, parameter :: srk = selected_real_kind(2)
 
+  ! range
+  real(kind=srk), dimension(:), allocatable :: r1,r2
+
   end module file_diff_utils
 
   module more_file_diff_utils

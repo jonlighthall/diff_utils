@@ -4,8 +4,6 @@ program cpddiff
   ! Aug 2022 JCL
   use file_diff_utils
   implicit none
-  ! range
-  real(kind=srk), dimension(:), allocatable :: r1,r2
   ! TL
   real(kind=srk), dimension(:,:), allocatable :: tl1,tl2
   real(kind=srk)::dtl,dtl_max=0
