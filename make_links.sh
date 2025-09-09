@@ -33,8 +33,22 @@ for my_link in cpddiff \
     prsdiff \
     tldiff \
     tsdiff \
-    uband_diff; do
+    uband_diff ; do
 
+    # define target (source)
+    target=${target_dir}/${my_link}${ext}
+
+    # define link (destination)
+    link=${link_dir}/${my_link}
+
+    # create link
+    decho "linking $target to $link..."
+    do_link_exe "$target" "$link"
+done
+
+target_dir="${src_dir_phys}"
+ext='.sh'
+for my_link in process_in_files; do
     # define target (source)
     target=${target_dir}/${my_link}${ext}
 
