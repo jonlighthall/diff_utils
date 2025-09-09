@@ -6,21 +6,23 @@
 # This script processes .in files in a directory using nspe.exe.
 #
 # Input options (first argument):
-#   make - Runs nspe.exe and renames output files to standard names (.tl, .rtl,
+#   make - Runs nspe.exe only (no file operations)
+#   copy - Runs nspe.exe and renames output files to standard names (.tl, .rtl,
 #   .ftl)
 #   test - Runs nspe.exe, logs output, and compares results to reference files
 #   diff - Compares existing output files to reference files (does not run nspe.exe)
 #
 # PROMPT: To process files, run:
 #   ./process_in_files.sh <mode> [directory]
-# Where <mode> is 'make', 'test', or 'diff'. Directory defaults to 'std'.
+# Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
 #
 # Replaces functionality of:
-#   * std/copy_std.bat
-#   * std/mkstd [should be "make"]
-#   * std/mkstd + std/copy_std.bat [MAKE, should be "copy"]
-#   * std/testram [TEST]
-#   * std/testram_getarg [TEST]
+#   script             | mode
+#   -------------------+------
+#   std/copy_std.bat   | COPY
+#   std/mkstd          | MAKE
+#   std/testram        | TEST
+#   std/testram_getarg | TEST
 
 # =============================
 
@@ -148,9 +150,14 @@ mode="$1"
 #
 # What do you want to do with respect to the reference output files?
 #
-# The script operates in three modes: 'make', 'test', and 'diff'.
+# The script operates in four modes: 'make', 'copy', 'test', and 'diff'.
 #
 # 'make':
+#   - Runs nspe.exe on each .in file
+#   - Does not perform any file operations (move, copy, diff)
+#   - Use when you just want to generate output files
+#
+# 'copy':
 #   - Runs nspe.exe on each .in file
 #   - Renames output files (_01.asc, _02.asc, _03.asc) to standard names (.tl, .rtl, .ftl)
 #   - Cleans up extra files
@@ -177,7 +184,7 @@ directory="${directory%/}"
 # Validate mode
 if [[ -z "$mode" ]]; then
     echo "Usage: $0 <mode> [directory]"
-    echo "mode: make, test, or diff"
+    echo "mode: make, copy, test, or diff"
     echo "directory: defaults to 'std' if not specified"
     exit 1
 fi
@@ -237,6 +244,8 @@ echo -e "\n=============================="
 echo "Processing directory: $directory"
 echo "Mode: $mode"
 if [[ "$mode" == "make" ]]; then
+    echo "Will run nspe.exe only (no file operations)"
+    elif [[ "$mode" == "copy" ]]; then
     echo "Will run nspe.exe and rename output files to reference files (.tl, .rtl, .ftl)"
     elif [[ "$mode" == "test" ]]; then
     echo "Will run nspe.exe and compare outputs to reference files"
@@ -251,8 +260,8 @@ for infile in "${infiles[@]}"; do
         echo "Processing: $infile"
         LOG_FILE="$directory/$(basename "$infile" .in).log"
         
-        # Run nspe.exe for 'make' and 'test' modes, but not for 'diff' mode
-        if [[ "$mode" == "make" || "$mode" == "test" ]]; then
+        # Run nspe.exe for 'make', 'copy' and 'test' modes, but not for 'diff' mode
+        if [[ "$mode" == "make" || "$mode" == "copy" || "$mode" == "test" ]]; then
             echo -n "   Running: $PROG $infile... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle nspe failures gracefully
@@ -280,6 +289,13 @@ for infile in "${infiles[@]}"; do
                 #continue
             fi
         fi
+        
+        # For 'make' mode, we're done after running nspe.exe - skip file operations
+        if [[ "$mode" == "make" ]]; then
+            echo "=============================="
+            continue
+        fi
+        
         # Find the first available file pair by priority: 03, 02, 01
         found_files=false
         for suffix in 03 02 01; do
@@ -290,9 +306,9 @@ for infile in "${infiles[@]}"; do
                 03) dest="$directory/$(basename "$infile" .in).ftl" ;;
             esac
             
-            # For make and test modes, check if src file exists
+            # For copy and test modes, check if src file exists
             # For diff mode, check if either src or dest exists to provide meaningful feedback
-            if [[ "$mode" != "diff" && -f "$src" && -s "$src" ]] || [[ "$mode" == "diff" && (-f "$src" || -f "$dest") ]]; then
+            if [[ ("$mode" == "copy" || "$mode" == "test") && -f "$src" && -s "$src" ]] || [[ "$mode" == "diff" && (-f "$src" || -f "$dest") ]]; then
                 # For diff mode, we need to check files even if src doesn't exist
                 if [[ "$mode" == "diff" && ! -f "$src" ]]; then
                     # In diff mode, check if either src or dest files exist to provide meaningful feedback
@@ -304,7 +320,7 @@ for infile in "${infiles[@]}"; do
                         found_files=true
                     else
                         echo -e "   \e[33m[[MISSING FILES]]\e[0m Both output '$src' and reference '$dest' do not exist"
-                        echo -e "   \e[33mHint: Run 'make' mode first to generate reference files, then 'test' mode for output files\e[0m"
+                        echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files, then 'test' mode for output files\e[0m"
                         fail_files+=("$infile")
                         missing_output_files+=("$src")
                         missing_reference_files+=("$dest")
@@ -315,8 +331,8 @@ for infile in "${infiles[@]}"; do
                 
                 # Continue with existing logic for cases where src file exists
                 if [[ -f "$src" && -s "$src" ]]; then
-                    if [[ "$mode" == "make" ]]; then
-                        # MAKE mode: Only rename files, no comparison
+                    if [[ "$mode" == "copy" ]]; then
+                        # COPY mode: Only rename files, no comparison
                         mv "$src" "$dest"
                         echo "   Renamed $src to $dest"
                         elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
@@ -329,7 +345,7 @@ for infile in "${infiles[@]}"; do
                             if [[ "$mode" == "test" ]]; then
                                 echo -e "\e[33m[[MISSING REFERENCE]]\e[0m Reference file '$dest' does not exist" >> "$LOG_FILE"
                             fi
-                            echo -e "   \e[33mHint: Run 'make' mode first to generate reference files\e[0m"
+                            echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
                             fail_files+=("$infile")
                             missing_reference_files+=("$dest")
                             continue
@@ -420,7 +436,7 @@ for infile in "${infiles[@]}"; do
         if [[ "$found_files" == false ]]; then
             echo -e "   \e[33m[[NO FILES]]\e[0m No output or reference files found for any suffix (01, 02, 03)"
             if [[ "$mode" == "diff" ]]; then
-                echo -e "   \e[33mHint: Run 'make' mode first to generate reference files, then 'test' mode for output files\e[0m"
+                echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files, then 'test' mode for output files\e[0m"
             fi
             fail_files+=("$infile")
         fi
@@ -450,7 +466,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
     
     # Show detailed missing file information
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
-        echo -e "\nMissing reference files (run 'make' mode first):"
+        echo -e "\nMissing reference files (run 'copy' mode first):"
         for f in "${missing_reference_files[@]}"; do
             echo -e "   \e[33mMISSING\e[0m $f"
         done
