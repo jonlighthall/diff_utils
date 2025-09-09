@@ -48,8 +48,6 @@ program tldiff
   ! TL
   real(kind=srk), dimension(:,:), allocatable :: tl1,tl2
   real(kind=srk)::dtl,dtl_max=0,dtl_max2=0,dtl_max3=0
-  ! arguments
-  integer :: ln1,ln2,ln3
   ! file parameters
   integer :: fstat,io,ls,n1,n2,ns1,ns2,unit1,unit2
   character(len=256) :: dummy,fname1,fname2,tlthresh

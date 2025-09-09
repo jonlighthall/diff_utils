@@ -8,8 +8,6 @@ program prsdiff
   real(kind=srk), dimension(:,:), allocatable :: pi1,pi2,pr1,pr2,tl1,tl2
   complex(kind=srk), dimension(:,:), allocatable :: p1,p2
   real(kind=srk):: dp,dp_max=0
-  ! arguments
-  integer :: ln1,ln2,ln3
   ! file parameters
   integer :: io,ls,n1,n2,np1,ns1,ns2,unit1,unit2
   character(len=256) :: dummy,fname1,fname2,tlthresh

@@ -13,6 +13,13 @@ module file_diff_utils
   ! range
   real(kind=srk), dimension(:), allocatable :: r1,r2
 
+   ! arguments
+   integer :: ln1,ln2,ln3
+   ! Command-line arguments:
+   !   1st argument: filename for first time series file (reference)
+   !   2nd argument: filename for second time series file (comparison)
+   !   3rd argument: pass/fail threshold for time-level difference (optional)
+
   end module file_diff_utils
 
   module more_file_diff_utils
