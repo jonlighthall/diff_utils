@@ -33,7 +33,7 @@
 # =============================
 
 # Source the utility library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 LIBRARY_FILE="${SCRIPT_DIR}/lib_diff_utils.sh"
 
 if [[ -f "$LIBRARY_FILE" ]]; then
@@ -44,18 +44,17 @@ else
     exit 1
 fi
 
-
 set -e
 mode="$1"
 # =============================
 # MODE EXPLANATION
 #
-# What do you want to do with respect to the reference output files?
+# What do you want to do with respect to the output files?
 #
 # The script operates in four modes: 'make', 'copy', 'test', and 'diff'.
 #
 # 'make':
-#   - Runs nspe.exe on each .in file
+#   - Runs nspe.exe on each .in file (generates output files)
 #   - Does not perform any file operations (move, copy, diff)
 #   - Use when you just want to generate output files
 #

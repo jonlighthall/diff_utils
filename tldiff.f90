@@ -43,8 +43,8 @@ program tldiff
   !   NERR4 - >dtl_error, both TL less than epsilon threshold 138dB
   !
   ! Aug 2022 JCL
+  use file_diff_utils
   implicit none
-  integer,parameter :: srk = selected_real_kind(2)
   ! range
   real(kind=srk), dimension(:), allocatable :: r1,r2
   ! TL

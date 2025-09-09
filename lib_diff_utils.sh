@@ -40,28 +40,28 @@ FILE_UTILS_LIB_LOADED=1
 headtail_truncate() {
     local file="$1"
     local SHOW_LINES="${2:-10}"
-
+    
     # Validation
     if [[ $# -lt 1 ]]; then
         echo "Error: headtail_truncate requires at least 1 argument" >&2
         echo "Usage: headtail_truncate <file> [lines_to_show]" >&2
         return 1
     fi
-
+    
     if [[ ! -f "$file" ]]; then
         echo "Error: $file does not exist." >&2
         return 1
     fi
-
+    
     if [[ ! -r "$file" ]]; then
         echo "Error: $file is not readable." >&2
         return 1
     fi
-
+    
     # Get total line count
     local lines
     lines=$(wc -l < "$file")
-
+    
     if [[ $lines -le $SHOW_LINES ]]; then
         # File is small enough to show completely
         cat "$file"
@@ -70,16 +70,16 @@ headtail_truncate() {
         # File is large, show head and tail with truncation indicator
         local head_lines tail_lines
         local half_lines=$((SHOW_LINES / 2))
-
+        
         head_lines=$(head -$half_lines "$file")
         tail_lines=$(tail -$half_lines "$file")
-
+        
         echo "$head_lines"
         echo "... (output truncated) ..."
-
+        
         # Show unique tail lines (avoid duplicates if file has repeated content)
         comm -13 <(echo "$head_lines" | sort) <(echo "$tail_lines" | sort)
-
+        
         local hidden_lines=$((lines - SHOW_LINES))
         echo "--- Total: $lines lines, showing $SHOW_LINES lines, $hidden_lines lines hidden ---"
     fi
@@ -109,19 +109,19 @@ diff_files() {
     local ref="$2"   # reference file
     local opt1="${3:-}" # significant error threshold for tldiff, uband_diff
     local opt2="${4:-}" # critical error threshold for uband_diff
-
+    
     # Configuration
     local SHOW_LINES=20
     local term_width=$(tput cols 2>/dev/null || echo 80)
     local line_len=$((term_width * 5 / 10))
-
+    
     # Validation
     if [[ $# -lt 2 ]]; then
         echo "Error: diff_files requires at least 2 arguments" >&2
         echo "Usage: diff_files <test_file> <reference_file> [threshold1] [threshold2]" >&2
         return 1
     fi
-
+    
     # Check test file
     if [[ ! -f "$test" ]]; then
         echo -e "\e[31mError: Test file '$test' does not exist.\e[0m" >&2
@@ -131,7 +131,7 @@ diff_files() {
         echo -e "\e[31mError: Test file '$test' is empty.\e[0m" >&2
         return 1
     fi
-
+    
     # Check reference file
     if [[ ! -f "$ref" ]]; then
         echo -e "\e[31mError: Reference file '$ref' does not exist.\e[0m" >&2
@@ -141,21 +141,21 @@ diff_files() {
         echo -e "\e[31mError: Reference file '$ref' is empty.\e[0m" >&2
         return 1
     fi
-
+    
     # Display comparison header
     echo
     printf '%*s\n' "$line_len" '' | tr ' ' '-'
     echo "Diffing $test and $ref:"
-
+    
     # Temporarily disable exit on error for diff commands
     set +e
-
+    
     # Step 1: Try standard diff
     local tmpfile_diff=$(mktemp)
     diff --color=always --suppress-common-lines -yiEZbwBs "$test" "$ref" > "$tmpfile_diff"
     local RETVAL=$?
     echo "diff done with return code $RETVAL"
-
+    
     if [ $RETVAL -eq 0 ]; then
         # Files are identical
         headtail_truncate "$tmpfile_diff" "$SHOW_LINES"
@@ -171,7 +171,7 @@ diff_files() {
         rm "$tmpfile_diff"
         echo -e "\e[31mdiff FAILED\e[0m"
         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-
+        
         # Step 2: Try tldiff if available
         echo "Trying tldiff..."
         if command -v tldiff >/dev/null 2>&1; then
@@ -180,7 +180,7 @@ diff_files() {
             local tldiff_status=$?
             headtail_truncate "$tmpfile_tldiff" "$SHOW_LINES"
             rm "$tmpfile_tldiff"
-
+            
             if [[ $tldiff_status -eq 0 ]]; then
                 echo -e "\e[32mtldiff OK\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
@@ -190,7 +190,7 @@ diff_files() {
                 echo -e "\e[31mtldiff FAILED\e[0m"
                 echo "Trying uband_diff..."
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
-
+                
                 # Step 3: Try uband_diff if available
                 if command -v uband_diff >/dev/null 2>&1; then
                     local tmpfile_uband=$(mktemp)
@@ -198,7 +198,7 @@ diff_files() {
                     local uband_status=$?
                     headtail_truncate "$tmpfile_uband" "$SHOW_LINES"
                     rm "$tmpfile_uband"
-
+                    
                     if [[ $uband_status -eq 0 ]]; then
                         echo -e "\e[32muband_diff OK\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
@@ -222,7 +222,7 @@ diff_files() {
             return 1
         fi
     fi
-
+    
     echo "Files differ."
     set -e
     return 1
@@ -244,7 +244,7 @@ file_utils_version() {
 
 # If script is run directly (not sourced), show usage
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "This is a library file meant to be sourced."
+    echo -e "\e[33mThis is a library file meant to be sourced.\e[0m"
     echo "Usage: source ${BASH_SOURCE[0]}"
     echo
     file_utils_version
