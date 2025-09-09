@@ -8,14 +8,18 @@
 #
 # Input options (first argument):
 #   make - Runs nspe.exe only (no file operations)
-#   copy - Runs nspe.exe and renames output files to standard names (.tl, .rtl,
-#   .ftl)
+#   copy - Runs nspe.exe and renames output files to standard names (.tl, .rtl, .ftl)
 #   test - Runs nspe.exe, logs output, and compares results to reference files
 #   diff - Compares existing output files to reference files (does not run nspe.exe)
 #
 # PROMPT: To process files, run:
 #   ./process_in_files.sh <mode> [directory]
 # Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
+#
+# Dependencies:
+#   - lib_diff_utils.sh (must be in same directory or PATH)
+#   - nspe.exe
+#   - Optional: tldiff, uband_diff for advanced comparisons
 #
 # Replaces functionality of:
 #
@@ -28,127 +32,18 @@
 #
 # =============================
 
-headtail_truncate() {
-    local file="$1"
-    local SHOW_LINES="${2:-10}"
+# Source the utility library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIBRARY_FILE="${SCRIPT_DIR}/lib_diff_utils.sh"
 
-    if [[ ! -f "$file" ]]; then
-        echo "Error: $file does not exist."
-        return 1
-    fi
+if [[ -f "$LIBRARY_FILE" ]]; then
+    source "$LIBRARY_FILE"
+else
+    echo -e "\e[31mError: Required library file '$LIBRARY_FILE' not found.\e[0m" >&2
+    echo "Please ensure lib_diff_utils.sh is in the same directory as this script." >&2
+    exit 1
+fi
 
-    local lines
-    lines=$(wc -l < "$file")
-    if [[ $lines -le $SHOW_LINES ]]; then
-        cat "$file"
-        echo "--- Total: $lines lines ---"
-    else
-        local head_lines tail_lines
-        head_lines=$(head -$((SHOW_LINES/2)) "$file")
-        tail_lines=$(tail -$((SHOW_LINES/2)) "$file")
-        echo "$head_lines"
-        echo "... (output truncated) ..."
-        comm -13 <(echo "$head_lines" | sort) <(echo "$tail_lines" | sort)
-
-        local hidden_lines=$((lines - SHOW_LINES))
-        echo "--- Total: $lines lines, showing $SHOW_LINES lines, $hidden_lines lines hidden ---"
-    fi
-}
-
-diff_files() {
-    local test="$1" # test file
-    local ref="$2"  # reference file
-    local opt1="${3:-}" # significant error threshold for tldiff, uband_diff
-    local opt2="${4:-}" # critical error threshold for uband_diff
-
-    local SHOW_LINES=20
-    term_width=$(tput cols 2>/dev/null || echo 80)
-    line_len=$((term_width * 5 / 10))
-
-    if [[ ! -f "$test" ]]; then
-        echo -e "\e[31mError: Test file '$test' does not exist. Exiting.\e[0m"
-        exit 1
-    fi
-    if [[ ! -f "$ref" ]]; then
-        echo -e "\e[31mError: Reference file '$ref' does not exist. Exiting.\e[0m"
-        exit 1
-    fi
-    if [[ ! -s "$test" ]]; then
-        echo -e "\e[31mError: Test file '$test' is empty. Exiting.\e[0m"
-        exit 1
-    fi
-    if [[ ! -s "$ref" ]]; then
-        echo -e "\e[31mError: Reference file '$ref' is empty. Exiting.\e[0m"
-        exit 1
-    fi
-
-    echo
-    printf '%*s\n' "$line_len" '' | tr ' ' '-'
-    echo "Diffing $test and $ref:"
-    set +e
-    tmpfile_diff=$(mktemp)
-    diff --color=always --suppress-common-lines -yiEZbwBs "$test" "$ref" > "$tmpfile_diff"
-    RETVAL=$?
-    echo "diff done with return code $RETVAL"
-    diff_lines=$(wc -l < "$tmpfile_diff")
-    if [ $RETVAL -eq 0 ]; then
-        headtail_truncate "$tmpfile_diff" "$SHOW_LINES"
-        rm "$tmpfile_diff"
-        echo -e "\e[32mdiff OK\e[0m"
-        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-        return 0
-    else
-        echo "Difference found between $test and $ref"
-
-        headtail_truncate "$tmpfile_diff" "$SHOW_LINES"
-        rm "$tmpfile_diff"
-        echo -e "\e[31mdiff FAILED\e[0m"
-        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-        echo "Trying tldiff..."
-        if command -v tldiff >/dev/null 2>&1; then
-
-            tmpfile_tldiff=$(mktemp)
-            tldiff "$test" "$ref" $opt1 > "$tmpfile_tldiff" 2>&1
-            tldiff_status=$?
-            headtail_truncate "$tmpfile_tldiff" "$SHOW_LINES"
-            rm "$tmpfile_tldiff"
-            if [[ $tldiff_status -eq 0 ]]; then
-                echo -e "\e[32mtldiff OK\e[0m"
-                printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                return 0
-            else
-                echo -e "\e[31mtldiff FAILED\e[0m"
-                echo "Trying uband_diff..."
-                printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                if command -v uband_diff >/dev/null 2>&1; then
-
-                    tmpfile_uband=$(mktemp)
-                    uband_diff "$test" "$ref" $opt1 $opt2 > "$tmpfile_uband" 2>&1
-                    uband_status=$?
-                    headtail_truncate "$tmpfile_uband" "$SHOW_LINES"
-                    rm "$tmpfile_uband"
-                    if [[ $uband_status -eq 0 ]]; then
-                        echo -e "\e[32muband_diff OK\e[0m"
-                        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        return 0
-                    else
-                        echo -e "\e[31muband_diff FAILED\e[0m"
-                        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        return 1
-                    fi
-                else
-                    echo "Error: uband_diff not found and files differ."
-                    return 1
-                fi
-            fi
-        else
-            echo "Error: tldiff not found and files differ."
-            return 1
-        fi
-        echo "Files differ."
-        return 1
-    fi
-}
 
 set -e
 mode="$1"
@@ -238,7 +133,7 @@ mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec 
 if [[ ${#infiles[@]} -eq 0 ]]; then
     echo
     echo -e "\e[31mNo input files (*.in) found in directory: $directory\e[0m"
-
+    
     exit 1
 fi
 pass_files=()
@@ -270,7 +165,7 @@ for infile in "${infiles[@]}"; do
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
         echo "Processing: $infile"
         LOG_FILE="$directory/$(basename "$infile" .in).log"
-
+        
         # Run nspe.exe for 'make', 'copy' and 'test' modes, but not for 'diff' mode
         if [[ "$mode" == "make" || "$mode" == "copy" || "$mode" == "test" ]]; then
             # Check for existing output files and warn user
@@ -282,7 +177,7 @@ for infile in "${infiles[@]}"; do
                     existing_files+=("$potential_output")
                 fi
             done
-
+            
             # Also check for other common output files
             for ext in .003 _41.dat _42.dat .log; do
                 potential_output="$directory/${basename_noext}${ext}"
@@ -290,7 +185,7 @@ for infile in "${infiles[@]}"; do
                     existing_files+=("$potential_output")
                 fi
             done
-
+            
             # Show warning if any existing files found
             if [[ ${#existing_files[@]} -gt 0 ]] && [[ "$mode" != "test" ]]; then
                 echo -e "   \e[90mWarning: Existing output files will be overwritten:\e[0m"
@@ -298,7 +193,7 @@ for infile in "${infiles[@]}"; do
                     echo -e "     \e[90m- $(basename "$existing_file")\e[0m"
                 done
             fi
-
+            
             echo -n "   Running: $PROG $infile... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle nspe failures gracefully
@@ -331,13 +226,13 @@ for infile in "${infiles[@]}"; do
                 #continue
             fi
         fi
-
+        
         # For 'make' mode, we're done after running nspe.exe - skip file operations
         if [[ "$mode" == "make" ]]; then
             printf '%*s\n' "$line_len" '' | tr '  ' '='
             continue
         fi
-
+        
         # Find the first available file pair by priority: 03, 02, 01
         found_files=false
         for suffix in 03 02 01; do
@@ -347,7 +242,7 @@ for infile in "${infiles[@]}"; do
                 02) ref="$directory/$(basename "$infile" .in).rtl" ;;
                 03) ref="$directory/$(basename "$infile" .in).ftl" ;;
             esac
-
+            
             # For copy and test modes, check if test file exists
             # For diff mode, check if either test or ref exists to provide meaningful feedback
             if [[ ("$mode" == "copy" || "$mode" == "test") && -f "$test" && -s "$test" ]] || [[ "$mode" == "diff" && (-f "$test" || -f "$ref") ]]; then
@@ -370,7 +265,7 @@ for infile in "${infiles[@]}"; do
                     fi
                     break  # Exit the suffix loop since we handled this case
                 fi
-
+                
                 # Continue with existing logic for cases where test file exists
                 if [[ -f "$test" && -s "$test" ]]; then
                     if [[ "$mode" == "copy" ]]; then
@@ -380,7 +275,7 @@ for infile in "${infiles[@]}"; do
                         elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                         # TEST and DIFF modes: Compare files
                         echo -n "   Comparing $test to $ref... "
-
+                        
                         # Check if reference file exists
                         if [[ ! -f "$ref" ]]; then
                             echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist"
@@ -393,7 +288,7 @@ for infile in "${infiles[@]}"; do
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
-
+                        
                         # Check if reference file is empty
                         if [[ ! -s "$ref" ]]; then
                             echo
@@ -408,7 +303,7 @@ for infile in "${infiles[@]}"; do
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
-
+                        
                         # For diff mode, also check if test file exists (since we're not running nspe.exe)
                         if [[ "$mode" == "diff" && ! -f "$test" ]]; then
                             echo -e "\e[33m[[MISSING OUTPUT]]\e[0m\n   Output file '$test' does not exist"
@@ -417,7 +312,7 @@ for infile in "${infiles[@]}"; do
                             missing_output_files+=("$test")
                             continue
                         fi
-
+                        
                         # For diff mode, check if test file is empty
                         if [[ "$mode" == "diff" && ! -s "$test" ]]; then
                             echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m\n   Output file '$test' is empty"
@@ -425,7 +320,7 @@ for infile in "${infiles[@]}"; do
                             empty_files+=("$test")
                             continue
                         fi
-
+                        
                         # Perform the actual comparison
                         if [[ "$mode" == "test" ]]; then
                             # TEST mode: Log comparison results
@@ -480,7 +375,7 @@ for infile in "${infiles[@]}"; do
                 fi  # End of the "if [[ -f "$test" && -s "$test" ]]; then" block
             fi  # End of the main suffix condition
         done
-
+        
         # If no files were found, report it
         if [[ "$found_files" == false ]]; then
             if [[ "$mode" == "copy" ]]; then
@@ -517,7 +412,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
     for f in "${fail_files[@]}"; do
         echo -e "   \e[31mFAIL\e[0m $f"
     done
-
+    
     # Show detailed missing file information
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
         echo -e "\nMissing reference files (run 'copy' mode first):"
@@ -525,21 +420,21 @@ if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
             echo -e "   \e[33mMISSING\e[0m $f"
         done
     fi
-
+    
     if [[ ${#missing_output_files[@]} -gt 0 ]]; then
         echo -e "\nMissing output files (run 'make' mode first):"
         for f in "${missing_output_files[@]}"; do
             echo -e "   \e[33mMISSING\e[0m $f"
         done
     fi
-
+    
     if [[ ${#empty_files[@]} -gt 0 ]]; then
         echo -e "\nEmpty files detected:"
         for f in "${empty_files[@]}"; do
             echo -e "   \e[33mEMPTY\e[0m $f"
         done
     fi
-
+    
     if [[ ${#fail_files[@]} -eq 0 ]]; then
         echo -e "\nAll files passed!"
         elif [[ ${#missing_reference_files[@]} -gt 0 || ${#missing_output_files[@]} -gt 0 ]]; then
