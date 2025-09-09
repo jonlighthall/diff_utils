@@ -62,7 +62,7 @@ diff_files() {
     
     local SHOW_LINES=20
     term_width=$(tput cols 2>/dev/null || echo 80)
-    line_len=$((term_width * 8 / 10))
+    line_len=$((term_width * 5 / 10))
     
     if [[ ! -f "$test" ]]; then
         echo -e "\e[31mError: Test file '$test' does not exist. Exiting.\e[0m"
@@ -247,7 +247,10 @@ missing_output_files=()
 empty_files=()
 
 # Print mode header once at the beginning
-echo -e "\n=============================="
+term_width=$(tput cols 2>/dev/null || echo 80)
+line_len=$((term_width * 5 / 10))
+
+printf '%*s\n' "$line_len" '' | tr '  ' '='
 echo "Processing directory: $directory"
 echo "Mode: $mode"
 if [[ "$mode" == "make" ]]; then
@@ -259,7 +262,7 @@ if [[ "$mode" == "make" ]]; then
     elif [[ "$mode" == "diff" ]]; then
     echo "Will compare existing output files to reference files (no nspe.exe execution)"
 fi
-echo "=============================="
+printf '%*s\n' "$line_len" '' | tr '  ' '='
 
 for infile in "${infiles[@]}"; do
     # Check for required strings (case-insensitive)
@@ -330,7 +333,7 @@ for infile in "${infiles[@]}"; do
         
         # For 'make' mode, we're done after running nspe.exe - skip file operations
         if [[ "$mode" == "make" ]]; then
-            echo "=============================="
+            printf '%*s\n' "$line_len" '' | tr '  ' '='
             continue
         fi
         
@@ -493,19 +496,18 @@ for infile in "${infiles[@]}"; do
     else
         echo -e "\e[33mSkipping $infile (does not contain required strings)\e[0m"
     fi
-    printf '%*s\n' "30" '' | tr ' ' '='
-    #echo "=============================="
+    printf '\n%*s\n' "$line_len" '' | tr ' ' '='
 done
 
 # Print summary if in test or diff mode
 if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
-    echo -e "\n=============================="
+    #printf '%*s\n' "$line_len" '' | tr ' ' '='
     if [[ "$mode" == "test" ]]; then
         echo "Test Summary:"
     else
         echo "Diff Summary:"
     fi
-    echo "=============================="
+    printf '%*s\n' "$line_len" '' | tr ' ' '='
     echo "Passed files: ${#pass_files[@]}"
     for f in "${pass_files[@]}"; do
         echo -e "   \e[32mPASS\e[0m $f"
