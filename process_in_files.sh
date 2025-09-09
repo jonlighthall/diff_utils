@@ -6,13 +6,22 @@
 # This script processes .in files in a directory using nspe.exe.
 #
 # Input options (first argument):
-#   make - Runs nspe.exe and renames output files to standard names (.tl, .rtl, .ftl)
+#   make - Runs nspe.exe and renames output files to standard names (.tl, .rtl,
+#   .ftl)
 #   test - Runs nspe.exe, logs output, and compares results to reference files
 #   diff - Compares existing output files to reference files (does not run nspe.exe)
 #
 # PROMPT: To process files, run:
 #   ./process_in_files.sh <mode> [directory]
 # Where <mode> is 'make', 'test', or 'diff'. Directory defaults to 'std'.
+#
+# Replaces functionality of:
+#   * std/copy_std.bat
+#   * std/mkstd [should be "make"]
+#   * std/mkstd + std/copy_std.bat [MAKE, should be "copy"]
+#   * std/testram [TEST]
+#   * std/testram_getarg [TEST]
+
 # =============================
 
 headtail_truncate() {
@@ -248,7 +257,7 @@ for infile in "${infiles[@]}"; do
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle nspe failures gracefully
             if [[ "$mode" == "test" ]]; then
-                { "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
+                { time "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
                 RETVAL=$?
             else
                 echo
