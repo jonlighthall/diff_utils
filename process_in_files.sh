@@ -179,6 +179,34 @@ if [[ ! -d "$directory" ]]; then
 fi
 
 PROG=./nspe.exe
+PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
+
+# Check if the program exists, and build it if not
+if [[ ! -f "$PROG" ]]; then
+    echo "Program $PROG not found. Attempting to build it..."
+    if command -v make >/dev/null 2>&1; then
+        echo "Running: make $PROG"
+        echo -en "${PROG_OUTPUT_COLOR}"
+        if make "$PROG"; then
+            echo -en "\x1B[0m" # Reset text color
+            echo "Successfully built $PROG"
+        else
+            echo -e "\e[31mError: Failed to build $PROG. Please check your makefile and dependencies.\e[0m"
+            exit 1
+        fi
+    else
+        echo -e "\e[31mError: make command not found and $PROG does not exist.\e[0m"
+        echo "Please build $PROG manually or install make."
+        exit 1
+    fi
+fi
+
+# Verify the program is now executable
+if [[ ! -x "$PROG" ]]; then
+    echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
+    echo "Making it executable..."
+    chmod +x "$PROG"
+fi
 
 # Create array of files to process, sorted by size
 mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}')
@@ -217,7 +245,7 @@ for infile in "${infiles[@]}"; do
         # Run nspe.exe for 'make' and 'test' modes, but not for 'diff' mode
         if [[ "$mode" == "make" || "$mode" == "test" ]]; then
             echo -n "   Running: $PROG $infile... "
-            echo -en "\x1B[38;5;71m" # Set text color to highlight PROG output (light green)
+            echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle nspe failures gracefully
             if [[ "$mode" == "test" ]]; then
                 { "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
