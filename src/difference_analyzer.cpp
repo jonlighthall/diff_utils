@@ -1,3 +1,9 @@
+/**
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from src/uband_diff.cpp
+ */ 
+
 #include "difference_analyzer.h"
 #include "uband_diff.h"  // For data structures
 #include <iostream>

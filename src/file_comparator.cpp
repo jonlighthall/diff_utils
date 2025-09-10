@@ -22,11 +22,15 @@
  * - Debugging macros for step-by-step tracing.
  *
  * @author J.C. Lighthall
- * @date January 2025
+ * @date March 2025
+ * Adapted from src/idiff.cpp
  *
  * @note This program was developed from the Fortran code tldiff.f90 and it's
  * derivatives cpddiff.f90, prsdiff.f90, and tsdiff.f90 (August 2022). It is
- * intended to replace those utilities with a more modern C++ implementation.
+ * intended to replace those utilities with a more modern C++ implementation. The 
+ * initial attempt at converting a generalized version of the code was idiff.cpp 
+ * (January 2025). This program, originally uband_diff.cpp, was adapted from
+ * idiff.cpp (March 2025).
  *
  * Development of this code was significantly assisted by GitHub Copilot (GPT-4,
  * Claude Sonnet 4, etc.) for code translation, refactoring, optimization, and

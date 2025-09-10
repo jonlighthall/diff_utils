@@ -6,7 +6,7 @@
  *
  * @author J. Lighthall
  * @date January 2025
- * Adapted from tldiff.f90 (Aug 2022)
+ * Refactored from src/uband_diff.cpp (Jul 2025)
  *
  * Usage: uband_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
  *   file1, file2 - Input files to compare

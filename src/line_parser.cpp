@@ -1,3 +1,9 @@
+/** 
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from src/uband_diff.cpp
+ */
+
 #include "line_parser.h"
 #include "uband_diff.h"  // For LineData and Flags structures
 #include <iostream>

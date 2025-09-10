@@ -1,3 +1,9 @@
+/** 
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from src/uband_diff.cpp
+ */
+
 #include "format_tracker.h"
 #include "uband_diff.h"  // For Flags and other struct definitions
 #include <iostream>

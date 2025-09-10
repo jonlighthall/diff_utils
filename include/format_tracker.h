@@ -1,3 +1,9 @@
+/**
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from src/uband_diff.cpp
+ */ 
+ 
 #ifndef FORMAT_TRACKER_H
 #define FORMAT_TRACKER_H
 
