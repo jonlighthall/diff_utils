@@ -1,3 +1,9 @@
+/** 
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from uband_diff.h
+ */ 
+ 
 #ifndef FILE_READER_H
 #define FILE_READER_H
 

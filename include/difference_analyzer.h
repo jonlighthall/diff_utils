@@ -1,3 +1,9 @@
+/**
+ * @author J. Lighthall
+ * @date July 2025
+ * Refactored from src/uband_diff.cpp
+ */ 
+ 
 #ifndef DIFFERENCE_ANALYZER_H
 #define DIFFERENCE_ANALYZER_H
 

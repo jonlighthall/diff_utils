@@ -1,5 +1,6 @@
 #!/bin/bash
 # Usage: ./process_in_files.sh <mode> [directory]
+# Aug 2025 JCL
 # =============================
 # EXPLANATION SECTION
 #
@@ -24,7 +25,7 @@
 #   std/mkstd          | MAKE
 #   std/testram        | TEST
 #   std/testram_getarg | TEST
-
+#
 # =============================
 
 headtail_truncate() {
