@@ -91,21 +91,100 @@ if [[ -z "$mode" ]]; then
     exit 1
 fi
 
+# Validate that mode is one of the accepted values
+if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != "diff" ]]; then
+    echo -e "\e[31mError: Invalid mode '$mode'.\e[0m"
+    echo "Valid modes are: make, copy, test, or diff"
+    echo ""
+    echo "Mode descriptions:"
+    echo "  make - Run NSPE only (no file operations) [mkstd]"
+    echo "  copy - Run NSPE and rename output files to reference files [copy_std.bat]"
+    echo "  test - Time and run NSPE and compare outputs to reference files [testram or testram_getarg]"
+    echo "  diff - Compare existing output files to reference files (no NSPE execution)"
+    exit 1
+fi
+
 if [[ ! -d "$directory" ]]; then
     echo "Error: Directory '$directory' does not exist. Exiting."
     exit 1
 fi
 
-PROG=./nspe.exe
+# Intelligent program detection - handles nspe.x, nspe.exe, or makefile targets
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
+
+detect_nspe_program() {
+    local candidates=("./nspe.x" "./nspe.exe" "nspe.x" "nspe.exe")
+    local makefile_targets=()
+    
+    # Check for existing executables first
+    for prog in "${candidates[@]}"; do
+        if [[ -f "$prog" && -x "$prog" ]]; then
+            echo "Found existing executable: $prog" >&2
+            echo "$prog"
+            return 0
+        fi
+    done
+    
+    # If no executable found, check makefile for available targets
+    if [[ -f "makefile" ]] || [[ -f "Makefile" ]]; then
+        echo "No executable found. Checking makefile for nspe targets..." >&2
+        
+        # Look for nspe targets in makefile (case insensitive)
+        if command -v make >/dev/null 2>&1; then
+            # Try to get makefile targets (this works with GNU make)
+            local make_targets
+            make_targets=$(make -qp 2>/dev/null | grep -E '^[^.%#[:space:]][^=]*:' | cut -d: -f1 | grep -i nspe || true)
+            
+            if [[ -n "$make_targets" ]]; then
+                echo "Found makefile targets containing 'nspe':" >&2
+                echo "$make_targets" | sed 's/^/  /' >&2
+                
+                # Prefer .x over .exe, then first match
+                for target in nspe.x nspe.exe $make_targets; do
+                    if echo "$make_targets" | grep -q "^$target$"; then
+                        echo "Selected target: $target" >&2
+                        if [[ "$target" == nspe.* ]]; then
+                            echo "./$target"
+                        else
+                            echo "$target"
+                        fi
+                        return 0
+                    fi
+                done
+                
+                # If no exact match, use first target found
+                local first_target
+                first_target=$(echo "$make_targets" | head -n1)
+                echo "Using first available target: $first_target" >&2
+                if [[ "$first_target" == nspe.* ]]; then
+                    echo "./$first_target"
+                else
+                    echo "$first_target"
+                fi
+                return 0
+            fi
+        fi
+    fi
+    
+    # Default fallback
+    echo "No executable or makefile target found. Using default: ./nspe.x" >&2
+    echo "./nspe.x"
+    return 0
+}
+
+# Detect the appropriate nspe program
+PROG=$(detect_nspe_program)
+echo "Selected program: $PROG"
 
 # Check if the program exists, and build it if not
 if [[ ! -f "$PROG" ]]; then
     echo "Program $PROG not found. Attempting to build it..."
     if command -v make >/dev/null 2>&1; then
-        echo "Running: make $PROG"
+        # Extract just the target name for make (remove ./ prefix)
+        make_target="${PROG#./}"
+        echo "Running: make $make_target"
         echo -en "${PROG_OUTPUT_COLOR}"
-        if make "$PROG"; then
+        if make "$make_target"; then
             echo -en "\x1B[0m" # Reset text color
             echo "Successfully built $PROG"
         else
@@ -210,7 +289,7 @@ for infile in "${infiles[@]}"; do
             # check PROG exit status
             if [[ $RETVAL -eq 0 ]]; then
                 if [[ "$mode" != "test" ]]; then
-                    echo "$PROG "
+                    echo -n "$PROG "
                 fi
                 echo -e "\e[32mOK\e[0m"
                 if [[ "$mode" != "test" ]]; then
