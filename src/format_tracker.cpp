@@ -174,8 +174,11 @@ double FormatTracker::calculate_threshold(int decimal_places,
   // current element)
   double dp_threshold = std::pow(10, -decimal_places);
 
-  if (dp_threshold > significant_threshold) {
-    return dp_threshold;
+  // Use the user's threshold as authoritative, but ensure it's not smaller
+  // than what the precision can actually distinguish
+  // This prevents false positives due to numerical precision limits
+  if (significant_threshold < dp_threshold) {
+    return dp_threshold;  // Use precision limit if user threshold is too small
   }
-  return significant_threshold;
+  return significant_threshold;  // Use user threshold when it's achievable
 }

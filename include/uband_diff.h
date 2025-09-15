@@ -121,6 +121,7 @@ struct ColumnValues {
   int dp1;        // Decimal places for file1 value
   int dp2;        // Decimal places for file2 value
   int min_dp;     // Minimum decimal places (for rounding)
+  int max_dp;     // Maximum decimal places (for more precise output)
 };
 
 struct SummaryParams {
@@ -153,7 +154,7 @@ class FileComparator {
             PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
                        debug_level >= 2, debug_level >= 3})),
         difference_analyzer_(std::make_unique<DifferenceAnalyzer>(Thresholds{
-            user_thresh, hard_thresh, print_thresh, 0.0, 110.0, 138.5})),
+            user_thresh, hard_thresh, print_thresh})),
         thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};

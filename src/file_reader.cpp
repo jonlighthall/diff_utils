@@ -102,7 +102,7 @@ bool FileReader::is_first_column_monotonic(const std::string& filename) const {
     double current_value;
 
     if (stream >> current_value) {
-      if (!first_value && current_value <= prev_value) {
+      if (!first_value && current_value < prev_value) {
         return false;
       }
       prev_value = current_value;

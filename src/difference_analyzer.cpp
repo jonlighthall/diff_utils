@@ -25,7 +25,7 @@ bool DifferenceAnalyzer::process_difference(
   double diff_rounded = std::abs(rounded1 - rounded2);
 
   process_rounded_values(column_data, column_index, diff_rounded,
-                         column_data.min_dp, counter, differ, flags);
+                         column_data.min_dp, threshold, counter, differ, flags);
 
   counter.elem_number++;
 
@@ -63,7 +63,7 @@ void DifferenceAnalyzer::process_raw_values(const ColumnValues& column_data,
 
 void DifferenceAnalyzer::process_rounded_values(
     const ColumnValues& column_data, size_t column_index, double rounded_diff,
-    int minimum_deci, CountStats& counter, DiffStats& differ,
+    int minimum_deci, double threshold, CountStats& counter, DiffStats& differ,
     Flags& flags) const {
   // Define the threshold for non-trivial differences
   //
@@ -87,7 +87,7 @@ void DifferenceAnalyzer::process_rounded_values(
     }
   }
 
-  if (rounded_diff > thresh.significant && column_data.value1 < thresh.ignore &&
+  if (rounded_diff > threshold && column_data.value1 < thresh.ignore &&
       column_data.value2 < thresh.ignore) {
     counter.diff_significant++;
     flags.has_significant_diff = true;

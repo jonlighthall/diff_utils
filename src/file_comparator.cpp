@@ -754,9 +754,10 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
                                             size_t column_index,
                                             double rounded_diff,
                                             int minimum_deci) {
-  difference_analyzer_->process_rounded_values(column_data, column_index,
-                                               rounded_diff, minimum_deci,
-                                               counter, differ, flag);
+  double ithreshold = calculate_threshold(column_data.min_dp);
+  difference_analyzer_->process_rounded_values(
+      column_data, column_index, rounded_diff, minimum_deci, ithreshold,
+      counter, differ, flag);
 }
 
 // ========================================================================
@@ -910,10 +911,9 @@ void FileComparator::print_table(const ColumnValues& column_data,
   std::cout << format_number(diff_rounded, column_data.min_dp, mxint, mxdec);
   std::cout << "\033[0m |";
 
-  // unrounded difference (show with higher precision for numerical analysis)
+  // unrounded difference (show with precision of the more precise input)
   print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
-  std::cout << format_number(diff_unrounded,
-                             std::max(column_data.min_dp + 2, 6), mxint, mxdec);
+  std::cout << format_number(diff_unrounded, column_data.max_dp, mxint, mxdec);
   std::cout << "\033[0m";
 }
 
@@ -1722,6 +1722,7 @@ ColumnValues FileComparator::extract_column_values(const LineData& data1,
   int dp1 = data1.decimal_places[column_index];
   int dp2 = data2.decimal_places[column_index];
   int min_dp = std::min(dp1, dp2);
+  int max_dp = std::max(dp1, dp2);
 
-  return {val1, val2, rangeValue, dp1, dp2, min_dp};
+  return {val1, val2, rangeValue, dp1, dp2, min_dp, max_dp};
 }
