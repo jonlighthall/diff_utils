@@ -27,8 +27,8 @@
  *
  * @note This program was developed from the Fortran code tldiff.f90 and it's
  * derivatives cpddiff.f90, prsdiff.f90, and tsdiff.f90 (August 2022). It is
- * intended to replace those utilities with a more modern C++ implementation. The 
- * initial attempt at converting a generalized version of the code was idiff.cpp 
+ * intended to replace those utilities with a more modern C++ implementation. The
+ * initial attempt at converting a generalized version of the code was idiff.cpp
  * (January 2025). This program, originally uband_diff.cpp, was adapted from
  * idiff.cpp (March 2025).
  *
@@ -228,6 +228,44 @@ bool FileComparator::compare_files(const std::string& file1,
 
   if (!file_reader_->open_files(file1, file2, infile1, infile2)) {
     return false;
+  }
+
+  // Perform column structure analysis before numerical comparison
+  bool structures_compatible = true;
+  if (print.level > 0 || print.debug) {
+    // Full detailed analysis for debug mode
+    std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m" << std::endl;
+    structures_compatible = file_reader_->compare_column_structures(file1, file2);
+
+    if (!structures_compatible) {
+      std::cout << "\033[1;33mNote: Files have different column structures but comparison will continue.\033[0m\n" << std::endl;
+    } else {
+      std::cout << "\033[1;32mColumn structures are compatible. Proceeding with numerical comparison.\033[0m\n" << std::endl;
+    }
+  } else {
+    // Quick structure check for normal operation
+    ColumnStructure struct1 = file_reader_->analyze_column_structure(file1);
+    ColumnStructure struct2 = file_reader_->analyze_column_structure(file2);
+
+    if (struct1.groups.size() != struct2.groups.size() ||
+        (struct1.groups.size() > 0 && struct2.groups.size() > 0 &&
+         struct1.groups.back().column_count != struct2.groups.back().column_count)) {
+      structures_compatible = false;
+      std::cout << "\033[1;33mStructure Note: Files have different column formats "
+                << "(File1: " << (struct1.groups.empty() ? 0 : struct1.groups.back().column_count)
+                << " cols, File2: " << (struct2.groups.empty() ? 0 : struct2.groups.back().column_count)
+                << " cols)\033[0m" << std::endl;
+    }
+  }
+
+  // Set structure compatibility flag
+  flag.structures_compatible = structures_compatible;
+
+  // If structures are incompatible, files cannot be considered identical or close enough
+  if (!structures_compatible) {
+    flag.files_are_same = false;
+    flag.files_have_same_values = false;
+    flag.files_are_close_enough = false;
   }
 
   // strings to store individual line contents
@@ -845,6 +883,13 @@ void FileComparator::print_maximum_difference_analysis(
 // Simplified main print_diff_like_summary function
 void FileComparator::print_diff_like_summary(
     const SummaryParams& params) const {
+  // Handle structure incompatibility first
+  if (!flag.structures_compatible) {
+    std::cout << "\033[1;31m   Files " << params.file1 << " and " << params.file2
+              << " have incompatible column structures\033[0m" << std::endl;
+    return;
+  }
+
   // Handle identical files case
   if (counter.diff_non_zero == 0) {
     print_identical_files_message(params);
@@ -866,6 +911,11 @@ void FileComparator::print_diff_like_summary(
 }
 
 void FileComparator::print_rounded_summary(const SummaryParams& params) const {
+  // Skip if structures are incompatible
+  if (!flag.structures_compatible) {
+    return;
+  }
+
   // Trivial differences
   // =========================================================
   if (counter.diff_non_trivial == 0) {
@@ -969,6 +1019,11 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
 
 void FileComparator::print_significant_summary(
     const SummaryParams& params) const {
+  // Skip if structures are incompatible
+  if (!flag.structures_compatible) {
+    return;
+  }
+
   // User-defined threshold differences
   // =========================================================
   if (counter.diff_significant == 0) {
@@ -1315,6 +1370,11 @@ void FileComparator::print_detailed_summary(const SummaryParams& params) const {
 // Helper function to print additional difference information
 void FileComparator::print_additional_diff_info(
     const SummaryParams& params) const {
+  // Skip if structures are incompatible
+  if (!flag.structures_compatible) {
+    return;
+  }
+
   if (counter.diff_non_zero == 0) {
     return;  // No non-zero differences to print
   }

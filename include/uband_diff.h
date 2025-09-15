@@ -2,8 +2,8 @@
  * @author J. Lighthall
  * @date July 2025
  * Refactored from main/uband_diff.cpp
- */ 
- 
+ */
+
 #ifndef UBAND_DIFF_H
 #define UBAND_DIFF_H
 
@@ -74,6 +74,7 @@ struct Flags {
   bool new_fmt = false;
   bool file_end_reached = false;  // Indicates if the end of file was reached
   bool error_found = false;       // Global error flag
+  bool structures_compatible = true;  // Files have compatible column structures
 
   // Counter-associated flags (correspond to CountStats)
   bool has_non_zero_diff =
