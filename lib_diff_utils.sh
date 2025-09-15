@@ -147,8 +147,21 @@ diff_files() {
     printf '%*s\n' "$line_len" '' | tr ' ' '-'
     echo "Diffing $test and $ref:"
     
+    # Check if errexit (set -e) is currently enabled and save the state
+    local errexit_was_set=false
+    if [[ $- == *e* ]]; then
+        errexit_was_set=true
+    fi
+    
     # Temporarily disable exit on error for diff commands
     set +e
+    
+    # Helper function to restore errexit state
+    restore_errexit() {
+        if [[ "$errexit_was_set" == true ]]; then
+            set -e
+        fi
+    }
     
     # Step 1: Try standard diff
     local tmpfile_diff=$(mktemp)
@@ -162,7 +175,7 @@ diff_files() {
         rm "$tmpfile_diff"
         echo -e "\e[32mdiff OK\e[0m"
         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-        set -e
+        restore_errexit
         return 0
     else
         # Files differ, try advanced tools
@@ -184,7 +197,7 @@ diff_files() {
             if [[ $tldiff_status -eq 0 ]]; then
                 echo -e "\e[32mtldiff OK\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                set -e
+                restore_errexit
                 return 0
             else
                 echo -e "\e[31mtldiff FAILED\e[0m"
@@ -202,29 +215,29 @@ diff_files() {
                     if [[ $uband_status -eq 0 ]]; then
                         echo -e "\e[32muband_diff OK\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        set -e
+                        restore_errexit
                         return 0
                     else
                         echo -e "\e[31muband_diff FAILED\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        set -e
+                        restore_errexit
                         return 1
                     fi
                 else
                     echo "Error: uband_diff not found and files differ." >&2
-                    set -e
+                    restore_errexit
                     return 1
                 fi
             fi
         else
             echo "Error: tldiff not found and files differ." >&2
-            set -e
+            restore_errexit
             return 1
         fi
     fi
     
     echo "Files differ."
-    set -e
+    restore_errexit
     return 1
 }
 
