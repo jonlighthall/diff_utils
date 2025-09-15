@@ -723,8 +723,8 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // thresholding but still display both for complete information
   double diff_for_threshold = diff_unrounded;
 
-  // Print differences if above or equal to plot threshold
-  if (diff_for_threshold >= thresh.print) {
+  // Print differences if above plot threshold
+  if (diff_for_threshold > thresh.print) {
     print_table(column_data, column_index, ithreshold, diff_rounded,
                 diff_unrounded);
     std::cout << std::endl;
