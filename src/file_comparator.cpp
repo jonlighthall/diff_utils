@@ -37,6 +37,7 @@
  * architectural improvements.
  *
  */
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -45,33 +46,243 @@
 #include <string>
 #include <vector>
 
+#include "precision_info.h"
 #include "uband_diff.h"
 
 // Implementation moved outside the class definition
 
 // Global utility functions
 
-// Function to count decimal places in a string token
-int stream_countDecimalPlaces(std::istringstream& stream) {
+// Structure to hold precision information for both fixed and scientific
+// notation Helper function to count significant figures in a numeric string
+int count_significant_figures(const std::string& num_str) {
+  std::string cleaned = num_str;
+
+  // Remove any whitespace
+  cleaned.erase(std::remove_if(cleaned.begin(), cleaned.end(), ::isspace),
+                cleaned.end());
+
+  // Handle negative sign
+  if (!cleaned.empty() && cleaned[0] == '-') {
+    cleaned = cleaned.substr(1);
+  }
+
+  // Handle empty or zero cases
+  if (cleaned.empty() || cleaned == "0" || cleaned == "0.0") {
+    return 1;  // Zero has 1 significant figure
+  }
+
+  int sig_figs = 0;
+  bool started_counting = false;
+
+  for (size_t i = 0; i < cleaned.size(); ++i) {
+    char c = cleaned[i];
+
+    if (c == '.') continue;  // Skip decimal point
+
+    if (std::isdigit(c)) {
+      if (c != '0') {
+        started_counting = true;
+        sig_figs++;
+      } else if (started_counting) {
+        // Zero counts as significant if we've already started counting
+        sig_figs++;
+      }
+      // Leading zeros don't count as significant
+    }
+  }
+
+  return sig_figs > 0 ? sig_figs : 1;  // Minimum 1 significant figure
+}
+
+// Enhanced function to analyze number precision in both fixed and scientific
+// notation
+PrecisionInfo stream_analyzePrecision(std::istringstream& stream) {
   // Peek ahead to determine the format of the number
   std::streampos pos = stream.tellg();
   std::string token;
   stream >> token;
 
-  int ndp = 0;
-  if (size_t decimal_pos = token.find('.'); decimal_pos != std::string::npos) {
-    ndp = static_cast<int>(token.size() - decimal_pos - 1);
+  PrecisionInfo info;
+
+  // Convert to lowercase for easier parsing
+  std::string lower_token = token;
+  std::transform(lower_token.begin(), lower_token.end(), lower_token.begin(),
+                 ::tolower);
+
+  // Check if it's scientific notation (contains 'e' or 'd')
+  size_t e_pos = lower_token.find('e');
+  if (e_pos == std::string::npos) {
+    e_pos = lower_token.find('d');  // Fortran double precision notation
   }
+
+  if (e_pos != std::string::npos) {
+    // Scientific notation
+    info.is_scientific = true;
+
+    // Extract mantissa and exponent
+    std::string mantissa = token.substr(0, e_pos);
+    std::string exp_str = token.substr(e_pos + 1);
+
+    try {
+      info.exponent = std::stoi(exp_str);
+    } catch (const std::exception&) {
+      info.exponent = 0;  // Default on parse error
+    }
+
+    // Count significant figures in mantissa
+    info.significant_figures = count_significant_figures(mantissa);
+
+    // Calculate effective precision
+    info.effective_precision =
+        std::pow(10.0, -(info.significant_figures - 1 - info.exponent));
+
 #ifdef DEBUG3
-  std::cout << "DEBUG3: " << token << " has ";
-  std::cout << ndp << " decimal places" << std::endl;
+    std::cout << "DEBUG3: Scientific notation " << token
+              << " -> mantissa: " << mantissa << ", exponent: " << info.exponent
+              << ", sig figs: " << info.significant_figures
+              << ", effective decimal places: "
+              << info.get_effective_decimal_places() << std::endl;
 #endif
-  // Reset stream to before reading token, so the original extraction
-  // works
+  } else {
+    // Fixed notation
+    info.is_scientific = false;
+
+    // Count decimal places
+    if (size_t decimal_pos = token.find('.');
+        decimal_pos != std::string::npos) {
+      info.decimal_places = static_cast<int>(token.size() - decimal_pos - 1);
+    }
+
+    // Also count significant figures for consistency checks
+    info.significant_figures = count_significant_figures(token);
+
+    // For fixed notation, effective precision is simply 10^(-decimal_places)
+    info.effective_precision = std::pow(10.0, -info.decimal_places);
+
+#ifdef DEBUG3
+    std::cout << "DEBUG3: Fixed notation " << token
+              << " -> decimal places: " << info.decimal_places
+              << ", sig figs: " << info.significant_figures << std::endl;
+#endif
+  }
+
+  // Parse the actual numerical value
+  try {
+    info.parsed_value = std::stod(token);
+  } catch (const std::exception&) {
+    info.parsed_value = 0.0;  // Default on parse error
+  }
+
+  // Check for single precision warning (6-7 significant figures)
+  if (info.significant_figures >= 6 && info.significant_figures <= 7) {
+    info.has_single_precision_warning = true;
+  }
+
+  // Reset stream to before reading token
+  stream.clear();
+  stream.seekg(pos);
+
+  return info;
+}
+
+// Legacy function for backward compatibility with enhanced scientific notation
+// support
+int stream_countDecimalPlaces(std::istringstream& stream) {
+  std::streampos pos = stream.tellg();
+  std::string token;
+  stream >> token;
+
+  int ndp = 0;
+
+  // Convert to lowercase for easier parsing
+  std::string lower_token = token;
+  std::transform(lower_token.begin(), lower_token.end(), lower_token.begin(),
+                 ::tolower);
+
+  // Check if it's scientific notation (contains 'e' or 'd')
+  size_t e_pos = lower_token.find('e');
+  if (e_pos == std::string::npos) {
+    e_pos = lower_token.find('d');  // Fortran double precision notation
+  }
+
+  if (e_pos != std::string::npos) {
+    // Scientific notation - calculate effective decimal places
+    std::string mantissa = token.substr(0, e_pos);
+    std::string exp_str = token.substr(e_pos + 1);
+
+    int exponent = 0;
+    try {
+      exponent = std::stoi(exp_str);
+    } catch (const std::exception&) {
+      exponent = 0;  // Default on parse error
+    }
+
+    // Count significant figures in mantissa
+    int sig_figs = count_significant_figures(mantissa);
+
+    // Calculate effective decimal places: sig_figs - 1 - exponent
+    // e.g., 1.23e-5 has 3 sig figs, so 3-1-(-5) = 7 effective decimal places
+    // For large positive exponents (e.g., 1.23e10), this can be negative,
+    // which means the number is effectively an integer with no decimal
+    // precision
+    ndp = sig_figs - 1 - exponent;
+
+    // Clamp to reasonable bounds (0 to 10 decimal places)
+    if (ndp < 0) {
+      ndp = 0;  // Large numbers like 1.23e10 have no decimal precision
+    } else if (ndp > 10) {
+      ndp = 10;  // Cap at maximum reasonable decimal places
+    }
+
+#ifdef DEBUG3
+    std::cout << "DEBUG3: Scientific notation " << token
+              << " -> sig figs: " << sig_figs << ", exponent: " << exponent
+              << ", effective decimal places: " << ndp << std::endl;
+#endif
+  } else {
+    // Fixed notation - original logic
+    if (size_t decimal_pos = token.find('.');
+        decimal_pos != std::string::npos) {
+      ndp = static_cast<int>(token.size() - decimal_pos - 1);
+    }
+
+#ifdef DEBUG3
+    std::cout << "DEBUG3: Fixed notation " << token << " has ";
+    std::cout << ndp << " decimal places" << std::endl;
+#endif
+  }
+
+  // Reset stream to before reading token, so the original extraction works
   stream.clear();
   stream.seekg(pos);
 
   return ndp;
+}
+
+// Function to check if precision exceeds single precision limits
+bool check_precision_warning(const PrecisionInfo& info,
+                             int single_precision_limit = 7) {
+  if (info.is_scientific) {
+    // For scientific notation, check significant figures
+    if (info.significant_figures > single_precision_limit) {
+      std::cout << "\033[1;33mWarning: Scientific notation with "
+                << info.significant_figures << " significant figures exceeds "
+                << "single precision limit (" << single_precision_limit
+                << "). Results may be unreliable.\033[0m" << std::endl;
+      return true;
+    }
+  } else {
+    // For fixed notation, check decimal places
+    if (info.decimal_places > single_precision_limit) {
+      std::cout << "\033[1;33mWarning: Fixed notation with "
+                << info.decimal_places << " decimal places exceeds "
+                << "single precision limit (" << single_precision_limit
+                << "). Results may be unreliable.\033[0m" << std::endl;
+      return true;
+    }
+  }
+  return false;
 };
 
 /**
@@ -173,30 +384,25 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
   imag_str.erase(imag_str.find_last_not_of(" \t") + 1);
 
   // Convert the cleaned strings to floating-point numbers
+  // This will be done by the precision analysis below
   double real;
   double imag;
-  try {
-    real = std::stod(real_str);
-    imag = std::stod(imag_str);
-  } catch (const std::exception&) {
-    std::cerr << "Error converting complex number";
-    flag.error_found = true;
-    return {0.0, 0.0, -1, -1};
-  }
 
-  // Count decimal places using direct string analysis
-  // This is more reliable than the previous stream-based approach
-  // which had issues with stream positioning and state management
-  auto count_decimal_places = [](const std::string& str) -> int {
-    size_t dot_pos = str.find('.');
-    if (dot_pos == std::string::npos) {
-      return 0;  // Integer has 0 decimal places
-    }
-    return static_cast<int>(str.length() - dot_pos - 1);
-  };
+  // Analyze precision using the enhanced precision analysis
+  // This handles both fixed-point and scientific notation
+  std::istringstream real_stream(real_str);
+  std::istringstream imag_stream(imag_str);
 
-  int real_dp = count_decimal_places(real_str);
-  int imag_dp = count_decimal_places(imag_str);
+  PrecisionInfo real_precision = stream_analyzePrecision(real_stream);
+  PrecisionInfo imag_precision = stream_analyzePrecision(imag_stream);
+
+  // Use effective decimal places for consistent comparison
+  int real_dp = real_precision.get_effective_decimal_places();
+  int imag_dp = imag_precision.get_effective_decimal_places();
+
+  // Use the parsed values from precision analysis (handles scientific notation)
+  real = real_precision.parsed_value;
+  imag = imag_precision.parsed_value;
 
   // Advance the original stream past the parsed content so the next
   // read operation starts at the correct position for subsequent tokens

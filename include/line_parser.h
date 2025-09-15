@@ -11,12 +11,15 @@
 #include <string>
 #include <vector>
 
+#include "precision_info.h"
+
 // Forward declarations
 struct LineData;
 struct Flags;
 
 // External utility functions that LineParser uses
 int stream_countDecimalPlaces(std::istringstream& stream);
+PrecisionInfo stream_analyzePrecision(std::istringstream& stream);
 std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
                                                  Flags& flag);
 
