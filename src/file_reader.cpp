@@ -1,11 +1,14 @@
-/** 
+/**
  * @author J. Lighthall
  * @date July 2025
  * Refactored from src/uband_diff.cpp
- */ 
- 
+ */
+
 #include "file_reader.h"
 #include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <limits>
 
 // ========================================================================
 // File Operations
@@ -58,4 +61,272 @@ bool FileReader::compare_file_lengths(const std::string& file1,
         return false;
     }
     return true;
+}
+
+// ========================================================================
+// Column Structure Analysis
+// ========================================================================
+
+size_t FileReader::count_columns_in_line(const std::string& line) const {
+    std::istringstream stream(line);
+    std::string token;
+    size_t count = 0;
+
+    while (stream >> token) {
+        count++;
+    }
+
+    return count;
+}
+
+bool FileReader::is_first_column_monotonic(const std::string& filename) const {
+    std::ifstream infile(filename);
+    if (!infile.is_open()) {
+        return false;
+    }
+
+    std::string line;
+    double prev_value = std::numeric_limits<double>::lowest();
+    bool first_value = true;
+
+    while (std::getline(infile, line)) {
+        if (line.empty()) continue;
+
+        std::istringstream stream(line);
+        double current_value;
+
+        if (stream >> current_value) {
+            if (!first_value && current_value <= prev_value) {
+                return false;
+            }
+            prev_value = current_value;
+            first_value = false;
+        }
+    }
+
+    return true;
+}
+
+std::string FileReader::generate_structure_summary(const ColumnStructure& structure) const {
+    std::ostringstream summary;
+
+    if (structure.has_headers) {
+        summary << "File has " << structure.groups.size() << " column format groups:\n";
+        for (size_t i = 0; i < structure.groups.size(); ++i) {
+            const auto& group = structure.groups[i];
+            if (group.is_header) {
+                summary << "  Header (lines " << group.start_line << "-" << group.end_line
+                       << "): " << group.column_count << " columns\n";
+            } else {
+                summary << "  Data (lines " << group.start_line << "+): "
+                       << group.column_count << " columns\n";
+            }
+        }
+    } else {
+        summary << "File has consistent " << structure.groups[0].column_count
+               << " columns throughout\n";
+    }
+
+    if (structure.is_monotonic_first_column) {
+        summary << "First column is monotonically increasing\n";
+    } else {
+        summary << "First column is NOT monotonically increasing\n";
+    }
+
+    return summary.str();
+}
+
+ColumnStructure FileReader::analyze_column_structure(const std::string& filename) const {
+    ColumnStructure structure;
+    structure.total_lines = 0;
+    structure.data_start_line = 0;
+    structure.has_headers = false;
+    structure.is_monotonic_first_column = false;
+
+    std::ifstream infile(filename);
+    if (!infile.is_open()) {
+        std::cerr << "\033[1;31mError opening file for structure analysis: "
+                  << filename << "\033[0m" << std::endl;
+        error_found = true;
+        return structure;
+    }
+
+    std::string line;
+    size_t line_number = 1;
+    size_t current_column_count = 0;
+    std::vector<size_t> column_counts;
+
+    // First pass: collect column counts for each line
+    while (std::getline(infile, line)) {
+        if (!line.empty()) {
+            size_t columns = count_columns_in_line(line);
+            column_counts.push_back(columns);
+        }
+        structure.total_lines++;
+        line_number++;
+    }
+
+    if (column_counts.empty()) {
+        return structure;
+    }
+
+    // Analyze column count patterns
+    size_t most_common_count = column_counts.back(); // Assume data format is at end
+    size_t most_common_frequency = 0;
+
+    // Find the most frequent column count (likely the main data format)
+    for (size_t target_count : column_counts) {
+        size_t frequency = 0;
+        for (size_t count : column_counts) {
+            if (count == target_count) frequency++;
+        }
+        if (frequency > most_common_frequency) {
+            most_common_frequency = frequency;
+            most_common_count = target_count;
+        }
+    }
+
+    // Build column groups
+    current_column_count = 0;
+    line_number = 1;
+
+    for (size_t i = 0; i < column_counts.size(); ++i) {
+        size_t columns = column_counts[i];
+
+        if (columns != current_column_count) {
+            // End previous group if it exists
+            if (current_column_count > 0 && !structure.groups.empty()) {
+                structure.groups.back().end_line = line_number - 1;
+            }
+
+            // Start new group
+            ColumnGroup group;
+            group.start_line = line_number;
+            group.end_line = 0; // Will be set later or remain 0 for final group
+            group.column_count = columns;
+            group.is_header = (columns != most_common_count);
+
+            if (group.is_header) {
+                structure.has_headers = true;
+            } else if (structure.data_start_line == 0) {
+                structure.data_start_line = line_number;
+            }
+
+            structure.groups.push_back(group);
+            current_column_count = columns;
+        }
+
+        line_number++;
+    }
+
+    // Check if first column is monotonic
+    structure.is_monotonic_first_column = is_first_column_monotonic(filename);
+
+    // Generate summary
+    structure.structure_summary = generate_structure_summary(structure);
+
+    return structure;
+}
+
+bool FileReader::compare_column_structures(const std::string& file1,
+                                          const std::string& file2) const {
+    ColumnStructure struct1 = analyze_column_structure(file1);
+    ColumnStructure struct2 = analyze_column_structure(file2);
+
+    std::cout << "\n\033[1;36m=== Column Structure Comparison ===\033[0m\n" << std::endl;
+
+    std::cout << "\033[1;34mFile 1 (" << file1 << "):\033[0m\n";
+    print_column_structure(struct1, file1);
+
+    std::cout << "\n\033[1;34mFile 2 (" << file2 << "):\033[0m\n";
+    print_column_structure(struct2, file2);
+
+    // Compare structures
+    bool structures_match = true;
+    std::cout << "\n\033[1;33mStructure Comparison:\033[0m\n";
+
+    if (struct1.groups.size() != struct2.groups.size()) {
+        std::cout << "\033[1;31m❌ Different number of column groups: "
+                  << struct1.groups.size() << " vs " << struct2.groups.size() << "\033[0m\n";
+        structures_match = false;
+    } else {
+        std::cout << "\033[1;32m✓ Same number of column groups: "
+                  << struct1.groups.size() << "\033[0m\n";
+
+        // Compare each group
+        for (size_t i = 0; i < struct1.groups.size(); ++i) {
+            const auto& g1 = struct1.groups[i];
+            const auto& g2 = struct2.groups[i];
+
+            if (g1.column_count != g2.column_count) {
+                std::cout << "\033[1;31m❌ Group " << (i+1) << " column count differs: "
+                          << g1.column_count << " vs " << g2.column_count << "\033[0m\n";
+                structures_match = false;
+            } else {
+                std::cout << "\033[1;32m✓ Group " << (i+1) << " has matching "
+                          << g1.column_count << " columns\033[0m\n";
+            }
+
+            if (g1.is_header != g2.is_header) {
+                std::cout << "\033[1;31m❌ Group " << (i+1) << " header status differs\033[0m\n";
+                structures_match = false;
+            }
+        }
+    }
+
+    if (struct1.is_monotonic_first_column != struct2.is_monotonic_first_column) {
+        std::cout << "\033[1;31m❌ First column monotonicity differs\033[0m\n";
+        structures_match = false;
+    } else {
+        std::cout << "\033[1;32m✓ First column monotonicity matches\033[0m\n";
+    }
+
+    if (structures_match) {
+        std::cout << "\n\033[1;32m🎉 Column structures are compatible!\033[0m\n";
+    } else {
+        std::cout << "\n\033[1;31m⚠️  Column structures are NOT compatible!\033[0m\n";
+    }
+
+    return structures_match;
+}
+
+void FileReader::print_column_structure(const ColumnStructure& structure,
+                                        const std::string& filename) const {
+    std::cout << "Total lines: " << structure.total_lines << std::endl;
+
+    if (structure.groups.empty()) {
+        std::cout << "\033[1;31mNo column structure detected\033[0m" << std::endl;
+        return;
+    }
+
+    std::cout << "Column groups detected: " << structure.groups.size() << std::endl;
+
+    for (size_t i = 0; i < structure.groups.size(); ++i) {
+        const auto& group = structure.groups[i];
+        std::cout << "  Group " << (i+1) << ": ";
+
+        if (group.is_header) {
+            std::cout << "\033[1;35m[HEADER]\033[0m ";
+        } else {
+            std::cout << "\033[1;36m[DATA]\033[0m ";
+        }
+
+        std::cout << "Lines " << group.start_line;
+        if (group.end_line > 0) {
+            std::cout << "-" << group.end_line;
+        } else {
+            std::cout << "+";
+        }
+        std::cout << " → " << group.column_count << " columns" << std::endl;
+    }
+
+    if (structure.data_start_line > 0) {
+        std::cout << "Main data starts at line: " << structure.data_start_line << std::endl;
+    }
+
+    if (structure.is_monotonic_first_column) {
+        std::cout << "\033[1;32m✓ First column is monotonically increasing\033[0m" << std::endl;
+    } else {
+        std::cout << "\033[1;33m⚠ First column is NOT monotonically increasing\033[0m" << std::endl;
+    }
 }
