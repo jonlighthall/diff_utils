@@ -10,9 +10,12 @@
  *
  * Usage: uband_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
  *   file1, file2 - Input files to compare
- *   sig_thresh   - difference threshold for counting significant errors (default: 0.05)
- *   crit_thresh  - difference threshold for interruption (default: 10.0)
- *   print_thresh - difference threshold for printing table (default: 1.0)
+ *   sig_thresh   - difference threshold for counting significant errors
+ *                  (default: 0.05)
+ *   crit_thresh  - difference threshold for interruption
+ *                  (default: 10.0)
+ *   print_thresh - difference threshold for printing table
+ *                  (default: 1.0)
  */
 
 #include "uband_diff.h"
@@ -117,45 +120,45 @@ bool parse_file_arguments(int argc, char* argv[], ProgramArgs& args) {
     args.file2 = argv[2];
   }
 
-    // Validate file arguments
-    if (args.file1.empty()) {
-      std::cerr << "\033[1;31mERROR:\033[0m First file name cannot be empty."
-                << std::endl;
-      return false;
-    }
-    if (args.file2.empty()) {
-      std::cerr << "\033[1;31mERROR:\033[0m Second file name cannot be empty."
-                << std::endl;
-      return false;
-    }
-    if (args.file1 == args.file2) {
-      std::cerr << "\033[1;33mWARNING:\033[0m Both files have the same name: '"
-                << args.file1 << "'" << std::endl;
-      std::cerr << "         This will compare the file with itself."
-                << std::endl;
-    }
+  // Validate file arguments
+  if (args.file1.empty()) {
+    std::cerr << "\033[1;31mERROR:\033[0m First file name cannot be empty."
+              << std::endl;
+    return false;
+  }
+  if (args.file2.empty()) {
+    std::cerr << "\033[1;31mERROR:\033[0m Second file name cannot be empty."
+              << std::endl;
+    return false;
+  }
+  if (args.file1 == args.file2) {
+    std::cerr << "\033[1;33mWARNING:\033[0m Both files have the same name: '"
+              << args.file1 << "'" << std::endl;
+    std::cerr << "         This will compare the file with itself."
+              << std::endl;
+  }
 
-    // Check if files exist and are readable
-    std::ifstream test_file1(args.file1);
-    std::ifstream test_file2(args.file2);
+  // Check if files exist and are readable
+  std::ifstream test_file1(args.file1);
+  std::ifstream test_file2(args.file2);
 
-    if (!test_file1.good()) {
-      std::cerr << "\033[1;33mWARNING:\033[0m Cannot access first file: '"
-                << args.file1 << "'" << std::endl;
-      std::cerr << "         The file may not exist or is not readable."
-                << std::endl;
-      std::cerr << "         Will attempt to proceed (error will be reported "
-                   "by comparator)."
-                << std::endl;
-    }
-    if (!test_file2.good()) {
-      std::cerr << "\033[1;33mWARNING:\033[0m Cannot access second file: '"
-                << args.file2 << "'" << std::endl;
-      std::cerr << "         The file may not exist or is not readable."
-                << std::endl;
-      std::cerr << "         Will attempt to proceed (error will be reported "
-                   "by comparator)."
-                << std::endl;
+  if (!test_file1.good()) {
+    std::cerr << "\033[1;33mWARNING:\033[0m Cannot access first file: '"
+              << args.file1 << "'" << std::endl;
+    std::cerr << "         The file may not exist or is not readable."
+              << std::endl;
+    std::cerr << "         Will attempt to proceed (error will be reported "
+                 "by comparator)."
+              << std::endl;
+  }
+  if (!test_file2.good()) {
+    std::cerr << "\033[1;33mWARNING:\033[0m Cannot access second file: '"
+              << args.file2 << "'" << std::endl;
+    std::cerr << "         The file may not exist or is not readable."
+              << std::endl;
+    std::cerr << "         Will attempt to proceed (error will be reported "
+                 "by comparator)."
+              << std::endl;
   }
   return true;
 }

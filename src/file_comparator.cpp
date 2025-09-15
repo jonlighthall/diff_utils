@@ -27,18 +27,16 @@
  *
  * @note This program was developed from the Fortran code tldiff.f90 and it's
  * derivatives cpddiff.f90, prsdiff.f90, and tsdiff.f90 (August 2022). It is
- * intended to replace those utilities with a more modern C++ implementation. The
- * initial attempt at converting a generalized version of the code was idiff.cpp
- * (January 2025). This program, originally uband_diff.cpp, was adapted from
- * idiff.cpp (March 2025).
+ * intended to replace those utilities with a more modern C++ implementation.
+ * The initial attempt at converting a generalized version of the code was
+ * idiff.cpp (January 2025). This program, originally uband_diff.cpp, was
+ * adapted from idiff.cpp (March 2025).
  *
  * Development of this code was significantly assisted by GitHub Copilot (GPT-4,
  * Claude Sonnet 4, etc.) for code translation, refactoring, optimization, and
  * architectural improvements.
  *
  */
-#include "uband_diff.h"
-
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -46,6 +44,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "uband_diff.h"
 
 // Implementation moved outside the class definition
 
@@ -234,13 +234,19 @@ bool FileComparator::compare_files(const std::string& file1,
   bool structures_compatible = true;
   if (print.level > 0 || print.debug) {
     // Full detailed analysis for debug mode
-    std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m" << std::endl;
-    structures_compatible = file_reader_->compare_column_structures(file1, file2);
+    std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
+              << std::endl;
+    structures_compatible =
+        file_reader_->compare_column_structures(file1, file2);
 
     if (!structures_compatible) {
-      std::cout << "\033[1;33mNote: Files have different column structures but comparison will continue.\033[0m\n" << std::endl;
+      std::cout << "\033[1;33mNote: Files have different column structures but "
+                   "comparison will continue.\033[0m\n"
+                << std::endl;
     } else {
-      std::cout << "\033[1;32mColumn structures are compatible. Proceeding with numerical comparison.\033[0m\n" << std::endl;
+      std::cout << "\033[1;32mColumn structures are compatible. Proceeding "
+                   "with numerical comparison.\033[0m\n"
+                << std::endl;
     }
   } else {
     // Quick structure check for normal operation
@@ -249,19 +255,24 @@ bool FileComparator::compare_files(const std::string& file1,
 
     if (struct1.groups.size() != struct2.groups.size() ||
         (struct1.groups.size() > 0 && struct2.groups.size() > 0 &&
-         struct1.groups.back().column_count != struct2.groups.back().column_count)) {
+         struct1.groups.back().column_count !=
+             struct2.groups.back().column_count)) {
       structures_compatible = false;
-      std::cout << "\033[1;33mStructure Note: Files have different column formats "
-                << "(File1: " << (struct1.groups.empty() ? 0 : struct1.groups.back().column_count)
-                << " cols, File2: " << (struct2.groups.empty() ? 0 : struct2.groups.back().column_count)
-                << " cols)\033[0m" << std::endl;
+      std::cout
+          << "\033[1;33mStructure Note: Files have different column formats "
+          << "(File1: "
+          << (struct1.groups.empty() ? 0 : struct1.groups.back().column_count)
+          << " cols, File2: "
+          << (struct2.groups.empty() ? 0 : struct2.groups.back().column_count)
+          << " cols)\033[0m" << std::endl;
     }
   }
 
   // Set structure compatibility flag
   flag.structures_compatible = structures_compatible;
 
-  // If structures are incompatible, files cannot be considered identical or close enough
+  // If structures are incompatible, files cannot be considered identical or
+  // close enough
   if (!structures_compatible) {
     flag.files_are_same = false;
     flag.files_have_same_values = false;
@@ -400,7 +411,8 @@ bool FileComparator::validate_and_track_column_format(
 
 bool FileComparator::validate_decimal_column_size(
     const std::vector<int>& dp_per_col, size_t column_index) const {
-  return format_tracker_->validate_decimal_column_size(dp_per_col, column_index, counter.line_number);
+  return format_tracker_->validate_decimal_column_size(dp_per_col, column_index,
+                                                       counter.line_number);
 }
 
 // ========================================================================
@@ -408,7 +420,8 @@ bool FileComparator::validate_decimal_column_size(
 // ========================================================================
 bool FileComparator::initialize_decimal_place_format(
     const int min_dp, const size_t column_index, std::vector<int>& dp_per_col) {
-  bool result = format_tracker_->initialize_decimal_place_format(min_dp, column_index, dp_per_col, counter.line_number, flag);
+  bool result = format_tracker_->initialize_decimal_place_format(
+      min_dp, column_index, dp_per_col, counter.line_number, flag);
   if (result) {
     this_fmt_line = format_tracker_->get_format_line();
     this_fmt_column = format_tracker_->get_format_column();
@@ -419,7 +432,8 @@ bool FileComparator::initialize_decimal_place_format(
 bool FileComparator::update_decimal_place_format(const int min_dp,
                                                  const size_t column_index,
                                                  std::vector<int>& dp_per_col) {
-  bool result = format_tracker_->update_decimal_place_format(min_dp, column_index, dp_per_col, counter.line_number, flag);
+  bool result = format_tracker_->update_decimal_place_format(
+      min_dp, column_index, dp_per_col, counter.line_number, flag);
   if (result && flag.new_fmt) {
     this_fmt_line = format_tracker_->get_format_line();
   }
@@ -428,7 +442,8 @@ bool FileComparator::update_decimal_place_format(const int min_dp,
 
 double FileComparator::calculate_threshold(int ndp) {
   // Use FormatTracker for the core threshold calculation
-  double dp_threshold = format_tracker_->calculate_threshold(ndp, thresh.significant);
+  double dp_threshold =
+      format_tracker_->calculate_threshold(ndp, thresh.significant);
 
   if (flag.new_fmt && print.debug && !print.diff_only) {
     if (this_fmt_line != last_fmt_line) {
@@ -487,22 +502,25 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   double ithreshold = calculate_threshold(column_data.min_dp);
 
   // Process the difference using DifferenceAnalyzer
-  bool result = difference_analyzer_->process_difference(column_data, column_index,
-                                                         ithreshold, counter, differ, flag);
+  bool result = difference_analyzer_->process_difference(
+      column_data, column_index, ithreshold, counter, differ, flag);
 
   // Calculate unrounded and rounded differences for comparison
   double diff_unrounded = std::abs(column_data.value1 - column_data.value2);
-  double rounded1 = DifferenceAnalyzer::round_to_decimals(column_data.value1, column_data.min_dp);
-  double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2, column_data.min_dp);
+  double rounded1 = DifferenceAnalyzer::round_to_decimals(column_data.value1,
+                                                          column_data.min_dp);
+  double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2,
+                                                          column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
 
-  // For rigorous cross-platform validation, use unrounded differences for thresholding
-  // but still display both for complete information
+  // For rigorous cross-platform validation, use unrounded differences for
+  // thresholding but still display both for complete information
   double diff_for_threshold = diff_unrounded;
 
   // Print differences if above or equal to plot threshold
   if (diff_for_threshold >= thresh.print) {
-    print_table(column_data, column_index, ithreshold, diff_rounded, diff_unrounded);
+    print_table(column_data, column_index, ithreshold, diff_rounded,
+                diff_unrounded);
     std::cout << std::endl;
   } else {
     if (print.debug2) {
@@ -573,7 +591,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
   // define column widths
-  //                     // line | col | range | file1 | file2 | thres | diff_rounded | diff_unrounded
+  //                     line | col | range | file1 |
+  //                     file2 | thres |diff_rounded | diff_unrounded
   std::vector<int> col_widths = {5,         5,         val_width, val_width,
                                  val_width, val_width, val_width, val_width};
 
@@ -606,7 +625,9 @@ void FileComparator::print_table(const ColumnValues& column_data,
     int total_width = 0;
     for (int w : col_widths) total_width += w;
     // Add spaces for extra padding in header columns
-    total_width += 1 + 3 + 3 + 3 + 1;  // file1(+1), file2(+3), thres(+3), diff_rnd(+3), diff_raw(+1)
+    total_width +=
+        1 + 3 + 3 + 3 +
+        1;  // file1(+1), file2(+3), thres(+3), diff_rnd(+3), diff_raw(+1)
     std::cout << std::string(total_width, '-') << std::endl;
   }
   counter.diff_print++;
@@ -685,7 +706,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   // unrounded difference (show with higher precision for numerical analysis)
   print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
-  std::cout << format_number(diff_unrounded, std::max(column_data.min_dp + 2, 6), mxint, mxdec);
+  std::cout << format_number(diff_unrounded,
+                             std::max(column_data.min_dp + 2, 6), mxint, mxdec);
   std::cout << "\033[0m";
 }
 
@@ -739,8 +761,8 @@ void FileComparator::print_hard_threshold_error(double rounded1,
   if (print.level < 0) {
     return;
   }
-  difference_analyzer_->print_hard_threshold_error(rounded1, rounded2, diff_rounded,
-                                                   column_index, counter);
+  difference_analyzer_->print_hard_threshold_error(
+      rounded1, rounded2, diff_rounded, column_index, counter);
   flag.error_found = true;
 }
 
@@ -896,8 +918,9 @@ void FileComparator::print_diff_like_summary(
     const SummaryParams& params) const {
   // Handle structure incompatibility first
   if (!flag.structures_compatible) {
-    std::cout << "\033[1;31m   Files " << params.file1 << " and " << params.file2
-              << " have incompatible column structures\033[0m" << std::endl;
+    std::cout << "\033[1;31m   Files " << params.file1 << " and "
+              << params.file2 << " have incompatible column structures\033[0m"
+              << std::endl;
     return;
   }
 
@@ -1066,9 +1089,10 @@ void FileComparator::print_significant_differences_count(
 
   if (counter.elem_number > 0) {
     print_significant_percentage();
-        print_count_with_percent(
-    params, "\"Close enough\" matches (<=" + std::to_string(thresh.significant) + ")",
-        counter.elem_number - counter.diff_significant);
+    print_count_with_percent(params,
+                             "\"Close enough\" matches (<=" +
+                                 std::to_string(thresh.significant) + ")",
+                             counter.elem_number - counter.diff_significant);
   }
 }
 
@@ -1251,7 +1275,8 @@ void FileComparator::print_statistics(const std::string& file1) const {
   std::cout << "   Total lines compared: " << counter.line_number;
 
   // Check if all lines were compared
-  if (size_t length1 = file_reader_->get_file_length(file1); length1 == counter.line_number) {
+  if (size_t length1 = file_reader_->get_file_length(file1);
+      length1 == counter.line_number) {
     std::cout << " (all)" << std::endl;
   } else {
     std::cout << " of " << length1 << std::endl;

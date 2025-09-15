@@ -9,16 +9,16 @@
 
 #include <cmath>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
 
-#include "file_reader.h"
-#include "line_parser.h"
-#include "format_tracker.h"
 #include "difference_analyzer.h"
-#include <memory>
+#include "file_reader.h"
+#include "format_tracker.h"
+#include "line_parser.h"
 
 // Data structures
 
@@ -104,8 +104,9 @@ struct DiffStats {
   int ndp_non_zero = 0;     // number of decimal places for non-zero values
   int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
   int ndp_significant = 0;  // number of decimal places
-  int ndp_max = 0;  // number of decimal places for maximum difference
-  const int ndp_single_precision = 7;  // number of decimal places for single precision
+  int ndp_max = 0;          // number of decimal places for maximum difference
+  const int ndp_single_precision =
+      7;  // number of decimal places for single precision
 };
 
 struct LineData {
@@ -148,8 +149,11 @@ class FileComparator {
                  int debug_level = 0)
       : file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
-        format_tracker_(std::make_unique<FormatTracker>(PrintLevel{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2, debug_level >= 3})),
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(Thresholds{user_thresh, hard_thresh, print_thresh, 0.0, 110.0, 138.5})),
+        format_tracker_(std::make_unique<FormatTracker>(
+            PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
+                       debug_level >= 2, debug_level >= 3})),
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(Thresholds{
+            user_thresh, hard_thresh, print_thresh, 0.0, 110.0, 138.5})),
         thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
@@ -247,7 +251,8 @@ class FileComparator {
                                      const LineData& data2,
                                      size_t column_index) const;
   void print_table(const ColumnValues& column_data, size_t column_index,
-                   double line_threshold, double diff_rounded, double diff_unrounded);
+                   double line_threshold, double diff_rounded,
+                   double diff_unrounded);
   std::string format_number(double value, int prec, int max_integer_width,
                             int max_decimals) const;
   void print_hard_threshold_error(double rounded1, double rounded2,
@@ -286,15 +291,16 @@ class FileComparator {
   void print_significant_differences_count(const SummaryParams& params) const;
   void print_significant_percentage() const;
   void print_insignificant_differences_count(const SummaryParams& params) const;
-  void print_maximum_significant_difference_analysis(const SummaryParams& params) const;
+  void print_maximum_significant_difference_analysis(
+      const SummaryParams& params) const;
   void print_maximum_significant_difference_details() const;
   void print_max_diff_threshold_comparison_above() const;
   void print_max_diff_threshold_comparison_below() const;
   void print_file_comparison_result(const SummaryParams& params) const;
-  void print_significant_differences_printing_status(const SummaryParams& params) const;
+  void print_significant_differences_printing_status(
+      const SummaryParams& params) const;
   void print_count_with_percent(const SummaryParams& params,
-                                const std::string& label,
-                                size_t count,
+                                const std::string& label, size_t count,
                                 const std::string& color = "") const;
 };
 

@@ -2,7 +2,7 @@
  * @author J. Lighthall
  * @date July 2025
  * Refactored from src/uband_diff.cpp
- */ 
+ */
 
 #ifndef LINE_PARSER_H
 #define LINE_PARSER_H
