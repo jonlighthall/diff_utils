@@ -250,3 +250,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     file_utils_version
     exit 1
 fi
+
+# Indicate that the library has been loaded
+echo "$(basename ${BASH_SOURCE[0]}) loaded"
