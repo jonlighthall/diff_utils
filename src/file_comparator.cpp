@@ -490,14 +490,19 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   bool result = difference_analyzer_->process_difference(column_data, column_index,
                                                          ithreshold, counter, differ, flag);
 
-  // Calculate rounded values for printing
+  // Calculate unrounded and rounded differences for comparison
+  double diff_unrounded = std::abs(column_data.value1 - column_data.value2);
   double rounded1 = DifferenceAnalyzer::round_to_decimals(column_data.value1, column_data.min_dp);
   double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2, column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
 
-  // Print differences if above plot threshold
-  if (diff_rounded > thresh.print) {
-    print_table(column_data, column_index, ithreshold, diff_rounded);
+  // For rigorous cross-platform validation, use unrounded differences for thresholding
+  // but still display both for complete information
+  double diff_for_threshold = diff_unrounded;
+
+  // Print differences if above or equal to plot threshold
+  if (diff_for_threshold >= thresh.print) {
+    print_table(column_data, column_index, ithreshold, diff_rounded, diff_unrounded);
     std::cout << std::endl;
   } else {
     if (print.debug2) {
@@ -535,7 +540,7 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
 // ========================================================================
 void FileComparator::print_table(const ColumnValues& column_data,
                                  size_t column_index, double line_threshold,
-                                 double diff_rounded) {
+                                 double diff_rounded, double diff_unrounded) {
   // Print a row in the difference table
   // Contents of the table:
   //    [0] the line number is printed
@@ -568,9 +573,9 @@ void FileComparator::print_table(const ColumnValues& column_data,
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
   // define column widths
-  //                     // line | col | range | file1 | file2 | thres | diff
+  //                     // line | col | range | file1 | file2 | thres | diff_rounded | diff_unrounded
   std::vector<int> col_widths = {5,         5,         val_width, val_width,
-                                 val_width, val_width, val_width};
+                                 val_width, val_width, val_width, val_width};
 
   auto padLeft = [](const std::string& str, int width) {
     if (static_cast<int>(str.length()) >= width) return str;
@@ -594,13 +599,14 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << std::setw(col_widths[3] + 1) << "file1";
     std::cout << std::setw(col_widths[4] + 3) << "file2 |";
     std::cout << padLeft(" thres |", col_widths[5] + 3);
-    std::cout << padLeft("diff", col_widths[6] + 1) << std::endl;
+    std::cout << padLeft("diff_rnd |", col_widths[6] + 3);
+    std::cout << padLeft("diff_raw", col_widths[7] + 1) << std::endl;
 
     // Print horizontal line matching header width
     int total_width = 0;
     for (int w : col_widths) total_width += w;
     // Add spaces for extra padding in header columns
-    total_width += 1 + 3 + 3 + 1;  // file1(+1), file2(+3), thres(+3), diff(+1)
+    total_width += 1 + 3 + 3 + 3 + 1;  // file1(+1), file2(+3), thres(+3), diff_rnd(+3), diff_raw(+1)
     std::cout << std::string(total_width, '-') << std::endl;
   }
   counter.diff_print++;
@@ -672,9 +678,14 @@ void FileComparator::print_table(const ColumnValues& column_data,
     }
   };
 
-  // difference
+  // rounded difference
   print_diff_color(column_data.value1, column_data.value2, diff_rounded);
   std::cout << format_number(diff_rounded, column_data.min_dp, mxint, mxdec);
+  std::cout << "\033[0m |";
+
+  // unrounded difference (show with higher precision for numerical analysis)
+  print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
+  std::cout << format_number(diff_unrounded, std::max(column_data.min_dp + 2, 6), mxint, mxdec);
   std::cout << "\033[0m";
 }
 

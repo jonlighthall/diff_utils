@@ -247,7 +247,7 @@ class FileComparator {
                                      const LineData& data2,
                                      size_t column_index) const;
   void print_table(const ColumnValues& column_data, size_t column_index,
-                   double line_threshold, double diff_rounded);
+                   double line_threshold, double diff_rounded, double diff_unrounded);
   std::string format_number(double value, int prec, int max_integer_width,
                             int max_decimals) const;
   void print_hard_threshold_error(double rounded1, double rounded2,
