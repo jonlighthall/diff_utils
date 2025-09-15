@@ -358,7 +358,7 @@ TESTBINDIR := $(BINDIR)/tests
 
 # Google Test flags
 GTEST_CFLAGS = -isystem /usr/include/gtest
-GTEST_LIBS = -lgtest -pthread
+GTEST_LIBS = -lgtest -lgtest_main -pthread
 
 # Test sources
 TEST_SOURCES = $(wildcard $(TESTDIR)/*.cpp)

@@ -701,9 +701,6 @@ double FileComparator::calculate_threshold(int ndp) {
 // ========================================================================
 bool FileComparator::process_difference(const ColumnValues& column_data,
                                         size_t column_index) {
-  // Process raw values first
-  difference_analyzer_->process_raw_values(column_data, counter, differ, flag);
-
   // Calculate threshold for this column
   double ithreshold = calculate_threshold(column_data.min_dp);
 
