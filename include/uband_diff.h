@@ -62,6 +62,7 @@ struct CountStats {
 
   // non-zero differences found (independent of arguments)
   size_t diff_non_zero = 0;     // based on value and format (strict)
+  size_t diff_trivial = 0;      // non-zero but within format precision
   size_t diff_non_trivial = 0;  // based on value only (format independent)
 
   // differences found greater than user defined...
@@ -153,8 +154,8 @@ class FileComparator {
         format_tracker_(std::make_unique<FormatTracker>(
             PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
                        debug_level >= 2, debug_level >= 3})),
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(Thresholds{
-            user_thresh, hard_thresh, print_thresh})),
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(
+            Thresholds{user_thresh, hard_thresh, print_thresh})),
         thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3} {};
@@ -184,6 +185,12 @@ class FileComparator {
   // ========================================================================
   const Flags& getFlag() const { return flag; }
   Flags& getFlag() { return flag; }
+
+  // ========================================================================
+  // Counter Access Methods (for testing)
+  // ========================================================================
+  const CountStats& getCountStats() const { return counter; }
+  const DiffStats& getDiffStats() const { return differ; }
 
  private:
   // ========================================================================

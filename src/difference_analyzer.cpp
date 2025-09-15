@@ -29,7 +29,10 @@ bool DifferenceAnalyzer::process_difference(
 
   counter.elem_number++;
 
-  // Check critical threshold
+  // Check critical threshold - only count if both values correspond to
+  // meaningful pressure values (TL <= ignore threshold)
+  // TL values > ignore threshold correspond to pressures < single precision
+  // limit
   if ((diff_rounded > thresh.critical) &&
       ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
     counter.diff_critical++;
@@ -85,16 +88,28 @@ void DifferenceAnalyzer::process_rounded_values(
       differ.max_non_trivial = rounded_diff;
       differ.ndp_non_trivial = column_data.min_dp;
     }
+  } else if (rounded_diff > thresh.zero) {
+    // This is a trivial difference - non-zero but within format precision
+    counter.diff_trivial++;
   }
 
-  if (rounded_diff > threshold && column_data.value1 < thresh.ignore &&
-      column_data.value2 < thresh.ignore) {
+  // A difference is significant if it exceeds the threshold AND
+  // at least one value represents meaningful pressure (TL <= ignore threshold)
+  // If both TL values > ignore threshold, both correspond to pressures below
+  // single precision limits, making the difference numerically meaningless
+  if (rounded_diff > threshold && !(column_data.value1 > thresh.ignore &&
+                                    column_data.value2 > thresh.ignore)) {
     counter.diff_significant++;
     flags.has_significant_diff = true;
     flags.files_are_close_enough = false;
 
-    if (column_data.value1 < thresh.marginal &&
-        column_data.value2 < thresh.marginal) {
+    // Marginal differences occur when both TL values are between marginal and
+    // ignore thresholds (110 < TL < ~138) - detectable but operationally less
+    // important
+    if (column_data.value1 > thresh.marginal &&
+        column_data.value1 < thresh.ignore &&
+        column_data.value2 > thresh.marginal &&
+        column_data.value2 < thresh.ignore) {
       counter.diff_marginal++;
       flags.has_marginal_diff = true;
     }

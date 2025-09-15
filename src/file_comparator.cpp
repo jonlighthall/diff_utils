@@ -1170,20 +1170,11 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
     return;
   }
   if (print.level > 0) {
-    if (counter.diff_non_zero > counter.diff_non_trivial) {
-      size_t zero_diff = counter.diff_non_zero - counter.diff_non_trivial;
-      if (zero_diff > 0) {
-        std::cout << "   Trivial differences     ( >" << 0.0 << "): ";
-        if (zero_diff > 0) {
-          std::cout << "\033[1;32m";
-        } else if (counter.diff_significant > 0) {
-          std::cout << "\033[1;31m";
-        } else {
-          std::cout << "\033[1;33m";
-        }
-        std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m"
-                  << std::endl;
-      }
+    if (counter.diff_trivial > 0) {
+      std::cout << "   Trivial differences     ( >" << 0.0 << "): ";
+      std::cout << "\033[1;32m";
+      std::cout << std::setw(params.fmt_wid) << counter.diff_trivial
+                << "\033[0m" << std::endl;
     }
     std::cout << "   Non-trivial differences      : ";
     if (counter.diff_non_trivial > 0) {
@@ -1278,6 +1269,26 @@ void FileComparator::print_significant_summary(
 
   print_significant_differences_count(params);
   print_insignificant_differences_count(params);
+
+  // Print detailed breakdown of significant differences
+  if (counter.diff_significant > 0 && print.level > 0) {
+    size_t non_marginal_non_critical = counter.diff_significant -
+                                       counter.diff_marginal -
+                                       counter.diff_critical;
+    if (counter.diff_marginal > 0) {
+      print_count_with_percent(params, "Marginal differences",
+                               counter.diff_marginal, "\033[1;33m");
+    }
+    if (counter.diff_critical > 0) {
+      print_count_with_percent(params, "Critical differences",
+                               counter.diff_critical, "\033[1;31m");
+    }
+    if (non_marginal_non_critical > 0) {
+      print_count_with_percent(params, "Non-marginal, non-critical significant",
+                               non_marginal_non_critical, "\033[1;36m");
+    }
+  }
+
   print_maximum_significant_difference_analysis(params);
   print_file_comparison_result(params);
   print_significant_differences_printing_status(params);
@@ -1308,13 +1319,41 @@ void FileComparator::print_significant_percentage() const {
   std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
             << percent << "%)" << std::endl;
 
-  // Check if probably OK
-  constexpr double threshold_percent = 2.0;
-  if (percent < threshold_percent) {
-    std::cout << "   \033[1;33mProbably OK: error percent less than "
-              << threshold_percent << "%  \033[0m" << std::endl;
+  // Calculate non-marginal, non-critical, significant differences
+  // These are the differences of real interest that cannot be attributed to:
+  // - Model failure (critical)
+  // - Being outside operational interest (marginal)
+  // - Machine precision errors (insignificant)
+  size_t non_marginal_non_critical_significant =
+      counter.diff_significant - counter.diff_marginal - counter.diff_critical;
+
+  double critical_percent =
+      100.0 * static_cast<double>(non_marginal_non_critical_significant) /
+      static_cast<double>(counter.elem_number);
+
+  // Check the 2% failure threshold for non-marginal, non-critical, significant
+  // differences
+  constexpr double failure_threshold_percent = 2.0;
+  if (critical_percent > failure_threshold_percent) {
+    std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
+                 "differences ("
+              << non_marginal_non_critical_significant << ", " << std::fixed
+              << std::setprecision(2) << critical_percent << "%) exceed "
+              << failure_threshold_percent << "% threshold\033[0m" << std::endl;
+    flag.files_are_close_enough = false;
+    flag.error_found = true;
+  } else if (critical_percent > 0) {
+    std::cout << "   \033[1;33mPASS: Non-marginal, non-critical significant "
+                 "differences ("
+              << non_marginal_non_critical_significant << ", " << std::fixed
+              << std::setprecision(2) << critical_percent << "%) within "
+              << failure_threshold_percent << "% tolerance\033[0m" << std::endl;
     flag.files_are_close_enough = true;
-    print_flag_status();
+  } else {
+    std::cout << "   \033[1;32mPASS: No non-marginal, non-critical significant "
+                 "differences found\033[0m"
+              << std::endl;
+    flag.files_are_close_enough = true;
   }
 }
 
@@ -1572,6 +1611,12 @@ void FileComparator::print_counter_info() const {
   if (counter.diff_non_zero == 0) {
     return;
   }
+  std::cout << "   diff_trivial     : ";
+  if (counter.diff_trivial == 0) {
+    std::cout << "\033[1;32m";
+  }
+  std::cout << std::setw(width) << counter.diff_trivial << "\033[0m"
+            << std::endl;
   std::cout << "   diff_non_trivial : ";
   if (counter.diff_non_trivial == 0) {
     std::cout << "\033[1;32m";
