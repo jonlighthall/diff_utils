@@ -24,14 +24,15 @@ output = -o $@
 #
 # Fortran options
 foptions = -fimplicit-none -std=f2008
-fwarnings = -W -Waliasing -Wall -Warray-temporaries -Wcharacter-truncation	-Wfatal-errors \
--Wextra -Wimplicit-interface -Wintrinsics-std -Wsurprising -Wuninitialized -pedantic
+fwarnings = -W -Waliasing -Wall -Warray-temporaries -Wcharacter-truncation	\
+		-Wfatal-errors -Wextra -Wimplicit-interface -Wintrinsics-std -Wsurprising		\
+		-Wuninitialized -pedantic
 fdebug = -g -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
 #
 # additional options for gfortran v4.5 and later
 foptions_new = -std=f2018
-fwarnings_new = -Wconversion-extra -Wimplicit-procedure -Winteger-division -Wreal-q-constant	\
--Wuse-without-only -Wrealloc-lhs-all
+fwarnings_new = -Wconversion-extra -Wimplicit-procedure -Winteger-division	\
+		-Wreal-q-constant -Wuse-without-only -Wrealloc-lhs-all
 fdebug_new = -fcheck=all
 #
 # concatenate options
@@ -111,7 +112,6 @@ MAINS.F90 := $(strip $(MAINS.F90))
 MAINS = $(strip $(MAINS.C) $(MAINS.CPP) $(MAINS.F77) $(MAINS.F90))
 # exclude readme files from the main list
 #MAINS := $(filter-out $(wildcard *readme*), $(MAINS))
-
 #
 # program files (executable)
 SRCS.F77 = $(wildcard *.f)
@@ -119,7 +119,6 @@ SRCS.F90 = $(wildcard *.f90)
 
 # source files (implementation, correspond to header files)
 # add source directory, if present
-
 SRCDIR := src
 ifneq ("$(strip $(wildcard $(SRCDIR)))","")
 	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
@@ -225,7 +224,6 @@ OBJS.src = $(patsubst %.cxx,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cc,%.o,$(patsu
 # should be a list of .o files with no directory
 OBJS.o := $(OBJS.src:$(SRCDIR)/%=%)
 # add object directory
-
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 
 #
@@ -236,7 +234,6 @@ TARGET =
 #
 # sub-programs
 SUBDIRS :=
-
 
 # dependency files
 DEPS := $(OBJS:.o=.d)
@@ -251,7 +248,6 @@ EXECS.list := $(EXECS.main:$(MAIN_DIR)/%=%)
 EXECS := $(addprefix $(BINDIR)/,$(EXECS.list))
 
 .DEFAULT_GOAL = all
-
 #
 # recipes
 
@@ -261,7 +257,6 @@ $(SUBDIRS):
 .PHONY: all
 all: $(OBJDIR) $(BINDIR) $(EXECS)
 	@/bin/echo -e "$${TAB}$(THISDIR) $@ done"
-
 
 printvars:
 	@echo
@@ -273,7 +268,6 @@ printvars:
 	@echo "fincludes = '$(fincludes)'"
 
 	@echo "VPATH = '$(VPATH)'"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -297,12 +291,10 @@ printvars:
 	@echo
 	@echo "FORTRAN_OBJS.all = $(FORTRAN_OBJS.all)"
 
-
 	@echo "SRCDIR  = $(SRCDIR)"
 	@echo "SRCS.C   = $(SRCS.C)"
 	@echo "SRCS.CPP = $(SRCS.CPP)"
 	@echo "SRCS     = $(SRCS)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -317,11 +309,9 @@ printvars:
 	@echo
 	@echo "DEPS. = $(DEPS.)"
 
-
 	@echo "OBJS.src = $(OBJS.src)"
 	@echo "FORTRAN_OBJS.o   = $(FORTRAN_OBJS.o)"
 	@echo "OBJS     = $(OBJS)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -335,7 +325,6 @@ printvars:
 	@echo "EXECS.main = $(EXECS.main)"
 	@echo "EXECS.list = $(EXECS.list)"
 	@echo "EXECS      = $(EXECS)"
-
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
@@ -390,7 +379,6 @@ $(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
 $(TEST_EXECUTABLE): $(TEST_OBJECTS) $(OBJS) | $(TESTBINDIR)
 	@echo "linking test executable $@..."
 	$(CXX) $(LDFLAGS) $^ $(GTEST_LIBS) -o $@
-
 
 #
 # generic recipes
@@ -490,14 +478,12 @@ endif
 
 diff: $(BINDIR)/uband_diff
 
-
 #
 # recipes without outputs
 
 .PHONY: all $(SUBDIRS) mostlyclean clean force out realclean distclean reset
 
 .PHONY: mostlyclean clean force out realclean distclean reset
-
 #
 # clean up
 
@@ -507,13 +493,11 @@ RM = @rm -vfrd
 mostlyclean:
 # remove compiled binaries
 	@echo "removing compiled binary files..."
-
 # remove build files
 	$(RM) $(OBJS)
 # remove dependency files
 	$(RM) $(DEPS)
 # remove remaining binaries
-
 	$(RM) $(OBJDIR)/*.o
 	$(RM) $(OBJDIR)
 	$(RM) *.o *.obj
@@ -531,7 +515,6 @@ clean: mostlyclean
 	$(RM) $(BINDIR)
 
 	@echo "$(DIR.NAME) $@ done"
-
 	$(RM) *.exe
 	$(RM) *.out
 
@@ -539,7 +522,6 @@ clean: mostlyclean
 	@echo "$(THISDIR) $@ done"
 
 	@echo "$(DIR.NAME) $@ done"
-
 force: clean
 # force re-make
 	@$(MAKE) --no-print-directory
@@ -551,13 +533,10 @@ out:
 	@echo "$(THISDIR) $@ done"
 
 	@echo "$(DIR.NAME) $@ done"
-
 realclean: clean out
 # remove binaries and outputs
 
 	@$(optSUBDIRS)
-
-
 
 distclean: realclean
 # remove binaries, outputs, and backups
@@ -572,7 +551,6 @@ distclean: realclean
 	@echo "$(THISDIR) $@ done"
 
 	@echo "$(DIR.NAME) $@ done"
-
 reset: distclean
 # remove untracked files
 	@/bin/echo -e "\nresetting repository..."
@@ -602,8 +580,6 @@ run: all
 	else \
 		echo "No executables found to run"; \
 	fi
-
-
 
 # =============================================================================
 # Test Targets
