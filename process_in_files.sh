@@ -172,37 +172,41 @@ detect_nspe_program() {
     return 0
 }
 
-# Detect the appropriate nspe program
-PROG=$(detect_nspe_program)
-echo "Selected program: $PROG"
+# Detect the appropriate nspe program (skip for diff mode)
+if [[ "$mode" != "diff" ]]; then
+    PROG=$(detect_nspe_program)
+    echo "Selected program: $PROG"
 
-# Check if the program exists, and build it if not
-if [[ ! -f "$PROG" ]]; then
-    echo "Program $PROG not found. Attempting to build it..."
-    if command -v make >/dev/null 2>&1; then
-        # Extract just the target name for make (remove ./ prefix)
-        make_target="${PROG#./}"
-        echo "Running: make $make_target"
-        echo -en "${PROG_OUTPUT_COLOR}"
-        if make "$make_target"; then
-            echo -en "\x1B[0m" # Reset text color
-            echo "Successfully built $PROG"
+    # Check if the program exists, and build it if not
+    if [[ ! -f "$PROG" ]]; then
+        echo "Program $PROG not found. Attempting to build it..."
+        if command -v make >/dev/null 2>&1; then
+            # Extract just the target name for make (remove ./ prefix)
+            make_target="${PROG#./}"
+            echo "Running: make $make_target"
+            echo -en "${PROG_OUTPUT_COLOR}"
+            if make "$make_target"; then
+                echo -en "\x1B[0m" # Reset text color
+                echo "Successfully built $PROG"
+            else
+                echo -e "\e[31mError: Failed to build $PROG. Please check your makefile and dependencies.\e[0m"
+                exit 1
+            fi
         else
-            echo -e "\e[31mError: Failed to build $PROG. Please check your makefile and dependencies.\e[0m"
+            echo -e "\e[31mError: make command not found and $PROG does not exist.\e[0m"
+            echo "Please build $PROG manually or install make."
             exit 1
         fi
-    else
-        echo -e "\e[31mError: make command not found and $PROG does not exist.\e[0m"
-        echo "Please build $PROG manually or install make."
-        exit 1
     fi
-fi
-
-# Verify the program is now executable
-if [[ ! -x "$PROG" ]]; then
-    echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
-    echo "Making it executable..."
-    chmod +x "$PROG"
+    
+    # Verify the program is now executable
+    if [[ ! -x "$PROG" ]]; then
+        echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
+        echo "Making it executable..."
+        chmod +x "$PROG"
+    fi
+else
+    echo "Diff mode: Skipping nspe program detection and execution"
 fi
 
 # Create array of files to process, sorted by size
@@ -330,13 +334,13 @@ for infile in "${infiles[@]}"; do
                     if [[ -f "$ref" ]]; then
                         echo -e "\e[33m[[MISSING OUTPUT]]\e[0m\n   Output file '$test' does not exist"
                         echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
-                        fail_files+=("$infile")
+                        # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
                         found_files=true
                     else
                         echo -e "\e[33m[[MISSING FILES]]\e[0m\n   Both output '$test' and reference '$ref' do not exist"
                         echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files, then 'test' mode for output files\e[0m"
-                        fail_files+=("$infile")
+                        # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
                         missing_reference_files+=("$ref")
                         found_files=true
@@ -359,9 +363,11 @@ for infile in "${infiles[@]}"; do
                             echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist"
                             if [[ "$mode" == "test" ]]; then
                                 echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
+                                # In test mode, mark as failed since we were trying to validate the output
+                                fail_files+=("$infile")
                             fi
+                            # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
-                            fail_files+=("$infile")
                             missing_reference_files+=("$ref")
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
@@ -375,8 +381,10 @@ for infile in "${infiles[@]}"; do
                             if [[ "$mode" == "test" ]]; then
                                 echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
                                 echo "   Reference file '$ref' is empty" >> "$LOG_FILE"
+                                # In test mode, mark as failed since we were trying to validate the output
+                                fail_files+=("$infile")
                             fi
-                            fail_files+=("$infile")
+                            # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$ref")
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
@@ -386,7 +394,7 @@ for infile in "${infiles[@]}"; do
                         if [[ "$mode" == "diff" && ! -f "$test" ]]; then
                             echo -e "\e[33m[[MISSING OUTPUT]]\e[0m\n   Output file '$test' does not exist"
                             echo -e "   \e[33mHint: Run 'test' mode first to generate output files\e[0m"
-                            fail_files+=("$infile")
+                            # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             missing_output_files+=("$test")
                             continue
                         fi
@@ -394,7 +402,7 @@ for infile in "${infiles[@]}"; do
                         # For diff mode, check if test file is empty
                         if [[ "$mode" == "diff" && ! -s "$test" ]]; then
                             echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m\n   Output file '$test' is empty"
-                            fail_files+=("$infile")
+                            # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$test")
                             continue
                         fi
@@ -463,8 +471,12 @@ for infile in "${infiles[@]}"; do
                 echo "No output files (01, 02, 03) or reference files (tl, rtl, ftl) found for $basename_noext"
                 if [[ "$mode" == "diff" ]]; then
                     echo -e "   \e[33mHint: Run 'make' mode to generate output files, and 'copy' mode to generate reference files\e[0m"
+                    # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
+                    # No specific file to add to missing arrays since we don't know which suffix
+                else
+                    # In test mode, mark as failed since we were trying to validate the output
+                    fail_files+=("$infile")
                 fi
-                fail_files+=("$infile")
             fi
         fi
     else
