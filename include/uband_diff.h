@@ -149,16 +149,13 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : file_reader_(std::make_unique<FileReader>()),
-        line_parser_(std::make_unique<LineParser>()),
-        format_tracker_(std::make_unique<FormatTracker>(
-            PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
-                       debug_level >= 2, debug_level >= 3})),
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(
-            Thresholds{user_thresh, hard_thresh, print_thresh})),
-        thresh{user_thresh, hard_thresh, print_thresh},
+      : thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
-              debug_level >= 3} {};
+              debug_level >= 3},
+        file_reader_(std::make_unique<FileReader>()),
+        line_parser_(std::make_unique<LineParser>()),
+        format_tracker_(std::make_unique<FormatTracker>(print)),
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)) {};
 
   // ========================================================================
   // Friend declarations for testing
@@ -194,6 +191,12 @@ class FileComparator {
 
  private:
   // ========================================================================
+  // Data Members (must be declared before composition classes that use them)
+  // ========================================================================
+  Thresholds thresh;
+  PrintLevel print;
+
+  // ========================================================================
   // Composition - Specialized classes for different responsibilities
   // ========================================================================
   std::unique_ptr<FileReader> file_reader_;
@@ -202,7 +205,7 @@ class FileComparator {
   std::unique_ptr<DifferenceAnalyzer> difference_analyzer_;
 
   // ========================================================================
-  // Data Members
+  // State Members
   // ========================================================================
   mutable Flags flag;
   size_t this_fmt_line;
@@ -212,8 +215,6 @@ class FileComparator {
 
   DiffStats differ;
   CountStats counter;
-  Thresholds thresh;
-  PrintLevel print;
 
   // ========================================================================
   // Line/Column Processing

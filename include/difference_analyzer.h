@@ -7,6 +7,7 @@
 #ifndef DIFFERENCE_ANALYZER_H
 #define DIFFERENCE_ANALYZER_H
 
+#include <cmath>
 #include <cstddef>
 
 // Forward declarations
@@ -14,6 +15,8 @@ struct ColumnValues;
 struct CountStats;
 struct DiffStats;
 struct Flags;
+
+// Include for Thresholds definition
 struct Thresholds;
 
 /**

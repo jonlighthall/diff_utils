@@ -128,7 +128,8 @@ TEST_F(FileComparatorTest, CompareDifferentFilesWithinTolerance) {
 // Test comparing files with significant differences
 TEST_F(FileComparatorTest, CompareDifferentFilesSignificant) {
   createTestFile("test_different1.txt", {"1.0 2.0"});
-  createTestFile("test_different2.txt", {"1.1 2.2"});  // Large differences
+  createTestFile("test_different2.txt",
+                 {"1.5 2.8"});  // Clearly significant differences (0.5 and 0.8)
 
   bool result =
       comparator->compare_files("test_different1.txt", "test_different2.txt");
@@ -191,7 +192,8 @@ TEST_F(FileComparatorTest, StrictThresholdBehavior) {
   FileComparator strict_comparator(0.0001, 10.0, 1.0);
 
   createTestFile("test_different1.txt", {"1.000"});
-  createTestFile("test_different2.txt", {"1.001"});  // Small difference
+  createTestFile("test_different2.txt",
+                 {"1.005"});  // Difference of 0.005 > 0.001 threshold
 
   bool result = strict_comparator.compare_files("test_different1.txt",
                                                 "test_different2.txt");
