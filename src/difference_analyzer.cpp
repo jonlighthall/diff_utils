@@ -143,8 +143,11 @@ void DifferenceAnalyzer::process_rounded_values(
             << " exceeds_significance=" << exceeds_significance << std::endl;
       }
       if (both_above_ignore || !exceeds_significance) {
-        // INSIGNIFICANT (still non-trivial but does not qualify as significant)
+        // INSIGNIFICANT
         counter.diff_insignificant++;
+        if (both_above_ignore) {
+          counter.diff_high_ignore++;  // track cause for semantic checks
+        }
       } else {
         // SIGNIFICANT (difference large enough AND at least one value
         // meaningful)

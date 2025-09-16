@@ -798,9 +798,13 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // analyzing silently.
   if (flag.has_critical_diff || counter.diff_print >= max_print_rows_) {
     if (!truncation_notice_printed_) {
-      std::cout << "\n[... diff table truncated after " << counter.diff_print
-                << " rows (" << (flag.has_critical_diff ? "critical threshold reached" : "row cap reached")
-                << "). Further differences will be analyzed but not printed ...]" << std::endl;
+      std::cout
+          << "\n[... diff table truncated after " << counter.diff_print
+          << " rows ("
+          << (flag.has_critical_diff ? "critical threshold reached"
+                                     : "row cap reached")
+          << "). Further differences will be analyzed but not printed ...]"
+          << std::endl;
       truncation_notice_printed_ = true;
     }
     return;
@@ -1547,23 +1551,26 @@ void FileComparator::print_significant_differences_printing_status(
     // Determine reason label
     std::string reason;
     if (truncation_notice_printed_) {
-      reason = flag.has_critical_diff ? "truncated after critical diff" :
-                                        "truncated by row cap";
+      reason = flag.has_critical_diff ? "truncated after critical diff"
+                                      : "truncated by row cap";
     } else {
       reason = "<= print threshold";  // classic reason
     }
-    std::cout << "\033[1;31m   Not printed differences   (" << reason << "): "
-              << std::setw(params.fmt_wid) << not_printed_signif << "\033[0m"
-              << std::endl;
+    std::cout << "\033[1;31m   Not printed differences   (" << reason
+              << "): " << std::setw(params.fmt_wid) << not_printed_signif
+              << "\033[0m" << std::endl;
   } else if (truncation_notice_printed_) {
     // Edge case: truncation occurred, but no additional significant diffs
     // after the truncation event.
     std::cout << "   (Table output was truncated; no additional significant "
-                 "differences occurred after truncation.)" << std::endl;
-  } else if (flag.has_critical_diff && counter.diff_print == counter.diff_significant) {
+                 "differences occurred after truncation.)"
+              << std::endl;
+  } else if (flag.has_critical_diff &&
+             counter.diff_print == counter.diff_significant) {
     // Critical diff seen; no further significant diffs beyond those printed.
     std::cout << "   (Critical difference encountered; all prior significant "
-                 "differences were printed.)" << std::endl;
+                 "differences were printed.)"
+              << std::endl;
   }
 }
 

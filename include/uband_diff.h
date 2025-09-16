@@ -19,6 +19,7 @@
 #include "file_reader.h"
 #include "format_tracker.h"
 #include "line_parser.h"
+#include "print_level.h"
 
 // Data structures
 
@@ -108,6 +109,9 @@ struct CountStats {
   size_t diff_non_error = 0;  // differences <= user threshold (argument 3)
 
   size_t diff_print = 0;  // print threshold (for difference table)
+  // Count of non-trivial differences where BOTH values exceed ignore threshold
+  size_t diff_high_ignore =
+      0;  // aids semantic consistency checks for zero threshold
 };
 struct Flags {
   bool new_fmt = false;
@@ -174,13 +178,7 @@ struct SummaryParams {
   int fmt_wid;        // Formatting width for output alignment
 };
 
-struct PrintLevel {
-  int level = 0;           // Debug level for printing
-  bool diff_only = false;  // Print only differences
-  bool debug = false;      // Print debug messages
-  bool debug2 = false;     // Print additional debug messages
-  bool debug3 = false;     // Print even more debug messages
-};
+// PrintLevel definition moved to print_level.h
 
 // Forward declarations for utility functions
 std::tuple<double, double, int, int> readComplex(std::istringstream& stream,

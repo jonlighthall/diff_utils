@@ -10,9 +10,11 @@
 #include <cstddef>
 #include <vector>
 
+#include "print_level.h"
+
 // Forward declarations
 struct Flags;
-struct PrintLevel;
+// PrintLevel now provided by print_level.h
 
 /**
  * @brief Manages decimal place format tracking and validation
@@ -63,7 +65,8 @@ class FormatTracker {
   void set_last_format_line(size_t line) { last_fmt_line = line; }
 
  private:
-  const PrintLevel& print;
+  // Store by value to avoid dangling reference to a temporary PrintLevel
+  PrintLevel print;
 
   // Format tracking state
   size_t this_fmt_line = 0;
