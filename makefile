@@ -627,3 +627,9 @@ help:
 # =============================================================================
 case1: diff
 	./bin/uband_diff example_data/pe.std1.pe01.ref.txt example_data/pe.std1.pe01.test.txt 0 1 0 1
+
+case2: diff
+	./bin/uband_diff example_data/pe.std2.pe01.ref.txt example_data/pe.std2.pe01.test.txt 0 1 0 1
+
+case3: diff
+	./bin/uband_diff example_data/pe.std3.pe01.ref.txt example_data/pe.std3.pe01.test.txt 0 3 1
