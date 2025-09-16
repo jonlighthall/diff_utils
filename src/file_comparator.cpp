@@ -741,11 +741,20 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // thresholding but still display both for complete information
   double diff_for_threshold = diff_unrounded;
 
-  // Print differences if above plot threshold
+  // Print differences if above print threshold and not a trivial (rounded zero)
+  // diff Suppress rows where rounding makes the diff zero unless debug output
+  // is requested.
   if (diff_for_threshold > thresh.print) {
-    print_table(column_data, column_index, ithreshold, diff_rounded,
-                diff_unrounded);
-    std::cout << std::endl;
+    if (diff_rounded == 0.0 && !print.debug && !print.debug2 && !print.debug3) {
+      // Still count it internally but do not emit a row.
+      // We intentionally do NOT increment diff_print here since nothing was
+      // printed.
+    } else {
+      // NOTE: newline now emitted inside print_table() for each row. Do NOT add
+      // another std::endl here or rows will be double-spaced.
+      print_table(column_data, column_index, ithreshold, diff_rounded,
+                  diff_unrounded);
+    }
   } else {
     if (print.debug2) {
       auto line_num_width =
@@ -938,6 +947,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
   print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
   std::cout << format_number(diff_unrounded, column_data.max_dp, mxint, mxdec);
   std::cout << "\033[0m";
+  // Emit exactly one newline per printed diff row (centralized here).
+  std::cout << std::endl;
 }
 
 std::string FileComparator::format_number(double value, int prec,
