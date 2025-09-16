@@ -240,6 +240,10 @@ class FileComparator {
   // ========================================================================
   Thresholds thresh;
   PrintLevel print;
+  // Cap for number of difference table rows to print. Analysis continues
+  // after the cap; only additional table rows are suppressed.
+  size_t max_print_rows_ = 50;  // reasonable default to avoid terminal spam
+  bool truncation_notice_printed_ = false;  // ensure single truncation notice
 
   // ========================================================================
   // Composition - Specialized classes for different responsibilities

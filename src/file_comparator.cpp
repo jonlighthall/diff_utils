@@ -793,9 +793,16 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
 void FileComparator::print_table(const ColumnValues& column_data,
                                  size_t column_index, double line_threshold,
                                  double diff_rounded, double diff_unrounded) {
-  // If a critical difference has already been encountered, suppress further
-  // table printing to avoid flooding output, but continue processing.
-  if (flag.has_critical_diff) {
+  // If a critical difference has already been encountered OR we've hit the
+  // maximum row print cap, stop printing further table rows. Continue
+  // analyzing silently.
+  if (flag.has_critical_diff || counter.diff_print >= max_print_rows_) {
+    if (!truncation_notice_printed_) {
+      std::cout << "\n[... diff table truncated after " << counter.diff_print
+                << " rows (" << (flag.has_critical_diff ? "critical threshold reached" : "row cap reached")
+                << "). Further differences will be analyzed but not printed ...]" << std::endl;
+      truncation_notice_printed_ = true;
+    }
     return;
   }
   // Print a row in the difference table
@@ -1512,20 +1519,51 @@ void FileComparator::print_file_comparison_result(
 
 void FileComparator::print_significant_differences_printing_status(
     const SummaryParams& params) const {
-  if (counter.diff_print < counter.diff_significant) {
-    print_count_with_percent(
-        params,
-        "Printed differences       ( >" + std::to_string(thresh.print) + ")",
-        counter.diff_print);
+  // We only claim that *all* significant differences are printed if:
+  //  1. No truncation notice was issued (row cap or critical stop), AND
+  //  2. A critical difference has not halted table row emission, AND
+  //  3. Every significant difference corresponds to a printed row.
+  bool exhaustive_print = !truncation_notice_printed_ &&
+                          !flag.has_critical_diff &&
+                          (counter.diff_print == counter.diff_significant);
 
-    size_t not_printed_signif = counter.diff_significant - counter.diff_print;
-    if (not_printed_signif > 0) {
-      std::cout << "\033[1;31m   Not printed differences   (<=" << thresh.print
-                << "): " << std::setw(params.fmt_wid) << not_printed_signif
-                << "\033[0m" << std::endl;
-    }
-  } else {
+  if (exhaustive_print) {
     std::cout << "   All significant differences are printed." << std::endl;
+    return;
+  }
+
+  // Otherwise provide a more nuanced accounting.
+  print_count_with_percent(
+      params,
+      "Printed differences       ( >" + std::to_string(thresh.print) + ")",
+      counter.diff_print);
+
+  size_t not_printed_signif = 0;
+  if (counter.diff_significant > counter.diff_print) {
+    not_printed_signif = counter.diff_significant - counter.diff_print;
+  }
+
+  if (not_printed_signif > 0) {
+    // Determine reason label
+    std::string reason;
+    if (truncation_notice_printed_) {
+      reason = flag.has_critical_diff ? "truncated after critical diff" :
+                                        "truncated by row cap";
+    } else {
+      reason = "<= print threshold";  // classic reason
+    }
+    std::cout << "\033[1;31m   Not printed differences   (" << reason << "): "
+              << std::setw(params.fmt_wid) << not_printed_signif << "\033[0m"
+              << std::endl;
+  } else if (truncation_notice_printed_) {
+    // Edge case: truncation occurred, but no additional significant diffs
+    // after the truncation event.
+    std::cout << "   (Table output was truncated; no additional significant "
+                 "differences occurred after truncation.)" << std::endl;
+  } else if (flag.has_critical_diff && counter.diff_print == counter.diff_significant) {
+    // Critical diff seen; no further significant diffs beyond those printed.
+    std::cout << "   (Critical difference encountered; all prior significant "
+                 "differences were printed.)" << std::endl;
   }
 }
 
@@ -1716,6 +1754,7 @@ void FileComparator::print_counter_info() const {
   }
   std::cout << "   diff_critical    : " << std::setw(width)
             << counter.diff_critical << std::endl;
+  // Debug diagnostics (temporary)
 }
 
 // Helper function to print detailed summary sections

@@ -115,7 +115,23 @@ void DifferenceAnalyzer::process_rounded_values(
       // Otherwise it is SIGNIFICANT.
       bool both_above_ignore = (column_data.value1 > thresh.ignore &&
                                 column_data.value2 > thresh.ignore);
-      bool exceeds_significance = (rounded_diff > threshold);
+      // Determine significance exceed condition. When the user-specified
+      // significant threshold is zero, any non-trivial difference (not both
+      // above ignore) should be considered significant regardless of the
+      // format-derived dp_threshold. This prevents the format precision from
+      // inflating the effective significance cutoff when the intent is
+      // "count everything meaningful".
+      bool exceeds_significance;
+      if (thresh.significant == 0.0) {
+        // User wants maximum sensitivity: treat all non-trivial differences
+        // (below ignore) as significant.
+        exceeds_significance = true;
+      } else {
+        // Standard behavior: strictly greater than the (possibly inflated)
+        // threshold. (Keep '>' not '>=' to preserve original semantics for
+        // non-zero thresholds.)
+        exceeds_significance = (rounded_diff > threshold);
+      }
 
       // DEBUG instrumentation (can be removed after validation)
       if (counter.line_number < 5 && column_index < 5) {
