@@ -149,13 +149,15 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : thresh{user_thresh, hard_thresh, print_thresh},
-        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
-              debug_level >= 3},
-        file_reader_(std::make_unique<FileReader>()),
+      : file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
-        format_tracker_(std::make_unique<FormatTracker>(print)),
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)) {};
+        format_tracker_(std::make_unique<FormatTracker>(
+            PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
+                       debug_level >= 2, debug_level >= 3})),
+        thresh{user_thresh, hard_thresh, print_thresh},
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)),
+        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
+              debug_level >= 3} {};
 
   // ========================================================================
   // Friend declarations for testing
