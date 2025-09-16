@@ -100,7 +100,13 @@ struct CountStats {
       0;                     // non-trivial but both values > ignore threshold
   size_t diff_marginal = 0;  // marginal threshold (pass and warn)
   size_t diff_critical = 0;  // critical threshold (fail and exit)
-  size_t diff_print = 0;     // print threshold (for difference table)
+
+  // LEVEL 5 counters: non_critical = error + non_error (based on user
+  // threshold)
+  size_t diff_error = 0;      // differences > user threshold (argument 3)
+  size_t diff_non_error = 0;  // differences <= user threshold (argument 3)
+
+  size_t diff_print = 0;  // print threshold (for difference table)
 };
 struct Flags {
   bool new_fmt = false;
@@ -117,7 +123,12 @@ struct Flags {
       false;                       // Difference exceeds user-defined threshold
   bool has_marginal_diff = false;  // Difference exceeds marginal threshold
   bool has_critical_diff = false;  // Difference exceeds critical/hard threshold
-  bool has_printed_diff = false;   // Difference exceeds print threshold
+
+  // LEVEL 5 flags: non_critical differences subdivision
+  bool has_error_diff = false;      // Difference exceeds user threshold
+  bool has_non_error_diff = false;  // Difference within user threshold
+
+  bool has_printed_diff = false;  // Difference exceeds print threshold
 
   // Overall comparison state flags
   bool files_are_same = true;  // Files are identical

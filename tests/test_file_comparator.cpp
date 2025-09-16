@@ -40,7 +40,8 @@ class FileComparatorTest : public ::testing::Test {
     std::vector<std::string> test_files = {
         "test_file1.txt",      "test_file2.txt",      "test_identical1.txt",
         "test_identical2.txt", "test_different1.txt", "test_different2.txt",
-        "test_complex1.txt",   "test_complex2.txt"};
+        "test_complex1.txt",   "test_complex2.txt",   "test_6level1.txt",
+        "test_6level2.txt"};
 
     for (const auto& file : test_files) {
       std::remove(file.c_str());
@@ -305,6 +306,12 @@ class FileComparatorSummationTest : public FileComparatorTest {
         << "diff_critical counter should match has_critical_diff flag";
     EXPECT_EQ(counter.diff_marginal > 0, flags.has_marginal_diff)
         << "diff_marginal counter should match has_marginal_diff flag";
+
+    // LEVEL 5 counter-flag consistency
+    EXPECT_EQ(counter.diff_error > 0, flags.has_error_diff)
+        << "diff_error counter should match has_error_diff flag";
+    EXPECT_EQ(counter.diff_non_error > 0, flags.has_non_error_diff)
+        << "diff_non_error counter should match has_non_error_diff flag";
 
     // ========================================================================
     // PRINT LOGIC CONSISTENCY
@@ -626,4 +633,154 @@ TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
   if (percentage > 2.0) {
     EXPECT_TRUE(flags.error_found) << "Should trigger 2% failure threshold";
   }
+}
+
+// ============================================================================
+// 6-LEVEL HIERARCHY VALIDATION TESTS
+// Test all mathematical relationships in the 6-level counting hierarchy
+// ============================================================================
+
+TEST_F(FileComparatorSummationTest, SixLevelHierarchyValidation) {
+  // Create test data that exercises all 6 levels of the hierarchy
+  std::vector<std::string> lines1 = {
+      "   50.0  51.0  52.0  53.0", "  115.0 116.0 117.0 118.0",
+      "  140.0 141.0 142.0 143.0", "   60.0  61.0  62.0  63.0"};
+
+  std::vector<std::string> lines2 = {
+      "   50.5  51.3  52.8  54.2", "  115.2 116.1 117.5 118.3",
+      "  140.0 141.0 142.0 143.0", "   60.0  65.0  62.0  63.0"};
+
+  // Use thresholds that will exercise all levels:
+  // user_thresh=0.2, critical_thresh=2.0, print_thresh=0.1
+  auto test_comparator = std::make_unique<FileComparator>(0.2, 2.0, 0.1, 0);
+
+  createTestFile("test_6level1.txt", lines1);
+  createTestFile("test_6level2.txt", lines2);
+  bool result =
+      test_comparator->compare_files("test_6level1.txt", "test_6level2.txt");
+
+  const auto& counter = test_comparator->getCountStats();
+
+  std::cout << "\n6-Level Hierarchy Validation:" << std::endl;
+  std::cout << "  Total elements: " << counter.elem_number << std::endl;
+  std::cout << "  Zero differences: "
+            << (counter.elem_number - counter.diff_non_zero) << std::endl;
+  std::cout << "  Non-zero differences: " << counter.diff_non_zero << std::endl;
+  std::cout << "  Trivial differences: " << counter.diff_trivial << std::endl;
+  std::cout << "  Non-trivial differences: " << counter.diff_non_trivial
+            << std::endl;
+  std::cout << "  Insignificant differences: " << counter.diff_insignificant
+            << std::endl;
+  std::cout << "  Significant differences: " << counter.diff_significant
+            << std::endl;
+  std::cout << "  Marginal differences: " << counter.diff_marginal << std::endl;
+  std::cout << "  Critical differences: " << counter.diff_critical << std::endl;
+  std::cout << "  Error differences: " << counter.diff_error << std::endl;
+  std::cout << "  Non-error differences: " << counter.diff_non_error
+            << std::endl;
+
+  // Calculate derived values
+  size_t zero_differences = counter.elem_number - counter.diff_non_zero;
+  size_t non_marginal = counter.diff_significant - counter.diff_marginal;
+  size_t non_critical =
+      non_marginal - counter.diff_critical;  // Only non-marginal non-critical
+
+  // ========================================================================
+  // LEVEL 1: total = zero + non_zero (based on raw difference [calculated])
+  // ========================================================================
+  EXPECT_EQ(counter.elem_number, zero_differences + counter.diff_non_zero)
+      << "LEVEL 1: total should equal zero + non_zero differences";
+
+  // ========================================================================
+  // LEVEL 2: non_zero = trivial + non_trivial (based on printed precision)
+  // ========================================================================
+  EXPECT_EQ(counter.diff_non_zero,
+            counter.diff_trivial + counter.diff_non_trivial)
+      << "LEVEL 2: non_zero should equal trivial + non_trivial differences";
+
+  // Alternative Level 2 validation: total = zero + trivial + non_trivial
+  EXPECT_EQ(counter.elem_number,
+            zero_differences + counter.diff_trivial + counter.diff_non_trivial)
+      << "LEVEL 2: total should equal zero + trivial + non_trivial";
+
+  // ========================================================================
+  // LEVEL 3: non_trivial = insignificant + significant (based on ignore
+  // threshold ~138)
+  // ========================================================================
+  EXPECT_EQ(counter.diff_non_trivial,
+            counter.diff_insignificant + counter.diff_significant)
+      << "LEVEL 3: non_trivial should equal insignificant + significant "
+         "differences";
+
+  // Alternative Level 3 validation: total = zero + trivial + insignificant +
+  // significant
+  EXPECT_EQ(counter.elem_number, zero_differences + counter.diff_trivial +
+                                     counter.diff_insignificant +
+                                     counter.diff_significant)
+      << "LEVEL 3: total should equal zero + trivial + insignificant + "
+         "significant";
+
+  // ========================================================================
+  // LEVEL 4: significant = marginal + non_marginal (based on marginal threshold
+  // 110)
+  // ========================================================================
+  EXPECT_EQ(counter.diff_significant, counter.diff_marginal + non_marginal)
+      << "LEVEL 4: significant should equal marginal + non_marginal "
+         "differences";
+
+  // Alternative Level 4 validation: total = zero + trivial + insignificant +
+  // marginal + non_marginal
+  EXPECT_EQ(counter.elem_number, zero_differences + counter.diff_trivial +
+                                     counter.diff_insignificant +
+                                     counter.diff_marginal + non_marginal)
+      << "LEVEL 4: total should equal zero + trivial + insignificant + "
+         "marginal + non_marginal";
+
+  // ========================================================================
+  // LEVEL 5: non_marginal = critical + non_critical (based on critical
+  // threshold)
+  // ========================================================================
+  EXPECT_EQ(non_marginal, counter.diff_critical + non_critical)
+      << "LEVEL 5: non_marginal should equal critical + non_critical "
+         "differences";
+
+  // Alternative Level 5 validation: total = zero + trivial + insignificant +
+  // marginal + critical + non_critical
+  EXPECT_EQ(counter.elem_number, zero_differences + counter.diff_trivial +
+                                     counter.diff_insignificant +
+                                     counter.diff_marginal +
+                                     counter.diff_critical + non_critical)
+      << "LEVEL 5: total should equal zero + trivial + insignificant + "
+         "marginal + critical + non_critical";
+
+  // ========================================================================
+  // LEVEL 6: non_critical = error + non_error (based on user threshold)
+  // ========================================================================
+  EXPECT_EQ(non_critical, counter.diff_error + counter.diff_non_error)
+      << "LEVEL 6: non_critical should equal error + non_error differences";
+
+  // Alternative Level 6 validation: total = zero + trivial + insignificant +
+  // marginal + critical + error + non_error
+  EXPECT_EQ(counter.elem_number,
+            zero_differences + counter.diff_trivial +
+                counter.diff_insignificant + counter.diff_marginal +
+                counter.diff_critical + counter.diff_error +
+                counter.diff_non_error)
+      << "LEVEL 6: total should equal zero + trivial + insignificant + "
+         "marginal + critical + error + non_error";
+
+  std::cout << "\nHierarchy Breakdown:" << std::endl;
+  std::cout << "  Non-marginal: " << non_marginal << " (significant - marginal)"
+            << std::endl;
+  std::cout << "  Non-critical: " << non_critical
+            << " (non_marginal - critical)" << std::endl;
+  std::cout << "  Mathematical check: " << counter.elem_number << " = "
+            << zero_differences << " + " << counter.diff_trivial << " + "
+            << counter.diff_insignificant << " + " << counter.diff_marginal
+            << " + " << counter.diff_critical << " + " << counter.diff_error
+            << " + " << counter.diff_non_error << std::endl;
+
+  // Clean up test files
+  std::remove("test_6level1.txt");
+  std::remove("test_6level2.txt");
 }

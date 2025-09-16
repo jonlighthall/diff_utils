@@ -429,6 +429,11 @@ auto round_to_decimals = [](double value, int precision) {
 
 bool FileComparator::compare_files(const std::string& file1,
                                    const std::string& file2) {
+  // DEBUG: Write to file
+  std::ofstream debug_file("/tmp/debug_compare.txt", std::ios::app);
+  debug_file << "compare_files called: " << file1 << " vs " << file2
+             << std::endl;
+  debug_file.close();
   std::ifstream infile1;
   std::ifstream infile2;
 
@@ -576,6 +581,11 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
 bool FileComparator::process_column(const LineData& data1,
                                     const LineData& data2, size_t column_index,
                                     std::vector<int>& dp_per_col) {
+  // DEBUG
+  std::ofstream debug_file("/tmp/debug_column.txt", std::ios::app);
+  debug_file << "process_column called for column " << column_index
+             << std::endl;
+  debug_file.close();
   ColumnValues column_data = extract_column_values(data1, data2, column_index);
   process_raw_values(column_data);
 
@@ -702,6 +712,11 @@ double FileComparator::calculate_threshold(int ndp) {
 // ========================================================================
 bool FileComparator::process_difference(const ColumnValues& column_data,
                                         size_t column_index) {
+  // DEBUG: File-based logging
+  std::ofstream debug_file("/tmp/debug_fc.txt", std::ios::app);
+  debug_file << "FC::process_difference called: v1=" << column_data.value1
+             << " v2=" << column_data.value2 << std::endl;
+  debug_file.close();
   // Calculate threshold for this column
   double ithreshold = calculate_threshold(column_data.min_dp);
 
@@ -1017,6 +1032,9 @@ void FileComparator::print_exact_matches_info(
   if (counter.elem_number <= counter.diff_non_zero) {
     return;  // No exact matches to report
   }
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // LEVEL 1: total = zero + non-zero differences
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
   if (zero_diff > 0 && print.debug) {
@@ -1067,23 +1085,37 @@ void FileComparator::print_maximum_difference_analysis(
   }
 
   // Print maximum difference
-  std::cout << "   Maximum difference: "
+
+  std::cout << "   \033[4;35mMaximum raw difference: "
             << format_number(
                    differ.max_non_zero, differ.ndp_non_zero,
                    static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
                    differ.ndp_non_zero)
+            << "\033[0m" << std::endl;
+  std::cout << "DEBUG: comparing max diff (" << differ.max_non_zero
+            << ") to significant thresh (" << thresh.significant << ")..."
             << std::endl;
 
   // Analyze maximum difference relative to significant threshold
   if (differ.max_non_zero > thresh.significant) {
+    // Maximum difference exceeds threshold
+    std::cout
+        << "DEBUG: max non-zero diff is greater than significant threshold"
+        << std::endl;
     std::string color =
         (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
-    std::cout << color
-              << "   Max diff is greater than the significant threshold: "
-              << thresh.significant << "\033[0m" << std::endl;
+    std::cout
+        << color
+        << "   Max non-zero diff is greater than the significant threshold: "
+        << thresh.significant << "\033[0m" << std::endl;
 
+    std::cout << "DEBUG: non-trivial diff count: " << counter.diff_non_trivial
+              << std::endl;
     // Handle special case when no non-trivial differences exist
     if (counter.diff_non_trivial == 0) {
+      // This means all differences are trivial but the max non-zero diff
+      // exceeds the significant threshold
+
       printbar(1);
       if (differ.max_non_trivial <= thresh.significant) {
         std::cout << "   \033[4;35mMaximum rounded difference: "
@@ -1100,11 +1132,16 @@ void FileComparator::print_maximum_difference_analysis(
                   << "\033[0m" << std::endl;
       }
     } else {
+      // FIXME: This case should not be printed if the max diff is greater than
+      // the significant threshold because it is already handled above
       std::cout << "\033[1;32m   Max diff is less or equal to than the "
                    "significant threshold: "
                 << thresh.significant << "\033[0m" << std::endl;
     }
   } else {
+    std::cout
+        << "DEBUG: max diff is less than or equal to significant threshold"
+        << std::endl;
     // Maximum difference is within threshold
     bool equal_to_threshold =
         fabs(differ.max_non_zero - thresh.significant) < thresh.zero;

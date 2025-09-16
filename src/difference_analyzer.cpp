@@ -7,6 +7,7 @@
 #include "difference_analyzer.h"
 
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 
@@ -18,6 +19,12 @@ DifferenceAnalyzer::DifferenceAnalyzer(const Thresholds& thresholds)
 bool DifferenceAnalyzer::process_difference(
     const ColumnValues& column_data, size_t column_index, double threshold,
     CountStats& counter, DiffStats& differ, Flags& flags) const {
+  // Write to file for debugging
+  std::ofstream debug_file("/tmp/debug_diff.txt", std::ios::app);
+  debug_file << "PROCESS_DIFFERENCE: v1=" << column_data.value1
+             << " v2=" << column_data.value2 << " threshold=" << threshold
+             << std::endl;
+  debug_file.close();
   // Calculate rounded values and process difference
   double rounded1 = round_to_decimals(column_data.value1, column_data.min_dp);
   double rounded2 = round_to_decimals(column_data.value2, column_data.min_dp);
@@ -35,7 +42,7 @@ bool DifferenceAnalyzer::process_difference(
   // limit
   if ((diff_rounded > thresh.critical) &&
       ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
-    counter.diff_critical++;
+    // NOTE: Critical differences are counted in the hierarchy logic, not here
     flags.has_critical_diff = true;
     print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index,
                                counter);
@@ -68,17 +75,15 @@ void DifferenceAnalyzer::process_rounded_values(
     const ColumnValues& column_data, size_t column_index, double rounded_diff,
     int minimum_deci, double threshold, CountStats& counter, DiffStats& differ,
     Flags& flags) const {
-  // Define the threshold for non-trivial differences
-  //
-  // The smallest non-zero difference between values with N decimal
-  // places is 10^(-N). A difference less than that value is trivial and
-  // effectively zero. A difference greater than that value is not just due to
-  // rounding errors or numerical precision issues. This is a heuristic to avoid
-  // counting trivial differences as significant.
+  // 6-LEVEL HIERARCHY IMPLEMENTATION
+  // Each level divides one group into two, with one group being further
+  // subdivided
 
-  // set to half the threshold to avoid counting trivial differences
-  if (double big_zero = std::pow(10, -minimum_deci) / 2;
-      rounded_diff > big_zero) {
+  // LEVEL 2: non_zero = trivial + non_trivial (based on printed precision)
+  double big_zero = std::pow(10, -minimum_deci) / 2;
+
+  if (rounded_diff > big_zero) {
+    // This is a NON-TRIVIAL difference
     counter.diff_non_trivial++;
     flags.has_non_trivial_diff = true;
     flags.files_have_same_values = false;
@@ -88,38 +93,57 @@ void DifferenceAnalyzer::process_rounded_values(
       differ.max_non_trivial = rounded_diff;
       differ.ndp_non_trivial = column_data.min_dp;
     }
-  } else if (rounded_diff > thresh.zero) {
-    // This is a trivial difference - non-zero but within format precision
-    counter.diff_trivial++;
-  }
 
-  // A difference is significant if it exceeds the USER threshold AND
-  // at least one value represents meaningful pressure (TL <= ignore threshold)
-  // If both TL values > ignore threshold, both correspond to pressures below
-  // single precision limits, making the difference numerically meaningless
-
-  // Use USER threshold for significance, not precision-based threshold
-  if (rounded_diff > thresh.significant) {
+    // LEVEL 3: non_trivial = insignificant + significant (based on ignore
+    // threshold ~138)
     if (column_data.value1 > thresh.ignore &&
         column_data.value2 > thresh.ignore) {
-      // Both values > ignore threshold - this is an insignificant difference
+      // Both values > ignore threshold - this is an INSIGNIFICANT difference
       counter.diff_insignificant++;
     } else {
-      // At least one value <= ignore threshold - this is a significant
+      // At least one value <= ignore threshold - this is a SIGNIFICANT
       // difference
       counter.diff_significant++;
       flags.has_significant_diff = true;
       flags.files_are_close_enough = false;
 
-      // Marginal differences occur when both TL values are between marginal and
-      // ignore thresholds (110 < TL < ~138) - detectable but operationally less
-      // important
+      // LEVEL 4: significant = marginal + non_marginal (based on marginal
+      // threshold 110)
       if (column_data.value1 > thresh.marginal &&
           column_data.value1 < thresh.ignore &&
           column_data.value2 > thresh.marginal &&
           column_data.value2 < thresh.ignore) {
+        // Both values in marginal range (110 < TL < 138) - this is a MARGINAL
+        // difference Marginal differences are a separate category and not
+        // further subdivided
         counter.diff_marginal++;
         flags.has_marginal_diff = true;
+      } else {
+        // This is a NON-MARGINAL significant difference
+
+        // LEVEL 5: non_marginal = critical + non_critical (based on critical
+        // threshold)
+        if (rounded_diff > thresh.critical) {
+          // This is a CRITICAL difference
+          counter.diff_critical++;
+          flags.has_critical_diff = true;
+          std::cout << "HIERARCHY DEBUG: CRITICAL diff=" << rounded_diff
+                    << " (total critical count now: " << counter.diff_critical
+                    << ")" << std::endl;
+        } else {
+          // This is a NON-CRITICAL difference (within non-marginal category)
+
+          // LEVEL 6: non_critical = error + non_error (based on user threshold)
+          if (rounded_diff > thresh.significant) {
+            // This is an ERROR difference (exceeds user threshold)
+            counter.diff_error++;
+            flags.has_error_diff = true;
+          } else {
+            // This is a NON-ERROR difference (within user threshold)
+            counter.diff_non_error++;
+            flags.has_non_error_diff = true;
+          }
+        }
       }
 
       // track the maximum significant difference
@@ -128,6 +152,9 @@ void DifferenceAnalyzer::process_rounded_values(
         differ.ndp_significant = column_data.min_dp;
       }
     }
+  } else if (rounded_diff > thresh.zero) {
+    // This is a TRIVIAL difference - non-zero but within format precision
+    counter.diff_trivial++;
   }
 }
 
