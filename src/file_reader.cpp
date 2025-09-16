@@ -11,6 +11,8 @@
 #include <limits>
 #include <sstream>
 
+#include "uband_diff.h"  // for PrintLevel definition
+
 // ========================================================================
 // File Operations
 // ========================================================================
@@ -239,35 +241,43 @@ ColumnStructure FileReader::analyze_column_structure(
   return structure;
 }
 
-bool FileReader::compare_column_structures(const std::string& file1,
-                                           const std::string& file2) const {
+bool FileReader::compare_column_structures(
+    const std::string& file1, const std::string& file2,
+    const PrintLevel& print_level) const {
   ColumnStructure struct1 = analyze_column_structure(file1);
   ColumnStructure struct2 = analyze_column_structure(file2);
+  if (print_level.debug2) {
+    std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
+              << std::endl;
 
-  std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
-            << std::endl;
+    std::cout << "\n\033[1;36m=== Column Structure Comparison ===\033[0m\n"
+              << std::endl;
 
-  std::cout << "\n\033[1;36m=== Column Structure Comparison ===\033[0m\n"
-            << std::endl;
+    std::cout << "\033[1;34mFile 1 (" << file1 << "):\033[0m\n";
+    print_column_structure(struct1, file1);
 
-  std::cout << "\033[1;34mFile 1 (" << file1 << "):\033[0m\n";
-  print_column_structure(struct1, file1);
-
-  std::cout << "\n\033[1;34mFile 2 (" << file2 << "):\033[0m\n";
-  print_column_structure(struct2, file2);
+    std::cout << "\n\033[1;34mFile 2 (" << file2 << "):\033[0m\n";
+    print_column_structure(struct2, file2);
+  }
 
   // Compare structures
   bool structures_match = true;
-  std::cout << "\n\033[1;33mStructure Comparison:\033[0m\n";
+  if (print_level.debug2) {
+    std::cout << "\n\033[1;33mStructure Comparison:\033[0m\n";
+  }
 
   if (struct1.groups.size() != struct2.groups.size()) {
-    std::cout << "\033[1;31m❌ Different number of column groups: "
-              << struct1.groups.size() << " vs " << struct2.groups.size()
-              << "\033[0m\n";
+    if (print_level.debug2) {
+      std::cout << "\033[1;31m❌ Different number of column groups: "
+                << struct1.groups.size() << " vs " << struct2.groups.size()
+                << "\033[0m\n";
+    }
     structures_match = false;
   } else {
-    std::cout << "\033[1;32m✓ Same number of column groups: "
-              << struct1.groups.size() << "\033[0m\n";
+    if (print_level.debug2) {
+      std::cout << "\033[1;32m✓ Same number of column groups: "
+                << struct1.groups.size() << "\033[0m\n";
+    }
 
     // Compare each group
     for (size_t i = 0; i < struct1.groups.size(); ++i) {
@@ -275,38 +285,57 @@ bool FileReader::compare_column_structures(const std::string& file1,
       const auto& g2 = struct2.groups[i];
 
       if (g1.column_count != g2.column_count) {
-        std::cout << "\033[1;31m❌ Group " << (i + 1)
-                  << " column count differs: " << g1.column_count << " vs "
-                  << g2.column_count << "\033[0m\n";
+        if (print_level.debug2) {
+          std::cout << "\033[1;31m❌ Group " << (i + 1)
+                    << " column count differs: " << g1.column_count << " vs "
+                    << g2.column_count << "\033[0m\n";
+        }
         structures_match = false;
       } else {
-        std::cout << "\033[1;32m✓ Group " << (i + 1) << " has matching "
-                  << g1.column_count << " columns\033[0m\n";
+        if (print_level.debug2) {
+          std::cout << "\033[1;32m✓ Group " << (i + 1) << " has matching "
+                    << g1.column_count << " columns\033[0m\n";
+        }
       }
 
       if (g1.is_header != g2.is_header) {
-        std::cout << "\033[1;31m❌ Group " << (i + 1)
-                  << " header status differs\033[0m\n";
+        if (print_level.debug2) {
+          std::cout << "\033[1;31m❌ Group " << (i + 1)
+                    << " header status differs\033[0m\n";
+        }
         structures_match = false;
       }
     }
   }
 
   if (struct1.is_monotonic_first_column != struct2.is_monotonic_first_column) {
-    std::cout << "\033[1;31m❌ First column monotonicity differs\033[0m\n";
+    if (print_level.debug2) {
+      std::cout << "\033[1;31m❌ First column monotonicity differs\033[0m\n";
+    }
     structures_match = false;
   } else {
-    std::cout << "\033[1;32m✓ First column monotonicity matches\033[0m\n";
+    if (print_level.debug2) {
+      std::cout << "\033[1;32m✓ First column monotonicity matches\033[0m\n";
+    }
   }
 
-  if (structures_match) {
-    std::cout << "\n\033[1;32m🎉 Column structures are compatible!\033[0m\n";
-  } else {
-    std::cout
-        << "\n\033[1;31m⚠️  Column structures are NOT compatible!\033[0m\n";
+  if (print_level.debug2) {
+    if (structures_match) {
+      std::cout << "\n\033[1;32m🎉 Column structures are compatible!\033[0m\n";
+    } else {
+      std::cout
+          << "\n\033[1;31m⚠️  Column structures are NOT compatible!\033[0m\n";
+    }
   }
 
   return structures_match;
+}
+
+// Overload that defaults to silent comparison (no debug output)
+bool FileReader::compare_column_structures(const std::string& file1,
+                                           const std::string& file2) const {
+  PrintLevel silent{0, false, false, false, false};
+  return compare_column_structures(file1, file2, silent);
 }
 
 void FileReader::print_column_structure(const ColumnStructure& structure,

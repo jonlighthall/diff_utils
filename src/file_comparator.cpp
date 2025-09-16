@@ -449,7 +449,7 @@ bool FileComparator::compare_files(const std::string& file1,
     std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
               << std::endl;
     structures_compatible =
-        file_reader_->compare_column_structures(file1, file2);
+        file_reader_->compare_column_structures(file1, file2, print);
 
     if (!structures_compatible) {
       std::cout << "\033[1;33mNote: Files have different column structures but "
@@ -1788,7 +1788,7 @@ void FileComparator::print_summary(const std::string& file1,
   print_detailed_summary(params);
   print_additional_diff_info(params);
   print_critical_threshold_info();
-  print_consistency_checks();
+  if (print.debug) print_consistency_checks();
 }
 
 void FileComparator::print_settings(const std::string& file1,

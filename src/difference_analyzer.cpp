@@ -106,23 +106,42 @@ void DifferenceAnalyzer::process_rounded_values(
         differ.ndp_non_trivial = column_data.min_dp;
       }
 
-      // LEVEL 3: non_trivial = insignificant + significant (ignore threshold)
-      if (column_data.value1 > thresh.ignore &&
-          column_data.value2 > thresh.ignore) {
-        // Both values above ignore threshold => INSIGNIFICANT
+      // LEVEL 3: non_trivial = insignificant + significant
+      // A non-trivial difference is considered INSIGNIFICANT if EITHER:
+      //   (a) both TL values are above the ignore threshold (numerically
+      //   meaningless) (b) the magnitude of the difference does NOT exceed the
+      //   (possibly
+      //       precision-inflated) significance threshold passed in (threshold)
+      // Otherwise it is SIGNIFICANT.
+      bool both_above_ignore = (column_data.value1 > thresh.ignore &&
+                                column_data.value2 > thresh.ignore);
+      bool exceeds_significance = (rounded_diff > threshold);
+
+      // DEBUG instrumentation (can be removed after validation)
+      if (counter.line_number < 5 && column_index < 5) {
+        std::ofstream dbg("/tmp/debug_significance.txt", std::ios::app);
+        dbg << "LN " << counter.line_number << " COL " << column_index + 1
+            << " raw_diff=" << raw_diff << " rounded_diff=" << rounded_diff
+            << " threshold=" << threshold
+            << " both_above_ignore=" << both_above_ignore
+            << " exceeds_significance=" << exceeds_significance << std::endl;
+      }
+      if (both_above_ignore || !exceeds_significance) {
+        // INSIGNIFICANT (still non-trivial but does not qualify as significant)
         counter.diff_insignificant++;
       } else {
-        // SIGNIFICANT difference (at least one value meaningful)
+        // SIGNIFICANT (difference large enough AND at least one value
+        // meaningful)
         counter.diff_significant++;
         flags.has_significant_diff = true;
         flags.files_are_close_enough = false;
 
-        // LEVEL 4: significant = marginal + non_marginal
+        // LEVEL 4: significant = marginal + non_marginal (based on TL range)
         if (column_data.value1 > thresh.marginal &&
             column_data.value1 < thresh.ignore &&
             column_data.value2 > thresh.marginal &&
             column_data.value2 < thresh.ignore) {
-          // MARGINAL (both in marginal band)
+          // MARGINAL band (warning range)
           counter.diff_marginal++;
           flags.has_marginal_diff = true;
         } else {
@@ -137,7 +156,8 @@ void DifferenceAnalyzer::process_rounded_values(
             flags.error_found = true;  // ensure failure exit code
           } else {
             // NON-CRITICAL
-            // LEVEL 6: non_critical = error + non_error (user threshold)
+            // LEVEL 6: non_critical = error + non_error (user/user_thresh
+            // split)
             if (rounded_diff > thresh.significant) {
               counter.diff_error++;
               flags.has_error_diff = true;
@@ -147,7 +167,7 @@ void DifferenceAnalyzer::process_rounded_values(
             }
           }
         }
-        // track maximum significant difference
+        // Track maximum significant difference
         if (rounded_diff > differ.max_significant) {
           differ.max_significant = rounded_diff;
           differ.ndp_significant = column_data.min_dp;

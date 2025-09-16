@@ -11,6 +11,9 @@
 #include <string>
 #include <vector>
 
+// Forward declaration to avoid circular include with uband_diff.h
+struct PrintLevel;
+
 /**
  * @brief Structure to hold column format information for a file
  */
@@ -65,6 +68,11 @@ class FileReader {
   // ========================================================================
   ColumnStructure analyze_column_structure(const std::string& filename) const;
 
+  bool compare_column_structures(const std::string& file1,
+                                 const std::string& file2,
+                                 const PrintLevel& print_level) const;
+
+  // Backward-compatible overload (no debug printing by default)
   bool compare_column_structures(const std::string& file1,
                                  const std::string& file2) const;
 
