@@ -96,9 +96,11 @@ struct CountStats {
 
   // differences found greater than user defined...
   size_t diff_significant = 0;  // nominal threshold ("good enough")
-  size_t diff_marginal = 0;     // marginal threshold (pass and warn)
-  size_t diff_critical = 0;     // critical threshold (fail and exit)
-  size_t diff_print = 0;        // print threshold (for difference table)
+  size_t diff_insignificant =
+      0;                     // non-trivial but both values > ignore threshold
+  size_t diff_marginal = 0;  // marginal threshold (pass and warn)
+  size_t diff_critical = 0;  // critical threshold (fail and exit)
+  size_t diff_print = 0;     // print threshold (for difference table)
 };
 struct Flags {
   bool new_fmt = false;

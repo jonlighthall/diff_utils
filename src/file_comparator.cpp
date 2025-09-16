@@ -1357,17 +1357,12 @@ void FileComparator::print_significant_percentage() const {
 
 void FileComparator::print_insignificant_differences_count(
     const SummaryParams& params) const {
-  if (counter.diff_non_trivial <= counter.diff_significant) {
-    return;
-  }
-
-  size_t insignificant_count =
-      counter.diff_non_trivial - counter.diff_significant;
-  if (insignificant_count > 0) {
+  // Print insignificant differences if any exist
+  if (counter.diff_insignificant > 0) {
     print_count_with_percent(params,
                              "Insignificant differences (<=" +
                                  std::to_string(thresh.significant) + ")",
-                             insignificant_count);
+                             counter.diff_insignificant);
   }
 }
 

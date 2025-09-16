@@ -93,31 +93,40 @@ void DifferenceAnalyzer::process_rounded_values(
     counter.diff_trivial++;
   }
 
-  // A difference is significant if it exceeds the threshold AND
+  // A difference is significant if it exceeds the USER threshold AND
   // at least one value represents meaningful pressure (TL <= ignore threshold)
   // If both TL values > ignore threshold, both correspond to pressures below
   // single precision limits, making the difference numerically meaningless
-  if (rounded_diff > threshold && !(column_data.value1 > thresh.ignore &&
-                                    column_data.value2 > thresh.ignore)) {
-    counter.diff_significant++;
-    flags.has_significant_diff = true;
-    flags.files_are_close_enough = false;
 
-    // Marginal differences occur when both TL values are between marginal and
-    // ignore thresholds (110 < TL < ~138) - detectable but operationally less
-    // important
-    if (column_data.value1 > thresh.marginal &&
-        column_data.value1 < thresh.ignore &&
-        column_data.value2 > thresh.marginal &&
-        column_data.value2 < thresh.ignore) {
-      counter.diff_marginal++;
-      flags.has_marginal_diff = true;
-    }
+  // Use USER threshold for significance, not precision-based threshold
+  if (rounded_diff > thresh.significant) {
+    if (column_data.value1 > thresh.ignore &&
+        column_data.value2 > thresh.ignore) {
+      // Both values > ignore threshold - this is an insignificant difference
+      counter.diff_insignificant++;
+    } else {
+      // At least one value <= ignore threshold - this is a significant
+      // difference
+      counter.diff_significant++;
+      flags.has_significant_diff = true;
+      flags.files_are_close_enough = false;
 
-    // track the maximum significant difference
-    if (rounded_diff > differ.max_significant) {
-      differ.max_significant = rounded_diff;
-      differ.ndp_significant = column_data.min_dp;
+      // Marginal differences occur when both TL values are between marginal and
+      // ignore thresholds (110 < TL < ~138) - detectable but operationally less
+      // important
+      if (column_data.value1 > thresh.marginal &&
+          column_data.value1 < thresh.ignore &&
+          column_data.value2 > thresh.marginal &&
+          column_data.value2 < thresh.ignore) {
+        counter.diff_marginal++;
+        flags.has_marginal_diff = true;
+      }
+
+      // track the maximum significant difference
+      if (rounded_diff > differ.max_significant) {
+        differ.max_significant = rounded_diff;
+        differ.ndp_significant = column_data.min_dp;
+      }
     }
   }
 }
