@@ -626,4 +626,4 @@ help:
 
 # =============================================================================
 case1: diff
-	./bin/uband_diff example_data/case1r.tl example_data/case1r_01.asc 0 1 0 1
+	./bin/uband_diff example_data/pe.std1.pe01.ref.txt example_data/pe.std1.pe01.test.txt 0 1 0 1
