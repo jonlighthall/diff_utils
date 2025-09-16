@@ -244,6 +244,9 @@ bool FileReader::compare_column_structures(const std::string& file1,
   ColumnStructure struct1 = analyze_column_structure(file1);
   ColumnStructure struct2 = analyze_column_structure(file2);
 
+  std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
+            << std::endl;
+
   std::cout << "\n\033[1;36m=== Column Structure Comparison ===\033[0m\n"
             << std::endl;
 

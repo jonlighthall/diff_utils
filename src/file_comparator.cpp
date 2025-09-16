@@ -665,24 +665,29 @@ double FileComparator::calculate_threshold(int ndp) {
   if (flag.new_fmt && print.debug && !print.diff_only) {
     if (this_fmt_line != last_fmt_line) {
       // group together all format specifications on the same line
-      std::cout << "PRECISION: Line " << this_fmt_line;
-      if (counter.line_number == 1) {
-        std::cout << " (initial format)";
-      } else {
-        std::cout << " (change in format)";
+      if (print.debug2) {
+        std::cout << "PRECISION: Line " << this_fmt_line;
+        if (counter.line_number == 1) {
+          std::cout << " (initial format)";
+        } else {
+          std::cout << " (change in format)";
+        }
+        std::cout << std::endl;
       }
-      std::cout << std::endl;
     }
     last_fmt_line = this_fmt_line;
     // Set the width for line numbers based on the number of digits in
     // this_fmt_line
     auto line_num_width =
         static_cast<int>(std::to_string(this_line_ncols).length());
-    // indent the column format specification under the line number
-    std::cout << "      Column " << std::setw(line_num_width) << this_fmt_column
-              << ": ";
-    std::cout << ndp << " decimal places or 10^(" << -ndp
-              << ") = " << std::setprecision(ndp) << dp_threshold << std::endl;
+    if (print.debug2) {
+      // indent the column format specification under the line number
+      std::cout << "      Column " << std::setw(line_num_width)
+                << this_fmt_column << ": ";
+      std::cout << ndp << " decimal places or 10^(" << -ndp
+                << ") = " << std::setprecision(ndp) << dp_threshold
+                << std::endl;
+    }
     if (ndp > differ.ndp_single_precision) {
       std::cout << "\033[1;33m   Warning: Decimal places (" << ndp
                 << ") exceed single precision (" << differ.ndp_single_precision
@@ -691,7 +696,7 @@ double FileComparator::calculate_threshold(int ndp) {
   }
   if (ndp > differ.ndp_max) {
     differ.ndp_max = ndp;
-    if (print.level > 0) {
+    if (print.level > 1) {
       std::cout << "      Maximum decimal places so far: " << differ.ndp_max
                 << std::endl;
     }
@@ -996,7 +1001,7 @@ void FileComparator::print_format_info(const ColumnValues& column_data,
     std::cout << "   NEW FORMAT" << std::endl;
   }
   // print the format
-  if (print.debug) {
+  if (print.debug2) {
     std::cout << "   DEBUG : Line " << counter.line_number << ", Column "
               << column_index + 1 << std::endl;
     std::cout << "      FORMAT: number of decimal places file1: "

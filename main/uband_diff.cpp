@@ -315,13 +315,15 @@ int main(int argc, char* argv[]) {
     return 0;
   } else {
     if (args.debug_level >= 0) {
-      std::cout << "\033[1;31mFiles differ significantly.\033[0m" << std::endl;
+      std::cout << "\033[1;31mFiles differ";
 
       if (comparator.getFlag().files_are_close_enough) {
-        std::cout << "\033[1;33mFiles are probably close enough (within "
+        std::cout << ",\033[1;33m but are probably close enough (within "
                      "tolerance).\033[0m"
                   << std::endl;
         return 0;
+      } else {
+        std::cout << " significantly.\033[0m" << std::endl;
       }
     }
     return 1;
