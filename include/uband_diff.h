@@ -32,8 +32,12 @@ struct Thresholds {
   // fixed thresholds
   // -------------------------------------------------------
 
+  // Single precision epsilon - calculate once to avoid duplicate computations
+  static constexpr double SINGLE_PRECISION_EPSILON =
+      1.1920928955078125e-07;  // pow(2, -23)
+
   // define epsilon when threshold is zero
-  const double zero = pow(2, -23);  // equal to single precision epsilon
+  const double zero = SINGLE_PRECISION_EPSILON;
 
   // Define the maximum significant value of TL (Transmission Loss). This will
   // be referred to as the marginal threshold. It is equal to the upper upper
@@ -52,8 +56,33 @@ struct Thresholds {
   // Values below this threshold are considered numerically "meaningless" and
   // will not trigger any action in the comparison.
   const double ignore =
-      -20 *
-      log10(pow(2, -23));  // threshold for meaningless difference (no action)
+      -20 * log10(SINGLE_PRECISION_EPSILON);  // threshold for meaningless
+                                              // difference (no action)
+
+  // Cached calculations for performance optimization
+  mutable double cached_log10_significant = 0.0;
+  mutable bool log10_significant_cached = false;
+
+  // Helper method to get log10(significant) with caching
+  double get_log10_significant() const {
+    if (!log10_significant_cached || significant <= 0) {
+      if (significant > 0) {
+        cached_log10_significant = std::log10(significant);
+        log10_significant_cached = true;
+      } else {
+        return 0.0;  // Handle edge case for zero/negative thresholds
+      }
+    }
+    return cached_log10_significant;
+  }
+
+  // Method to invalidate cache when significant threshold changes
+  void update_significant(double new_significant) {
+    if (significant != new_significant) {
+      significant = new_significant;
+      log10_significant_cached = false;
+    }
+  }
 };
 struct CountStats {
   // number of...
@@ -149,15 +178,15 @@ class FileComparator {
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
                  int debug_level = 0)
-      : file_reader_(std::make_unique<FileReader>()),
+      : thresh{user_thresh, hard_thresh, print_thresh},
+        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
+              debug_level >= 3},
+        file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
         format_tracker_(std::make_unique<FormatTracker>(
             PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
                        debug_level >= 2, debug_level >= 3})),
-        thresh{user_thresh, hard_thresh, print_thresh},
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)),
-        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
-              debug_level >= 3} {};
+        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)) {};
 
   // ========================================================================
   // Friend declarations for testing

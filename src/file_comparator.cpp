@@ -1228,7 +1228,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
                        static_cast<int>(
-                           std::round(std::log10(thresh.significant)) + 2),
+                           std::round(thresh.get_log10_significant()) + 2),
                        differ.ndp_non_trivial)
                 << "\033[0m" << std::endl;
     } else {
@@ -1237,7 +1237,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                 << format_number(
                        thresh.significant, differ.ndp_non_trivial,
                        static_cast<int>(
-                           std::round(std::log10(thresh.significant)) + 2),
+                           std::round(thresh.get_log10_significant()) + 2),
                        differ.ndp_non_trivial)
                 << "\033[0m" << std::endl;
     }
@@ -1411,7 +1411,7 @@ void FileComparator::print_max_diff_threshold_comparison_below() const {
                "significant threshold: "
             << format_number(
                    thresh.significant, differ.ndp_significant,
-                   static_cast<int>(std::round(std::log10(thresh.significant)) +
+                   static_cast<int>(std::round(thresh.get_log10_significant()) +
                                     2),
                    differ.ndp_significant)
             << "\033[0m" << std::endl;
