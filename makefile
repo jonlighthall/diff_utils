@@ -622,3 +622,8 @@ help:
 	@echo "  tests     - build unit tests only"
 	@echo "  clean-tests - remove test files only"
 	@echo "  help      - show this help message"
+
+
+# =============================================================================
+case1: diff
+	./bin/uband_diff example_data/case1r.tl example_data/case1r_01.asc 0 1 0 1
