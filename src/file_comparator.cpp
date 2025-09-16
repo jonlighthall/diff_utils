@@ -433,6 +433,7 @@ bool FileComparator::compare_files(const std::string& file1,
   std::ifstream infile2;
 
   if (!file_reader_->open_files(file1, file2, infile1, infile2)) {
+    flag.error_found = true;
     return false;
   }
 

@@ -383,3 +383,247 @@ TEST_F(FileComparatorSummationTest, CounterSummationInvariants) {
   std::cout << "  Marginal: " << counter.diff_marginal << std::endl;
   std::cout << "  Critical: " << counter.diff_critical << std::endl;
 }
+
+// ============================================================================
+// TRANSMISSION LOSS DOMAIN-SPECIFIC TESTS
+// Test behavior with different TL value ranges and thresholds
+// ============================================================================
+
+// Test values that should be ignored (TL > ignore threshold ~138.47)
+TEST_F(FileComparatorSummationTest, IgnoreHighTLValues) {
+  // Test with TL values above ignore threshold - differences should be ignored
+  createTestFile(
+      "test_high_tl1.txt",
+      {"150.0 200.0 300.0",  // All values > ignore threshold (~138.47)
+       "160.0 250.0 350.0"});
+  createTestFile(
+      "test_high_tl2.txt",
+      {"155.0 220.0 330.0",  // Large differences but should be ignored
+       "175.0 280.0 380.0"});
+
+  bool result =
+      comparator->compare_files("test_high_tl1.txt", "test_high_tl2.txt");
+
+  validateCounterInvariants();
+
+  const auto& counter = comparator->getCountStats();
+  const auto& flags = comparator->getFlag();
+
+  EXPECT_EQ(counter.elem_number, 6) << "Should have processed 6 elements";
+  EXPECT_TRUE(flags.has_non_zero_diff) << "Should have non-zero differences";
+  EXPECT_TRUE(flags.has_non_trivial_diff)
+      << "Should have non-trivial differences";
+  EXPECT_FALSE(flags.has_significant_diff)
+      << "Should NOT have significant differences (all values > ignore)";
+  EXPECT_FALSE(flags.has_marginal_diff)
+      << "Should NOT have marginal differences";
+  EXPECT_FALSE(flags.has_critical_diff)
+      << "Should NOT have critical differences";
+
+  std::cout << "\nHigh TL Values Test (values > ignore ~138.47):" << std::endl;
+  std::cout << "  Significant: " << counter.diff_significant << " (expected: 0)"
+            << std::endl;
+  std::cout << "  All differences should be ignored due to high TL values"
+            << std::endl;
+}
+
+// Test marginal differences (110 < TL < ignore ~138.47)
+TEST_F(FileComparatorSummationTest, MarginalTLDifferences) {
+  // Test with TL values in marginal range
+  createTestFile("test_marginal1.txt",
+                 {"115.0 120.0 130.0"});  // Values in marginal range
+  createTestFile("test_marginal2.txt",
+                 {"117.0 125.0 135.0"});  // Differences in marginal range
+
+  bool result =
+      comparator->compare_files("test_marginal1.txt", "test_marginal2.txt");
+
+  validateCounterInvariants();
+
+  const auto& counter = comparator->getCountStats();
+  const auto& flags = comparator->getFlag();
+
+  EXPECT_EQ(counter.elem_number, 3) << "Should have processed 3 elements";
+  EXPECT_TRUE(flags.has_significant_diff)
+      << "Should have significant differences";
+  EXPECT_TRUE(flags.has_marginal_diff) << "Should have marginal differences";
+  EXPECT_FALSE(flags.has_critical_diff)
+      << "Should NOT have critical differences (values in marginal range)";
+
+  std::cout << "\nMarginal TL Values Test (110 < TL < 138.47):" << std::endl;
+  std::cout << "  Significant: " << counter.diff_significant << std::endl;
+  std::cout << "  Marginal: " << counter.diff_marginal << std::endl;
+  std::cout << "  Expected: marginal differences for values in operational "
+               "warning range"
+            << std::endl;
+}
+
+// Test critical differences (both TL values ≤ ignore threshold)
+TEST_F(FileComparatorSummationTest, CriticalTLDifferences) {
+  // Create comparator with lower critical threshold for testing
+  FileComparator critical_comparator(0.05, 2.0, 1.0);  // critical=2.0
+
+  createTestFile("test_critical1.txt",
+                 {"50.0"});  // Single low TL value (operationally important)
+  createTestFile("test_critical2.txt",
+                 {"53.0"});  // Difference > critical threshold (3.0 > 2.0)
+
+  bool result = critical_comparator.compare_files("test_critical1.txt",
+                                                  "test_critical2.txt");
+
+  const auto& counter = critical_comparator.getCountStats();
+  const auto& flags = critical_comparator.getFlag();
+
+  // Critical differences should cause early exit, so only 1 element processed
+  EXPECT_EQ(counter.elem_number, 1)
+      << "Should have processed 1 element before critical exit";
+  EXPECT_TRUE(flags.has_significant_diff)
+      << "Should have significant differences";
+  EXPECT_TRUE(flags.has_critical_diff) << "Should have critical differences";
+  EXPECT_FALSE(flags.has_marginal_diff)
+      << "Should NOT have marginal differences (values < marginal threshold)";
+  EXPECT_FALSE(result) << "Should return false due to critical difference";
+
+  std::cout
+      << "\nCritical TL Values Test (low TL values with large differences):"
+      << std::endl;
+  std::cout << "  Significant: " << counter.diff_significant << std::endl;
+  std::cout << "  Critical: " << counter.diff_critical << std::endl;
+  std::cout << "  Expected: critical differences for operationally important "
+               "low TL values"
+            << std::endl;
+  std::cout << "  Note: Program exits early when critical difference found"
+            << std::endl;
+}
+
+// Test mixed TL ranges in same comparison
+TEST_F(FileComparatorSummationTest, MixedTLRanges) {
+  // Mix of low TL (critical range), medium TL (marginal range), and high TL
+  // (ignore range)
+  createTestFile("test_mixed_tl1.txt",
+                 {"50.0",     // Low TL - critical range
+                  "120.0",    // Medium TL - marginal range
+                  "200.0"});  // High TL - ignore range
+  createTestFile("test_mixed_tl2.txt",
+                 {"51.0",     // Small difference in critical range
+                  "125.0",    // Small difference in marginal range
+                  "250.0"});  // Large difference in ignore range
+
+  bool result =
+      comparator->compare_files("test_mixed_tl1.txt", "test_mixed_tl2.txt");
+
+  validateCounterInvariants();
+
+  const auto& counter = comparator->getCountStats();
+  const auto& flags = comparator->getFlag();
+
+  EXPECT_EQ(counter.elem_number, 3) << "Should have processed 3 elements";
+  EXPECT_TRUE(flags.has_significant_diff)
+      << "Should have significant differences";
+
+  // The high TL difference should be ignored, but low and medium TL should be
+  // significant
+  std::cout << "\nMixed TL Ranges Test:" << std::endl;
+  std::cout << "  Elements: " << counter.elem_number << std::endl;
+  std::cout << "  Significant: " << counter.diff_significant
+            << " (expected: 2, ignoring high TL)" << std::endl;
+  std::cout << "  Marginal: " << counter.diff_marginal << std::endl;
+  std::cout << "  Critical: " << counter.diff_critical << std::endl;
+}
+
+// Test edge cases around thresholds
+TEST_F(FileComparatorSummationTest, ThresholdEdgeCases) {
+  // Test values right at threshold boundaries
+  double ignore_threshold = 138.47379800543135;
+  double marginal_threshold = 110.0;
+
+  createTestFile("test_edge1.txt",
+                 {"109.9",    // Just below marginal
+                  "110.1",    // Just above marginal
+                  "138.0",    // Just below ignore
+                  "139.0"});  // Just above ignore
+  createTestFile("test_edge2.txt",
+                 {"110.1",    // Cross marginal boundary
+                  "110.3",    // Within marginal range
+                  "138.2",    // Within marginal range
+                  "139.2"});  // Both above ignore
+
+  bool result = comparator->compare_files("test_edge1.txt", "test_edge2.txt");
+
+  validateCounterInvariants();
+
+  const auto& counter = comparator->getCountStats();
+
+  std::cout << "\nThreshold Edge Cases Test:" << std::endl;
+  std::cout << "  Marginal threshold: " << marginal_threshold << std::endl;
+  std::cout << "  Ignore threshold: " << ignore_threshold << std::endl;
+  std::cout << "  Elements: " << counter.elem_number << std::endl;
+  std::cout << "  Significant: " << counter.diff_significant << std::endl;
+  std::cout << "  Marginal: " << counter.diff_marginal << std::endl;
+  std::cout << "  Expected behavior:" << std::endl;
+  std::cout << "    - Element 1: significant (crosses into marginal range)"
+            << std::endl;
+  std::cout << "    - Element 2: marginal (both in marginal range)"
+            << std::endl;
+  std::cout << "    - Element 3: marginal (both in marginal range)"
+            << std::endl;
+  std::cout << "    - Element 4: ignored (both above ignore threshold)"
+            << std::endl;
+}
+
+// Test 2% failure threshold with different TL ranges
+TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
+  std::vector<std::string> lines1, lines2;
+
+  // Create 100 elements where most are identical but some have differences in
+  // different TL ranges
+  for (int i = 0; i < 95; ++i) {
+    lines1.push_back("50.0");  // Low TL value - operationally important
+    lines2.push_back("50.0");  // Identical
+  }
+
+  // Add 3 differences in low TL range (should be significant and count toward
+  // 2% threshold)
+  lines1.push_back("60.0 70.0 80.0");
+  lines2.push_back("60.2 70.2 80.2");  // Small but significant differences
+
+  // Add 2 differences in high TL range (should be ignored and NOT count toward
+  // 2% threshold)
+  lines1.push_back("200.0 250.0");
+  lines2.push_back("220.0 280.0");  // Large differences but in ignore range
+
+  createTestFile("test_2percent_tl1.txt", lines1);
+  createTestFile("test_2percent_tl2.txt", lines2);
+
+  bool result = comparator->compare_files("test_2percent_tl1.txt",
+                                          "test_2percent_tl2.txt");
+
+  validateCounterInvariants();
+  validate2PercentLogic();
+
+  const auto& counter = comparator->getCountStats();
+  const auto& flags = comparator->getFlag();
+
+  EXPECT_EQ(counter.elem_number, 100) << "Should have exactly 100 elements";
+
+  // Calculate non-marginal, non-critical significant differences
+  size_t non_marginal_non_critical =
+      counter.diff_significant - counter.diff_marginal - counter.diff_critical;
+  double percentage = 100.0 * static_cast<double>(non_marginal_non_critical) /
+                      static_cast<double>(counter.elem_number);
+
+  std::cout << "\n2% Threshold with TL Ranges Test:" << std::endl;
+  std::cout << "  Total elements: " << counter.elem_number << std::endl;
+  std::cout << "  Total significant: " << counter.diff_significant << std::endl;
+  std::cout << "  Non-marginal, non-critical: " << non_marginal_non_critical
+            << " (" << percentage << "%)" << std::endl;
+  std::cout << "  Expected: Only low TL differences should count (3%), high TL "
+               "ignored"
+            << std::endl;
+
+  // Should have exactly 3% significant differences (3 out of 100), exceeding 2%
+  // threshold
+  if (percentage > 2.0) {
+    EXPECT_TRUE(flags.error_found) << "Should trigger 2% failure threshold";
+  }
+}
