@@ -34,7 +34,7 @@ struct Thresholds {
 
   // Single precision epsilon - calculate once to avoid duplicate computations
   static constexpr double SINGLE_PRECISION_EPSILON =
-      1.1920928955078125e-07;  // pow(2, -23)
+      std::pow(2.0, -23);  // ~1.19e-07
 
   // define epsilon when threshold is zero
   const double zero = SINGLE_PRECISION_EPSILON;
