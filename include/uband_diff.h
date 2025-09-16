@@ -101,8 +101,9 @@ struct CountStats {
   size_t diff_marginal = 0;  // marginal threshold (pass and warn)
   size_t diff_critical = 0;  // critical threshold (fail and exit)
 
-  // LEVEL 5 counters: non_critical = error + non_error (based on user
-  // threshold)
+  // LEVEL 6 counters: non_critical = error + non_error (based on user
+  // threshold). These are only populated for non-marginal, non-critical,
+  // significant differences.
   size_t diff_error = 0;      // differences > user threshold (argument 3)
   size_t diff_non_error = 0;  // differences <= user threshold (argument 3)
 
@@ -331,6 +332,7 @@ class FileComparator {
   void print_detailed_summary(const SummaryParams& params) const;
   void print_additional_diff_info(const SummaryParams& params) const;
   void print_critical_threshold_info() const;
+  void print_consistency_checks() const;  // Verify six-level identities
 
   // Diff-like summary helper functions
   void print_identical_files_message(const SummaryParams& params) const;

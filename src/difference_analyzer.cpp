@@ -36,17 +36,18 @@ bool DifferenceAnalyzer::process_difference(
 
   counter.elem_number++;
 
-  // Check critical threshold - only count if both values correspond to
-  // meaningful pressure values (TL <= ignore threshold)
-  // TL values > ignore threshold correspond to pressures < single precision
-  // limit
-  if ((diff_rounded > thresh.critical) &&
-      ((rounded1 <= thresh.ignore) && (rounded2 <= thresh.ignore))) {
-    // NOTE: Critical differences are counted in the hierarchy logic, not here
+  // Check critical threshold - only annotate early if both values correspond
+  // to meaningful pressure values (TL <= ignore threshold). We DO NOT abort
+  // processing; instead we set flags and let the hierarchy logic count it.
+  if ((diff_rounded > thresh.critical) && (rounded1 <= thresh.ignore) &&
+      (rounded2 <= thresh.ignore)) {
+    if (!flags.has_critical_diff) {
+      // First critical difference encountered: print a concise notification
+      print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index,
+                                 counter);
+    }
     flags.has_critical_diff = true;
-    print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index,
-                               counter);
-    return false;
+    flags.error_found = true;  // ensure program exits non-zero
   }
   return true;
 }
@@ -80,81 +81,79 @@ void DifferenceAnalyzer::process_rounded_values(
   // subdivided
 
   // LEVEL 2: non_zero = trivial + non_trivial (based on printed precision)
-  double big_zero = std::pow(10, -minimum_deci) / 2;
+  // A raw non-zero difference is TRIVIAL if, after rounding to the minimum
+  // printed precision, the two values are identical OR the rounded difference
+  // is within half an LSB (big_zero). Otherwise it is NON-TRIVIAL.
+  double raw_diff = std::abs(column_data.value1 - column_data.value2);
+  double lsb = std::pow(10, -minimum_deci);    // one unit in last place
+  double big_zero = lsb / 2.0;                 // half-ulp criterion
+  bool raw_non_zero = raw_diff > thresh.zero;  // raw difference observed
+  bool trivial_after_rounding = (rounded_diff <= big_zero);
 
-  if (rounded_diff > big_zero) {
-    // This is a NON-TRIVIAL difference
-    counter.diff_non_trivial++;
-    flags.has_non_trivial_diff = true;
-    flags.files_have_same_values = false;
-
-    // track the maximum non trivial difference
-    if (rounded_diff > differ.max_non_trivial) {
-      differ.max_non_trivial = rounded_diff;
-      differ.ndp_non_trivial = column_data.min_dp;
-    }
-
-    // LEVEL 3: non_trivial = insignificant + significant (based on ignore
-    // threshold ~138)
-    if (column_data.value1 > thresh.ignore &&
-        column_data.value2 > thresh.ignore) {
-      // Both values > ignore threshold - this is an INSIGNIFICANT difference
-      counter.diff_insignificant++;
+  if (raw_non_zero) {
+    if (trivial_after_rounding) {
+      // TRIVIAL: raw difference exists but formatting precision hides it
+      counter.diff_trivial++;
     } else {
-      // At least one value <= ignore threshold - this is a SIGNIFICANT
-      // difference
-      counter.diff_significant++;
-      flags.has_significant_diff = true;
-      flags.files_are_close_enough = false;
+      // NON-TRIVIAL difference
+      counter.diff_non_trivial++;
+      flags.has_non_trivial_diff = true;
+      flags.files_have_same_values = false;
 
-      // LEVEL 4: significant = marginal + non_marginal (based on marginal
-      // threshold 110)
-      if (column_data.value1 > thresh.marginal &&
-          column_data.value1 < thresh.ignore &&
-          column_data.value2 > thresh.marginal &&
-          column_data.value2 < thresh.ignore) {
-        // Both values in marginal range (110 < TL < 138) - this is a MARGINAL
-        // difference Marginal differences are a separate category and not
-        // further subdivided
-        counter.diff_marginal++;
-        flags.has_marginal_diff = true;
+      // track maximum non-trivial difference
+      if (rounded_diff > differ.max_non_trivial) {
+        differ.max_non_trivial = rounded_diff;
+        differ.ndp_non_trivial = column_data.min_dp;
+      }
+
+      // LEVEL 3: non_trivial = insignificant + significant (ignore threshold)
+      if (column_data.value1 > thresh.ignore &&
+          column_data.value2 > thresh.ignore) {
+        // Both values above ignore threshold => INSIGNIFICANT
+        counter.diff_insignificant++;
       } else {
-        // This is a NON-MARGINAL significant difference
+        // SIGNIFICANT difference (at least one value meaningful)
+        counter.diff_significant++;
+        flags.has_significant_diff = true;
+        flags.files_are_close_enough = false;
 
-        // LEVEL 5: non_marginal = critical + non_critical (based on critical
-        // threshold)
-        if (rounded_diff > thresh.critical) {
-          // This is a CRITICAL difference
-          counter.diff_critical++;
-          flags.has_critical_diff = true;
-          std::cout << "HIERARCHY DEBUG: CRITICAL diff=" << rounded_diff
-                    << " (total critical count now: " << counter.diff_critical
-                    << ")" << std::endl;
+        // LEVEL 4: significant = marginal + non_marginal
+        if (column_data.value1 > thresh.marginal &&
+            column_data.value1 < thresh.ignore &&
+            column_data.value2 > thresh.marginal &&
+            column_data.value2 < thresh.ignore) {
+          // MARGINAL (both in marginal band)
+          counter.diff_marginal++;
+          flags.has_marginal_diff = true;
         } else {
-          // This is a NON-CRITICAL difference (within non-marginal category)
-
-          // LEVEL 6: non_critical = error + non_error (based on user threshold)
-          if (rounded_diff > thresh.significant) {
-            // This is an ERROR difference (exceeds user threshold)
-            counter.diff_error++;
-            flags.has_error_diff = true;
+          // NON-MARGINAL
+          // LEVEL 5: non_marginal = critical + non_critical
+          if ((rounded_diff > thresh.critical) &&
+              (column_data.value1 <= thresh.ignore) &&
+              (column_data.value2 <= thresh.ignore)) {
+            // CRITICAL
+            counter.diff_critical++;
+            flags.has_critical_diff = true;
+            flags.error_found = true;  // ensure failure exit code
           } else {
-            // This is a NON-ERROR difference (within user threshold)
-            counter.diff_non_error++;
-            flags.has_non_error_diff = true;
+            // NON-CRITICAL
+            // LEVEL 6: non_critical = error + non_error (user threshold)
+            if (rounded_diff > thresh.significant) {
+              counter.diff_error++;
+              flags.has_error_diff = true;
+            } else {
+              counter.diff_non_error++;
+              flags.has_non_error_diff = true;
+            }
           }
         }
-      }
-
-      // track the maximum significant difference
-      if (rounded_diff > differ.max_significant) {
-        differ.max_significant = rounded_diff;
-        differ.ndp_significant = column_data.min_dp;
+        // track maximum significant difference
+        if (rounded_diff > differ.max_significant) {
+          differ.max_significant = rounded_diff;
+          differ.ndp_significant = column_data.min_dp;
+        }
       }
     }
-  } else if (rounded_diff > thresh.zero) {
-    // This is a TRIVIAL difference - non-zero but within format precision
-    counter.diff_trivial++;
   }
 }
 

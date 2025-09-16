@@ -779,6 +779,11 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
 void FileComparator::print_table(const ColumnValues& column_data,
                                  size_t column_index, double line_threshold,
                                  double diff_rounded, double diff_unrounded) {
+  // If a critical difference has already been encountered, suppress further
+  // table printing to avoid flooding output, but continue processing.
+  if (flag.has_critical_diff) {
+    return;
+  }
   // Print a row in the difference table
   // Contents of the table:
   //    [0] the line number is printed
@@ -1038,6 +1043,7 @@ void FileComparator::print_exact_matches_info(
 
   const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
   if (zero_diff > 0 && print.debug) {
+    std::cout << "  LEVEL 1 DISCRIMINATION: raw difference" << std::endl;
     std::cout << "   Exact matches        ( =" << 0.0 << "): ";
     std::cout << get_count_color(zero_diff);
     std::cout << std::setw(params.fmt_wid) << zero_diff << "\033[0m"
@@ -1092,7 +1098,7 @@ void FileComparator::print_maximum_difference_analysis(
                    static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
                    differ.ndp_non_zero)
             << "\033[0m" << std::endl;
-  std::cout << "DEBUG: comparing max diff (" << differ.max_non_zero
+  std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
             << ") to significant thresh (" << thresh.significant << ")..."
             << std::endl;
 
@@ -1100,7 +1106,7 @@ void FileComparator::print_maximum_difference_analysis(
   if (differ.max_non_zero > thresh.significant) {
     // Maximum difference exceeds threshold
     std::cout
-        << "DEBUG: max non-zero diff is greater than significant threshold"
+        << "   DEBUG: max non-zero diff is greater than significant threshold"
         << std::endl;
     std::string color =
         (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
@@ -1109,8 +1115,8 @@ void FileComparator::print_maximum_difference_analysis(
         << "   Max non-zero diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
 
-    std::cout << "DEBUG: non-trivial diff count: " << counter.diff_non_trivial
-              << std::endl;
+    std::cout << "   DEBUG: non-trivial diff count: "
+              << counter.diff_non_trivial << std::endl;
     // Handle special case when no non-trivial differences exist
     if (counter.diff_non_trivial == 0) {
       // This means all differences are trivial but the max non-zero diff
@@ -1181,7 +1187,6 @@ void FileComparator::print_diff_like_summary(
   print_non_zero_differences_info(params);
   print_difference_counts(params);
   print_maximum_difference_analysis(params);
-
   printbar(1);
 }
 
@@ -1204,12 +1209,22 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   if (counter.diff_significant > 0 && print.level < 1) {
     return;
   }
+
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // LEVEL 2: non-zero = trivial + non-trivial differences
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  const size_t trivial_diff = counter.diff_non_zero - counter.diff_non_trivial;
+  std::cout << "  LEVEL 2 DISCRIMINATION: rounded difference" << std::endl;
   if (print.level > 0) {
-    if (counter.diff_trivial > 0) {
+    std::cout << "   DEBUG: Trivial differences: " << trivial_diff
+              << ", Non-trivial differences: " << counter.diff_non_trivial
+              << std::endl;
+
+    if (trivial_diff > 0) {
       std::cout << "   Trivial differences     ( >" << 0.0 << "): ";
       std::cout << "\033[1;32m";
-      std::cout << std::setw(params.fmt_wid) << counter.diff_trivial
-                << "\033[0m" << std::endl;
+      std::cout << std::setw(params.fmt_wid) << trivial_diff << "\033[0m"
+                << std::endl;
     }
     std::cout << "   Non-trivial differences      : ";
     if (counter.diff_non_trivial > 0) {
@@ -1304,21 +1319,35 @@ void FileComparator::print_significant_summary(
 
   print_significant_differences_count(params);
   print_insignificant_differences_count(params);
+  printbar(1);
 
   // Print detailed breakdown of significant differences
   if (counter.diff_significant > 0 && print.level > 0) {
     size_t non_marginal_non_critical = counter.diff_significant -
                                        counter.diff_marginal -
                                        counter.diff_critical;
+
+    std::cout << "  LEVEL 4 DISCRIMINATION: both values less than "
+              << thresh.marginal << std::endl;
     if (counter.diff_marginal > 0) {
       print_count_with_percent(params, "Marginal differences",
                                counter.diff_marginal, "\033[1;33m");
     }
+    std::cout << "   Non-marginal differences: " << non_marginal_non_critical
+              << std::endl;
+    printbar(1);
+    std::cout << "  LEVEL 5 DISCRIMINATION: difference less than "
+              << thresh.critical << std::endl;
     if (counter.diff_critical > 0) {
       print_count_with_percent(params, "Critical differences",
                                counter.diff_critical, "\033[1;31m");
+    } else {
+      std::cout << "   No critical differences found." << std::endl;
     }
+    printbar(1);
     if (non_marginal_non_critical > 0) {
+      std::cout << "  LEVEL 6 DISCRIMINATION: difference less than "
+                << thresh.significant << std::endl;
       print_count_with_percent(params, "Non-marginal, non-critical significant",
                                non_marginal_non_critical, "\033[1;36m");
     }
@@ -1333,6 +1362,8 @@ void FileComparator::print_significant_summary(
 
 void FileComparator::print_significant_differences_count(
     const SummaryParams& params) const {
+  std::cout << "  LEVEL 3 DISCRIMINATION: both values less than "
+            << thresh.ignore << std::endl;
   std::cout << "   Significant differences   ( >" << thresh.significant
             << "): ";
 
@@ -1376,7 +1407,8 @@ void FileComparator::print_significant_percentage() const {
               << std::setprecision(2) << critical_percent << "%) exceed "
               << failure_threshold_percent << "% threshold\033[0m" << std::endl;
     flag.files_are_close_enough = false;
-    flag.error_found = true;
+    // Do not mark error_found here; reserve for true criticals or structural
+    // errors
   } else if (critical_percent > 0) {
     std::cout << "   \033[1;33mPASS: Non-marginal, non-critical significant "
                  "differences ("
@@ -1745,13 +1777,13 @@ void FileComparator::print_summary(const std::string& file1,
   }
 
   // Early return for errors
-  if (flag.error_found) {
-    return;
-  }
+  // Do not abort summary on error; continue to print detailed breakdowns
+  // so the rest of the file is processed and reported.
 
   print_detailed_summary(params);
   print_additional_diff_info(params);
   print_critical_threshold_info();
+  print_consistency_checks();
 }
 
 void FileComparator::print_settings(const std::string& file1,
@@ -1784,6 +1816,142 @@ void FileComparator::print_settings(const std::string& file1,
     std::cout << "      Ignore     : \033[1;34m" << thresh.ignore
               << "\033[0m (maximum TL)" << std::endl;
   }
+}
+void FileComparator::print_consistency_checks() const {
+  if (print.level < 0) return;
+  if (counter.elem_number == 0) return;
+
+  auto passfail = [](bool ok) {
+    return ok ? "\033[1;32mPASS\033[0m" : "\033[1;31mFAIL\033[0m";
+  };
+  std::cout << "CONSISTENCY CHECKS:" << std::endl;
+
+  // Level 1: total = zero + non_zero
+  size_t zero = counter.elem_number - counter.diff_non_zero;
+  bool ok1 = (counter.elem_number == zero + counter.diff_non_zero);
+  std::cout << "   L1: total == zero + non_zero: " << passfail(ok1)
+            << std::endl;
+
+  // Level 2: total = zero + trivial + non_trivial
+  bool ok2 = (counter.elem_number ==
+              zero + counter.diff_trivial + counter.diff_non_trivial);
+  std::cout << "   L2: total == zero + trivial + non_trivial: " << passfail(ok2)
+            << std::endl;
+
+  // Level 3:
+  // non_zero = trivial + insignificant + significant
+  bool ok3a = (counter.diff_non_zero == counter.diff_trivial +
+                                            counter.diff_insignificant +
+                                            counter.diff_significant);
+  std::cout << "   L3a: non_zero == trivial + insignificant + significant: "
+            << passfail(ok3a) << std::endl;
+  // total = zero + trivial + insignificant + significant
+  bool ok3b = (counter.elem_number == zero + counter.diff_trivial +
+                                          counter.diff_insignificant +
+                                          counter.diff_significant);
+  std::cout << "   L3b: total == zero + trivial + insignificant + significant: "
+            << passfail(ok3b) << std::endl;
+
+  // Level 4:
+  // non_trivial = insignificant + marginal + non_marginal
+  size_t non_marginal = (counter.diff_significant > counter.diff_marginal
+                             ? counter.diff_significant - counter.diff_marginal
+                             : 0);
+  bool ok4a =
+      (counter.diff_non_trivial ==
+       counter.diff_insignificant + counter.diff_marginal + non_marginal);
+  std::cout
+      << "   L4a: non_trivial == insignificant + marginal + non_marginal: "
+      << passfail(ok4a) << std::endl;
+  // non_zero = trivial + insignificant + marginal + non_marginal
+  bool ok4b = (counter.diff_non_zero ==
+               counter.diff_trivial + counter.diff_insignificant +
+                   counter.diff_marginal + non_marginal);
+  std::cout << "   L4b: non_zero == trivial + insignificant + marginal + "
+               "non_marginal: "
+            << passfail(ok4b) << std::endl;
+  // total = zero + trivial + insignificant + marginal + non_marginal
+  bool ok4c = (counter.elem_number == zero + counter.diff_trivial +
+                                          counter.diff_insignificant +
+                                          counter.diff_marginal + non_marginal);
+  std::cout << "   L4c: total == zero + trivial + insignificant + marginal + "
+               "non_marginal: "
+            << passfail(ok4c) << std::endl;
+
+  // Level 5:
+  // significant = marginal + critical + non_critical
+  size_t non_critical = (counter.diff_significant >
+                                 (counter.diff_marginal + counter.diff_critical)
+                             ? counter.diff_significant -
+                                   counter.diff_marginal - counter.diff_critical
+                             : 0);
+  bool ok5a = (counter.diff_significant ==
+               counter.diff_marginal + counter.diff_critical + non_critical);
+  std::cout << "   L5a: significant == marginal + critical + non_critical: "
+            << passfail(ok5a) << std::endl;
+  // non_trivial = insignificant + marginal + critical + non_critical
+  bool ok5b = (counter.diff_non_trivial ==
+               counter.diff_insignificant + counter.diff_marginal +
+                   counter.diff_critical + non_critical);
+  std::cout << "   L5b: non_trivial == insignificant + marginal + critical + "
+               "non_critical: "
+            << passfail(ok5b) << std::endl;
+  // non_zero = trivial + insignificant + marginal + critical + non_critical
+  bool ok5c =
+      (counter.diff_non_zero ==
+       counter.diff_trivial + counter.diff_insignificant +
+           counter.diff_marginal + counter.diff_critical + non_critical);
+  std::cout << "   L5c: non_zero == trivial + insignificant + marginal + "
+               "critical + non_critical: "
+            << passfail(ok5c) << std::endl;
+  // total = zero + trivial + insignificant + marginal + critical + non_critical
+  bool ok5d =
+      (counter.elem_number ==
+       zero + counter.diff_trivial + counter.diff_insignificant +
+           counter.diff_marginal + counter.diff_critical + non_critical);
+  std::cout << "   L5d: total == zero + trivial + insignificant + marginal + "
+               "critical + non_critical: "
+            << passfail(ok5d) << std::endl;
+
+  // Level 6:
+  // non_marginal = critical + error + non_error
+  bool ok6a = (non_marginal == counter.diff_critical + counter.diff_error +
+                                   counter.diff_non_error);
+  std::cout << "   L6a: non_marginal == critical + error + non_error: "
+            << passfail(ok6a) << std::endl;
+  // significant = marginal + critical + error + non_error
+  bool ok6b = (counter.diff_significant ==
+               counter.diff_marginal + counter.diff_critical +
+                   counter.diff_error + counter.diff_non_error);
+  std::cout
+      << "   L6b: significant == marginal + critical + error + non_error: "
+      << passfail(ok6b) << std::endl;
+  // non_trivial = insignificant + marginal + critical + error + non_error
+  bool ok6c =
+      (counter.diff_non_trivial ==
+       counter.diff_insignificant + counter.diff_marginal +
+           counter.diff_critical + counter.diff_error + counter.diff_non_error);
+  std::cout << "   L6c: non_trivial == insignificant + marginal + critical + "
+               "error + non_error: "
+            << passfail(ok6c) << std::endl;
+  // non_zero = trivial + insignificant + marginal + critical + error +
+  // non_error
+  bool ok6d = (counter.diff_non_zero ==
+               counter.diff_trivial + counter.diff_insignificant +
+                   counter.diff_marginal + counter.diff_critical +
+                   counter.diff_error + counter.diff_non_error);
+  std::cout << "   L6d: non_zero == trivial + insignificant + marginal + "
+               "critical + error + non_error: "
+            << passfail(ok6d) << std::endl;
+  // total = zero + trivial + insignificant + marginal + critical + error +
+  // non_error
+  bool ok6e = (counter.elem_number ==
+               zero + counter.diff_trivial + counter.diff_insignificant +
+                   counter.diff_marginal + counter.diff_critical +
+                   counter.diff_error + counter.diff_non_error);
+  std::cout << "   L6e: total == zero + trivial + insignificant + marginal + "
+               "critical + error + non_error: "
+            << passfail(ok6e) << std::endl;
 }
 
 ColumnValues FileComparator::extract_column_values(const LineData& data1,
