@@ -148,8 +148,6 @@ SRCS.CPP = $(wildcard $(SRCDIR)/*.cc $(SRCDIR)/*.cpp $(SRCDIR)/*.cxx)
 SRCS.CPP := $(strip $(SRCS.CPP))
 SRCS = $(strip $(SRCS.C) $(SRCS.CPP))
 
-#
-
 # module files
 # fortran module complier flags
 FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
