@@ -39,6 +39,39 @@ Level 4: Marginal (operational warning band) vs non‑marginal
 Level 5: Critical vs non‑critical (exceeds hard threshold)
 Level 6: Error vs non‑error (user threshold subdivision inside non‑marginal, non‑critical significant set)
 
+#### Clarifying the Discrimination Flow
+
+The stages are intentionally **short‑circuiting**:
+
+* A difference classified as trivial at Level 2 never re-enters later semantic buckets. It is excluded from both `diff_significant` and `diff_insignificant` counts. This guarantees that formatting / representational artifacts (e.g. values differing only beyond the shared displayed precision) cannot be “rescued” or later promoted by threshold tuning.
+* Level 3 decisions operate **only on the non‑trivial remainder**. Thus, any override or special behavior (like zero-threshold sensitivity) *starts after* trivial filtering has permanently removed display‑noise.
+* “Insignificant” at Level 3 therefore means: physically or numerically unimportant given thresholds (high TL ignore region, or below effective significance floor) — **not** trivial. Trivial is a stricter, earlier exclusion.
+
+Why this matters: without this separation, a user setting a very low (or zero) significant threshold could unintentionally reintroduce representational chatter. The design prevents that by making Level 2 an immutable filter.
+
+##### Zero-Threshold vs Trivial Filtering
+
+When `user_significant == 0.0`, the intent is *maximum sensitivity*: count every physically meaningful non‑trivial difference. The engine therefore bypasses the precision-derived floor (`dp_threshold`) **only for the Level 3 significant/insignificant split**. It does **not** revisit Level 2, and does **not** permit trivial differences to become significant. The semantic invariant introduced is:
+
+```
+diff_significant = diff_non_trivial - diff_high_ignore   (when user_significant == 0)
+```
+
+Where `diff_high_ignore` counts non‑trivial differences whose *both* TL values exceed the ignore threshold (physically meaningless region). Trivial differences (`diff_trivial`) are already excluded before this equation applies.
+
+This yields a clean mental model:
+
+1. Remove pure formatting noise (trivial) — irrevocable.
+2. Among the rest, if in sensitive (zero) mode: count all except those physically screened by the high-ignore band.
+3. Apply further partitioning (marginal, critical, error) on that significant core.
+
+##### Semantic vs Structural Invariants
+
+*Structural* (additive) invariants: ensure bookkeeping integrity (e.g. `non_trivial == insignificant + marginal + non_marginal`). They cannot detect a logic bug that mislabels many small, meaningful diffs as insignificant so long as the mislabeling is consistent.
+*Semantic* invariants: encode meaning. Example: when in zero-threshold mode, no non-trivial difference below ignore should be demoted due to a formatting precision floor; equivalently, the equation above must hold. Failing this indicates erosion of the “maximum sensitivity” contract, even if additive sums still balance.
+
+The test suite now includes semantic invariant tests to lock these expectations in, preventing silent regression that would otherwise pass pure additive checks.
+
 ### Threshold Definitions
 
 | Symbol             | Meaning                                                                                                                       | Source                           |
