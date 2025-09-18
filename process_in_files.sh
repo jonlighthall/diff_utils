@@ -225,6 +225,27 @@ missing_output_files=()
 empty_files=()
 processed_files=()
 skipped_files=()
+exec_success_files=()
+exec_fail_files=()
+missing_exec_output_files=()
+
+# Helper function to add file to array only if not already present
+add_to_array_if_not_present() {
+    local array_name="$1"
+    local file="$2"
+    local -n array_ref="$array_name"
+    
+    # Check if file is already in array
+    local item
+    for item in "${array_ref[@]}"; do
+        if [[ "$item" == "$file" ]]; then
+            return 0  # File already present, don't add
+        fi
+    done
+    
+    # File not found, add it
+    array_ref+=("$file")
+}
 
 # Print mode header once at the beginning
 term_width=$(tput cols 2>/dev/null || echo 80)
@@ -301,10 +322,12 @@ for infile in "${infiles[@]}"; do
                 if [[ "$mode" != "test" ]]; then
                     echo "   Success: ${PROG} completed successfully for $infile"
                 fi
+                exec_success_files+=("$infile")
             else
                 echo -e "\e[31mFAIL\e[0m"
                 echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
+                exec_fail_files+=("$infile")
                 echo "   Aborting..."
                 break
                 #continue
@@ -338,7 +361,7 @@ for infile in "${infiles[@]}"; do
                         echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
                         # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
-                        skipped_files+=("$infile")
+                        add_to_array_if_not_present "skipped_files" "$infile"
                         found_files=true
                     else
                         echo -e "\e[33m[[MISSING]]\e[0m\n   Both output '$test' and reference '$ref' do not exist"
@@ -346,7 +369,7 @@ for infile in "${infiles[@]}"; do
                         # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
                         missing_reference_files+=("$ref")
-                        skipped_files+=("$infile")
+                        add_to_array_if_not_present "skipped_files" "$infile"
                         found_files=true
                     fi
                     break  # Exit the suffix loop since we handled this case
@@ -369,12 +392,12 @@ for infile in "${infiles[@]}"; do
                             if [[ "$mode" == "test" ]]; then
                                 echo -e "\e[33m[[MISSING]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
                                 # In test mode, mark as failed since we were trying to validate the output
-                                fail_files+=("$infile")
+                                add_to_array_if_not_present "fail_files" "$infile"
                             fi
                             # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
                             missing_reference_files+=("$ref")
-                            skipped_files+=("$infile")
+                            add_to_array_if_not_present "skipped_files" "$infile"
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
@@ -388,11 +411,11 @@ for infile in "${infiles[@]}"; do
                                 echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
                                 echo "   Reference file '$ref' is empty" >> "$LOG_FILE"
                                 # In test mode, mark as failed since we were trying to validate the output
-                                fail_files+=("$infile")
+                                add_to_array_if_not_present "fail_files" "$infile"
                             fi
                             # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$ref")
-                            skipped_files+=("$infile")
+                            add_to_array_if_not_present "skipped_files" "$infile"
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
@@ -403,7 +426,7 @@ for infile in "${infiles[@]}"; do
                             echo -e "   \e[33mHint: Run 'test' mode first to generate output files\e[0m"
                             # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             missing_output_files+=("$test")
-                            skipped_files+=("$infile")
+                            add_to_array_if_not_present "skipped_files" "$infile"
                             continue
                         fi
                         
@@ -412,7 +435,7 @@ for infile in "${infiles[@]}"; do
                             echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m\n   Output file '$test' is empty"
                             # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$test")
-                            skipped_files+=("$infile")
+                            add_to_array_if_not_present "skipped_files" "$infile"
                             continue
                         fi
                         
@@ -422,20 +445,20 @@ for infile in "${infiles[@]}"; do
                             if diff_files "$test" "$ref" >> "$LOG_FILE" 2>&1; then
                                 echo -e "\e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
-                                pass_files+=("$infile")
+                                add_to_array_if_not_present "pass_files" "$infile"
                             else
                                 echo -e "\e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                                 echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
-                                fail_files+=("$infile")
+                                add_to_array_if_not_present "fail_files" "$infile"
                             fi
                         else
                             # DIFF mode: Show comparison results to terminal only
                             if diff_files "$test" "$ref"; then
                                 echo -e "$infile \e[32m[[PASS]]\e[0m" # Print PASS to terminal
-                                pass_files+=("$infile")
+                                add_to_array_if_not_present "pass_files" "$infile"
                             else
                                 echo -e "$infile \e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
-                                fail_files+=("$infile")
+                                add_to_array_if_not_present "fail_files" "$infile"
                             fi
                         fi
                     else
@@ -486,10 +509,10 @@ for infile in "${infiles[@]}"; do
                     echo -e "   \e[33mHint: Run 'make' mode to generate output files, and 'copy' mode to generate reference files\e[0m"
                     # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                     # No specific file to add to missing arrays since we don't know which suffix
-                    skipped_files+=("$infile")
+                    add_to_array_if_not_present "skipped_files" "$infile"
                 else
                     # In test mode, mark as failed since we were trying to validate the output
-                    fail_files+=("$infile")
+                    add_to_array_if_not_present "fail_files" "$infile"
                 fi
             fi
         fi
@@ -510,6 +533,30 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
         echo "Diff Summary:"
     fi
     printf '%*s\n' "$line_len" '' | tr ' ' '='
+    
+    # Show executable results for test mode
+    if [[ "$mode" == "test" ]]; then
+        if [[ ${#exec_success_files[@]} -gt 0 ]]; then
+            echo "Executable successful: ${#exec_success_files[@]}"
+            for f in "${exec_success_files[@]}"; do
+                echo -e "   \e[32mEXEC_OK\e[0m $f"
+            done
+        fi
+        if [[ ${#exec_fail_files[@]} -gt 0 ]]; then
+            echo "Executable failed: ${#exec_fail_files[@]}"
+            for f in "${exec_fail_files[@]}"; do
+                echo -e "   \e[31mEXEC_FAIL\e[0m $f"
+            done
+        fi
+        if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
+            echo "Executable ran but no output: ${#missing_exec_output_files[@]}"
+            for f in "${missing_exec_output_files[@]}"; do
+                echo -e "   \e[33mNO_OUTPUT\e[0m $(basename "$f" .line)"
+            done
+        fi
+        echo ""
+    fi
+    
     if [[ "$mode" == "copy" ]]; then
         echo "Processed files: ${#processed_files[@]}"
         for f in "${processed_files[@]}"; do
