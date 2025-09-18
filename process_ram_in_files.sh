@@ -8,7 +8,7 @@
 #
 # Input options (first argument):
 #   make - Runs ram1.5.exe only (no file operations)
-#   copy - Renames existing output files (basename.line) to reference names (.tl)
+#   copy - Copies existing output files (basename.line) to reference names (.tl)
 #   test - Runs ram1.5.exe, logs output, and compares results to reference files
 #   diff - Compares existing output files to reference files (does not run ram1.5.exe)
 #
@@ -51,7 +51,7 @@ mode="$1"
 #
 # 'copy':
 #   - Does NOT run ram1.5.exe
-#   - Renames existing output files (basename.line) to reference names (.tl)
+#   - Copies existing output files (.line) to reference names (.tl)
 #   - Cleans up extra files
 #   - Use when you want to prepare existing outputs for reference
 #
@@ -64,7 +64,7 @@ mode="$1"
 #
 # 'diff':
 #   - Does NOT run ram1.5.exe
-#   - Compares existing output files (basename.line) to reference files (.tl)
+#   - Compares existing output files (.line) to reference files (.tl)
 #   - Shows differences using diff_files
 #   - Use to manually inspect differences between existing outputs and references
 # =============================
@@ -89,7 +89,7 @@ if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != 
     echo ""
     echo "Mode descriptions:"
     echo "  make - Run RAM only (no file operations)"
-    echo "  copy - Rename existing output files (basename.line) to reference files (.tl)"
+    echo "  copy - Copy existing output files (.line) to reference files (.tl)"
     echo "  test - Time and run RAM and compare outputs to reference files"
     echo "  diff - Compare existing output files to reference files (no RAM execution)"
     exit 1
@@ -108,21 +108,20 @@ PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     echo "Selected program: $PROG"
     
-    # Check if the program exists
+    # Check if the program exists, and build it if not
     if [[ ! -f "$PROG" ]]; then
-        echo -e "\e[31mError: $PROG not found.\e[0m"
-        echo "Please ensure bin/ram1.5.exe exists."
+        echo "Program $PROG not found. Attempting to build it..."
         make
     fi
     
-    # Verify the program is executable
+    # Verify the program is now executable
     if [[ ! -x "$PROG" ]]; then
         echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
         echo "Making it executable..."
         chmod +x "$PROG"
     fi
 else
-    echo "Copy/Diff mode: Skipping ram program detection and execution"
+    echo "Copy/Diff mode: Skipping $PROG program detection and execution"
 fi
 
 # Create array of files to process, sorted by size
@@ -150,13 +149,13 @@ printf '%*s\n' "$line_len" '' | tr '  ' '='
 echo "Processing directory: $directory"
 echo "Mode: $mode"
 if [[ "$mode" == "make" ]]; then
-    echo "Will run ram1.5.exe only (no file operations)"
+    echo "Will run ${PROG} only (no file operations)"
     elif [[ "$mode" == "copy" ]]; then
-    echo "Will rename existing output files (basename.line) to reference files (.tl)"
+    echo "Will copy existing output files (.line) to reference files (.tl)"
     elif [[ "$mode" == "test" ]]; then
-    echo "Will run ram1.5.exe and compare outputs to reference files"
+    echo "Will run ${PROG} and compare outputs to reference files"
     elif [[ "$mode" == "diff" ]]; then
-    echo "Will compare existing output files to reference files (no ram1.5.exe execution)"
+    echo "Will compare existing output files to reference files (no ${PROG} execution)"
 fi
 printf '%*s\n' "$line_len" '' | tr '  ' '='
 
@@ -215,12 +214,12 @@ for infile in "${infiles[@]}"; do
             fi
             echo -e "\e[32mOK\e[0m"
             if [[ "$mode" != "test" ]]; then
-                echo "   Success: ram1.5.exe completed successfully for $infile"
+                echo "   Success: ${PROG} completed successfully for $infile"
             fi
         else
             echo -e "\e[31mFAIL\e[0m"
-            echo -e "   \e[31mError: ram1.5.exe failed with exit code $RETVAL for $infile\e[0m"
-            echo "   Error: ram1.5.exe failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
+            echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
+            echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
             echo "   Aborting..."
             break
         fi
@@ -263,18 +262,20 @@ for infile in "${infiles[@]}"; do
             if [[ -f "$ref" ]]; then
                 echo -e "\e[33m[[MISSING OUTPUT]]\e[0m\n   Output file '$test' does not exist"
                 echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
+                # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                 missing_output_files+=("$test")
             else
                 echo -e "\e[33m[[MISSING FILES]]\e[0m\n   Both output '$test' and reference '$ref' do not exist"
                 echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files, then 'test' mode for output files\e[0m"
+                # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                 missing_output_files+=("$test")
                 missing_reference_files+=("$ref")
             fi
             elif [[ -f "$test" && -s "$test" ]]; then
             if [[ "$mode" == "copy" ]]; then
-                # COPY mode: Rename basename.line to .tl
-                mv "$test" "$ref"
-                echo "   Renamed $test to $ref"
+                # COPY mode: Copy basename.line to .tl
+                cp -v "$test" "$ref"
+                echo "   Copied $test to $ref"
                 processed_files+=("$infile")
                 elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                 # TEST and DIFF modes: Compare files
@@ -289,6 +290,7 @@ for infile in "${infiles[@]}"; do
                     fi
                     echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
                     missing_reference_files+=("$ref")
+                    # Check if reference file is empty
                     elif [[ ! -s "$ref" ]]; then
                     echo
                     echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
@@ -380,7 +382,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
     if [[ "$mode" == "copy" ]]; then
         echo "Processed files: ${#processed_files[@]}"
         for f in "${processed_files[@]}"; do
-            echo -e "   \e[32mRENAMED\e[0m $f"
+            echo -e "   \e[32mCOPIED\e[0m $f"
         done
         echo "Skipped files: ${#skipped_files[@]}"
         for f in "${skipped_files[@]}"; do

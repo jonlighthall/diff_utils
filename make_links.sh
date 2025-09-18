@@ -30,17 +30,17 @@ cbar "Start Making Links"
 # list of files to be linked
 ext=''
 for my_link in cpddiff \
-    prsdiff \
-    tldiff \
-    tsdiff \
-    uband_diff; do
-
+prsdiff \
+tldiff \
+tsdiff \
+uband_diff; do
+    
     # define target (source)
     target=${target_dir}/${my_link}${ext}
-
+    
     # define link (destination)
     link=${link_dir}/${my_link}
-
+    
     # create link
     decho "linking $target to $link..."
     do_link_exe "$target" "$link"
@@ -48,13 +48,13 @@ done
 
 target_dir="${src_dir_phys}"
 ext='.sh'
-for my_link in process_in_files; do
+for my_link in process_in_files process_ram_in_files; do
     # define target (source)
     target=${target_dir}/${my_link}${ext}
-
+    
     # define link (destination)
     link=${link_dir}/${my_link}
-
+    
     # create link
     decho "linking $target to $link..."
     do_link_exe "$target" "$link"
