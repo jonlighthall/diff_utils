@@ -289,7 +289,7 @@ for infile in "${infiles[@]}"; do
                     if [[ "$mode" == "test" ]]; then
                         echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
                         fail_files+=("$infile")
-                    elif [[ "$mode" == "diff" ]]; then
+                        elif [[ "$mode" == "diff" ]]; then
                         skipped_files+=("$infile")
                     fi
                     echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
@@ -303,7 +303,7 @@ for infile in "${infiles[@]}"; do
                         echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
                         echo "   Reference file '$ref' is empty" >> "$LOG_FILE"
                         fail_files+=("$infile")
-                    elif [[ "$mode" == "diff" ]]; then
+                        elif [[ "$mode" == "diff" ]]; then
                         skipped_files+=("$infile")
                     fi
                     empty_files+=("$ref")
@@ -344,6 +344,7 @@ for infile in "${infiles[@]}"; do
             echo "No output file (basename.line) or reference file (.tl) found for $basename_noext"
             if [[ "$mode" == "diff" ]]; then
                 echo -e "   \e[33mHint: Run 'make' mode to generate output files, and 'copy' mode to generate reference files\e[0m"
+                skipped_files+=("$infile")
             else
                 fail_files+=("$infile")
             fi

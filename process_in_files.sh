@@ -486,6 +486,7 @@ for infile in "${infiles[@]}"; do
                     echo -e "   \e[33mHint: Run 'make' mode to generate output files, and 'copy' mode to generate reference files\e[0m"
                     # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                     # No specific file to add to missing arrays since we don't know which suffix
+                    skipped_files+=("$infile")
                 else
                     # In test mode, mark as failed since we were trying to validate the output
                     fail_files+=("$infile")
