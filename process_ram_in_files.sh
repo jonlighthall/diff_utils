@@ -8,7 +8,7 @@
 #
 # Input options (first argument):
 #   make - Runs ram1.5.exe only (no file operations)
-#   copy - Runs ram1.5.exe and renames output files to reference names (.tl)
+#   copy - Renames existing output files (basename.line) to reference names (.tl)
 #   test - Runs ram1.5.exe, logs output, and compares results to reference files
 #   diff - Compares existing output files to reference files (does not run ram1.5.exe)
 #
@@ -50,10 +50,10 @@ mode="$1"
 #   - Use when you just want to generate output files
 #
 # 'copy':
-#   - Runs ram1.5.exe on each .in file
-#   - Renames output files (tl.line) to reference names (.tl)
+#   - Does NOT run ram1.5.exe
+#   - Renames existing output files (basename.line) to reference names (.tl)
 #   - Cleans up extra files
-#   - Use when you want to generate and prepare outputs for reference
+#   - Use when you want to prepare existing outputs for reference
 #
 # 'test':
 #   - Runs ram1.5.exe on each .in file
@@ -89,7 +89,7 @@ if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != 
     echo ""
     echo "Mode descriptions:"
     echo "  make - Run RAM only (no file operations)"
-    echo "  copy - Run RAM and rename output files to reference files"
+    echo "  copy - Rename existing output files (basename.line) to reference files (.tl)"
     echo "  test - Time and run RAM and compare outputs to reference files"
     echo "  diff - Compare existing output files to reference files (no RAM execution)"
     exit 1
@@ -104,15 +104,15 @@ fi
 PROG="bin/ram1.5.exe"
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
-# Detect the appropriate ram program (skip for diff mode)
-if [[ "$mode" != "diff" ]]; then
+# Detect the appropriate ram program (skip for diff and copy modes)
+if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     echo "Selected program: $PROG"
     
     # Check if the program exists
     if [[ ! -f "$PROG" ]]; then
         echo -e "\e[31mError: $PROG not found.\e[0m"
-        echo "Please ensure bin/ram1.5.exe exists and is executable."
-        exit 1
+        echo "Please ensure bin/ram1.5.exe exists."
+        make
     fi
     
     # Verify the program is executable
@@ -122,7 +122,7 @@ if [[ "$mode" != "diff" ]]; then
         chmod +x "$PROG"
     fi
 else
-    echo "Diff mode: Skipping ram program detection and execution"
+    echo "Copy/Diff mode: Skipping ram program detection and execution"
 fi
 
 # Create array of files to process, sorted by size
@@ -139,6 +139,8 @@ fail_files=()
 missing_reference_files=()
 missing_output_files=()
 empty_files=()
+processed_files=()
+skipped_files=()
 
 # Print mode header once at the beginning
 term_width=$(tput cols 2>/dev/null || echo 80)
@@ -150,7 +152,7 @@ echo "Mode: $mode"
 if [[ "$mode" == "make" ]]; then
     echo "Will run ram1.5.exe only (no file operations)"
     elif [[ "$mode" == "copy" ]]; then
-    echo "Will run ram1.5.exe and rename output files to reference files (.tl)"
+    echo "Will rename existing output files (basename.line) to reference files (.tl)"
     elif [[ "$mode" == "test" ]]; then
     echo "Will run ram1.5.exe and compare outputs to reference files"
     elif [[ "$mode" == "diff" ]]; then
@@ -162,22 +164,23 @@ for infile in "${infiles[@]}"; do
     echo "Processing: $infile"
     LOG_FILE="$directory/$(basename "$infile" .in).log"
     basename_noext="$(basename "$infile" .in)"
+    parent_dir="$(dirname "$directory")"
     
-    # Run ram1.5.exe for 'make', 'copy' and 'test' modes, but not for 'diff' mode
-    if [[ "$mode" == "make" || "$mode" == "copy" || "$mode" == "test" ]]; then
-        # Copy infile to ram.in
-        cp "$infile" "$directory/ram.in"
+    # Run ram1.5.exe for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
+    if [[ "$mode" == "make" || "$mode" == "test" ]]; then
+        # Copy infile to ram.in in parent directory
+        cp "$infile" "$parent_dir/ram.in"
         
         # Check for existing output files and warn user
         existing_files=()
-        potential_output="$directory/tl.line"
+        potential_output="$parent_dir/tl.line"
         if [[ -f "$potential_output" ]]; then
             existing_files+=("$potential_output")
         fi
         
         # Also check for other common output files
         for ext in .log; do
-            potential_output="$directory/${basename_noext}${ext}"
+            potential_output="$parent_dir/${basename_noext}${ext}"
             if [[ -f "$potential_output" ]]; then
                 existing_files+=("$potential_output")
             fi
@@ -191,15 +194,15 @@ for infile in "${infiles[@]}"; do
             done
         fi
         
-        echo -n "   Running: $PROG ram.in... "
+        echo -n "   Running: $PROG... "
         echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
         set +e  # Temporarily disable exit on error to handle ram failures gracefully
         if [[ "$mode" == "test" ]]; then
-            { time "$PROG" "$directory/ram.in"; } >> "$LOG_FILE" 2>&1
+            { time "$PROG"; } >> "$LOG_FILE" 2>&1
             RETVAL=$?
         else
             echo
-            "$PROG" "$directory/ram.in"
+            "$PROG"
             RETVAL=$?
             echo -n "   "
         fi
@@ -221,9 +224,18 @@ for infile in "${infiles[@]}"; do
             echo "   Aborting..."
             break
         fi
+        
+        # After running the executable, move the output file to the target directory
+        test="$directory/${basename_noext}.line"
+        if [[ -f "$parent_dir/tl.line" ]]; then
+            mv "$parent_dir/tl.line" "$test"
+            echo "   Moved tl.line to $test"
+        else
+            echo -e "   \e[33mWarning: Expected output file tl.line not found in parent directory\e[0m"
+        fi
     fi
     
-    # For 'make' mode, we're done after running ram1.5.exe - skip file operations
+    # For 'make' mode, we're done after running ram1.5.exe and moving output - skip file operations
     if [[ "$mode" == "make" ]]; then
         printf '%*s\n' "$line_len" '' | tr '  ' '='
         continue
@@ -233,13 +245,16 @@ for infile in "${infiles[@]}"; do
     test="$directory/${basename_noext}.line"
     ref="$directory/${basename_noext}.tl"
     
-    # For copy and test modes, check if test file exists (tl.line renamed to basename.line)
+    # For make and test modes, check if test file exists (after moving from parent directory)
+    # For copy mode, check if basename.line exists directly
     # For diff mode, check if either test or ref exists
-    if [[ ("$mode" == "copy" || "$mode" == "test") && -f "$directory/tl.line" && -s "$directory/tl.line" ]] || [[ "$mode" == "diff" && (-f "$test" || -f "$ref") ]]; then
-        # Rename tl.line to basename.line if it exists
-        if [[ -f "$directory/tl.line" ]]; then
-            mv "$directory/tl.line" "$test"
-            echo "   Renamed tl.line to $test"
+    if [[ ("$mode" == "test") && -f "$parent_dir/tl.line" ]] || [[ "$mode" == "copy" && -f "$test" && -s "$test" ]] || [[ "$mode" == "diff" && (-f "$test" || -f "$ref") ]]; then
+        # Rename tl.line to basename.line if it exists (for test mode only, since make mode already moved it)
+        if [[ "$mode" == "test" ]]; then
+            if [[ -f "$parent_dir/tl.line" ]]; then
+                mv "$parent_dir/tl.line" "$test"
+                echo "   Renamed tl.line to $test"
+            fi
         fi
         
         # For diff mode, we need to check files even if test doesn't exist
@@ -257,9 +272,10 @@ for infile in "${infiles[@]}"; do
             fi
             elif [[ -f "$test" && -s "$test" ]]; then
             if [[ "$mode" == "copy" ]]; then
-                # COPY mode: Only rename files, no comparison
+                # COPY mode: Rename basename.line to .tl
                 mv "$test" "$ref"
                 echo "   Renamed $test to $ref"
+                processed_files+=("$infile")
                 elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                 # TEST and DIFF modes: Compare files
                 echo -n "   Comparing $test to $ref... "
@@ -311,10 +327,13 @@ for infile in "${infiles[@]}"; do
         fi
     else
         if [[ "$mode" == "copy" ]]; then
-            echo -e "   \e[36m[[INFO]]\e[0m Output file tl.line will be generated by ram1.5.exe"
+            echo -e "   \e[33m[[SKIPPED]]\e[0m No $test file found to rename"
+            skipped_files+=("$infile")
+            elif [[ "$mode" == "test" ]]; then
+            echo -e "   \e[36m[[INFO]]\e[0m Output file tl.line will be generated by ram1.5.exe in parent directory"
         else
             echo -e "\e[33m[[NO FILES]]\e[0m"
-            echo "No output file (tl.line) or reference file (.tl) found for $basename_noext"
+            echo "No output file (basename.line) or reference file (.tl) found for $basename_noext"
             if [[ "$mode" == "diff" ]]; then
                 echo -e "   \e[33mHint: Run 'make' mode to generate output files, and 'copy' mode to generate reference files\e[0m"
             else
@@ -337,25 +356,46 @@ for infile in "${infiles[@]}"; do
             fi
         fi
     done
+    
+    # Clean up ram.in from parent directory if it exists
+    if [[ -f "$parent_dir/ram.in" ]]; then
+        rm "$parent_dir/ram.in"
+        if [[ "$mode" != "test" ]]; then
+            echo "   Deleted $parent_dir/ram.in"
+        fi
+    fi
     printf '\n%*s\n' "$line_len" '' | tr ' ' '='
 done
 
-# Print summary if in test or diff mode
-if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
+# Print summary if in test, diff, or copy mode
+if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
     if [[ "$mode" == "test" ]]; then
         echo "Test Summary:"
+        elif [[ "$mode" == "copy" ]]; then
+        echo "Copy Summary:"
     else
         echo "Diff Summary:"
     fi
     printf '%*s\n' "$line_len" '' | tr ' ' '='
-    echo "Passed files: ${#pass_files[@]}"
-    for f in "${pass_files[@]}"; do
-        echo -e "   \e[32mPASS\e[0m $f"
-    done
-    echo "Failed files: ${#fail_files[@]}"
-    for f in "${fail_files[@]}"; do
-        echo -e "   \e[31mFAIL\e[0m $f"
-    done
+    if [[ "$mode" == "copy" ]]; then
+        echo "Processed files: ${#processed_files[@]}"
+        for f in "${processed_files[@]}"; do
+            echo -e "   \e[32mRENAMED\e[0m $f"
+        done
+        echo "Skipped files: ${#skipped_files[@]}"
+        for f in "${skipped_files[@]}"; do
+            echo -e "   \e[33mSKIPPED\e[0m $f"
+        done
+    else
+        echo "Passed files: ${#pass_files[@]}"
+        for f in "${pass_files[@]}"; do
+            echo -e "   \e[32mPASS\e[0m $f"
+        done
+        echo "Failed files: ${#fail_files[@]}"
+        for f in "${fail_files[@]}"; do
+            echo -e "   \e[31mFAIL\e[0m $f"
+        done
+    fi
     
     # Show detailed missing file information
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
@@ -379,7 +419,9 @@ if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
         done
     fi
     
-    if [[ ${#fail_files[@]} -eq 0 ]]; then
+    if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
+        echo -e "\nAll files processed!"
+        elif [[ "$mode" != "copy" && ${#fail_files[@]} -eq 0 ]]; then
         echo -e "\nAll files passed!"
         elif [[ ${#missing_reference_files[@]} -gt 0 || ${#missing_output_files[@]} -gt 0 ]]; then
         echo -e "\n\e[33mSome failures are due to missing files. Consider running the suggested modes first.\e[0m"
