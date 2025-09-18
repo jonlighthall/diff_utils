@@ -336,7 +336,7 @@ for infile in "${infiles[@]}"; do
                     echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist"
                     if [[ "$mode" == "test" ]]; then
                         echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
-                        fail_files+=("$infile")
+                        add_to_array_if_not_present "skipped_files" "$infile"
                         elif [[ "$mode" == "diff" ]]; then
                         add_to_array_if_not_present "skipped_files" "$infile"
                     fi
@@ -350,7 +350,7 @@ for infile in "${infiles[@]}"; do
                     if [[ "$mode" == "test" ]]; then
                         echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
                         echo "   Reference file '$ref' is empty" >> "$LOG_FILE"
-                        fail_files+=("$infile")
+                        add_to_array_if_not_present "skipped_files" "$infile"
                         elif [[ "$mode" == "diff" ]]; then
                         add_to_array_if_not_present "skipped_files" "$infile"
                     fi
