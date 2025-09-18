@@ -264,12 +264,14 @@ for infile in "${infiles[@]}"; do
                 echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
                 # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                 missing_output_files+=("$test")
+                skipped_files+=("$infile")
             else
                 echo -e "\e[33m[[MISSING FILES]]\e[0m\n   Both output '$test' and reference '$ref' do not exist"
                 echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files, then 'test' mode for output files\e[0m"
                 # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                 missing_output_files+=("$test")
                 missing_reference_files+=("$ref")
+                skipped_files+=("$infile")
             fi
             elif [[ -f "$test" && -s "$test" ]]; then
             if [[ "$mode" == "copy" ]]; then
@@ -287,6 +289,8 @@ for infile in "${infiles[@]}"; do
                     if [[ "$mode" == "test" ]]; then
                         echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
                         fail_files+=("$infile")
+                    elif [[ "$mode" == "diff" ]]; then
+                        skipped_files+=("$infile")
                     fi
                     echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
                     missing_reference_files+=("$ref")
@@ -299,6 +303,8 @@ for infile in "${infiles[@]}"; do
                         echo -e "\e[33m[[EMPTY REFERENCE]]\e[0m"
                         echo "   Reference file '$ref' is empty" >> "$LOG_FILE"
                         fail_files+=("$infile")
+                    elif [[ "$mode" == "diff" ]]; then
+                        skipped_files+=("$infile")
                     fi
                     empty_files+=("$ref")
                 else
@@ -396,6 +402,10 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
         echo "Failed files: ${#fail_files[@]}"
         for f in "${fail_files[@]}"; do
             echo -e "   \e[31mFAIL\e[0m $f"
+        done
+        echo "Skipped files: ${#skipped_files[@]}"
+        for f in "${skipped_files[@]}"; do
+            echo -e "   \e[33mSKIPPED\e[0m $f"
         done
     fi
     

@@ -338,6 +338,7 @@ for infile in "${infiles[@]}"; do
                         echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
                         # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
+                        skipped_files+=("$infile")
                         found_files=true
                     else
                         echo -e "\e[33m[[MISSING]]\e[0m\n   Both output '$test' and reference '$ref' do not exist"
@@ -345,6 +346,7 @@ for infile in "${infiles[@]}"; do
                         # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                         missing_output_files+=("$test")
                         missing_reference_files+=("$ref")
+                        skipped_files+=("$infile")
                         found_files=true
                     fi
                     break  # Exit the suffix loop since we handled this case
@@ -372,6 +374,7 @@ for infile in "${infiles[@]}"; do
                             # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
                             missing_reference_files+=("$ref")
+                            skipped_files+=("$infile")
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
@@ -389,6 +392,7 @@ for infile in "${infiles[@]}"; do
                             fi
                             # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$ref")
+                            skipped_files+=("$infile")
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
@@ -399,6 +403,7 @@ for infile in "${infiles[@]}"; do
                             echo -e "   \e[33mHint: Run 'test' mode first to generate output files\e[0m"
                             # In diff mode, only mark as missing, not as failed (since no comparison was attempted)
                             missing_output_files+=("$test")
+                            skipped_files+=("$infile")
                             continue
                         fi
                         
@@ -407,6 +412,7 @@ for infile in "${infiles[@]}"; do
                             echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m\n   Output file '$test' is empty"
                             # In diff mode, only mark as empty, not as failed (since no comparison was attempted)
                             empty_files+=("$test")
+                            skipped_files+=("$infile")
                             continue
                         fi
                         
@@ -520,6 +526,10 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
         echo "Failed files: ${#fail_files[@]}"
         for f in "${fail_files[@]}"; do
             echo -e "   \e[31mFAIL\e[0m $f"
+        done
+        echo "Skipped files: ${#skipped_files[@]}"
+        for f in "${skipped_files[@]}"; do
+            echo -e "   \e[33mSKIPPED\e[0m $f"
         done
     fi
     
