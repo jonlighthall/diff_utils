@@ -421,20 +421,29 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
     fi
     printf '%*s\n' "$line_len" '' | tr ' ' '='
     
-    # Show executable results for test mode
-    if [[ "$mode" == "test" ]]; then
+    # Execution Results Section (for modes that run executable)
+    if [[ "$mode" == "test" || "$mode" == "make" ]]; then
+        echo "Execution Results:"
+        echo "=================="
+        
         if [[ ${#exec_success_files[@]} -gt 0 ]]; then
             echo "Executable successful: ${#exec_success_files[@]}"
             for f in "${exec_success_files[@]}"; do
                 echo -e "   \e[32mEXEC_OK\e[0m $f"
             done
+        else
+            echo "Executable successful: 0"
         fi
+        
         if [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo "Executable failed: ${#exec_fail_files[@]}"
             for f in "${exec_fail_files[@]}"; do
                 echo -e "   \e[31mEXEC_FAIL\e[0m $f"
             done
+        else
+            echo "Executable failed: 0"
         fi
+        
         if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
             echo "Executable ran but no output: ${#missing_exec_output_files[@]}"
             for f in "${missing_exec_output_files[@]}"; do
@@ -444,58 +453,119 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
         echo ""
     fi
     
-    if [[ "$mode" == "copy" ]]; then
-        echo "Processed files: ${#processed_files[@]}"
-        for f in "${processed_files[@]}"; do
-            echo -e "   \e[32mCOPIED\e[0m $f"
-        done
-        echo "Skipped files: ${#skipped_files[@]}"
-        for f in "${skipped_files[@]}"; do
-            echo -e "   \e[33mSKIPPED\e[0m $f"
-        done
-    else
-        echo "Passed files: ${#pass_files[@]}"
-        for f in "${pass_files[@]}"; do
-            echo -e "   \e[32mPASS\e[0m $f"
-        done
-        echo "Failed files: ${#fail_files[@]}"
-        for f in "${fail_files[@]}"; do
-            echo -e "   \e[31mFAIL\e[0m $f"
-        done
-        echo "Skipped files: ${#skipped_files[@]}"
-        for f in "${skipped_files[@]}"; do
-            echo -e "   \e[33mSKIPPED\e[0m $f"
-        done
+    # Diff Results Section (for modes that compare files)
+    if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
+        echo "Diff Results:"
+        echo "============="
+        
+        if [[ ${#pass_files[@]} -gt 0 ]]; then
+            echo "Passed files: ${#pass_files[@]}"
+            for f in "${pass_files[@]}"; do
+                echo -e "   \e[32mPASS\e[0m $f"
+            done
+        else
+            echo "Passed files: 0"
+        fi
+        
+        if [[ ${#fail_files[@]} -gt 0 ]]; then
+            echo "Failed files: ${#fail_files[@]}"
+            for f in "${fail_files[@]}"; do
+                echo -e "   \e[31mFAIL\e[0m $f"
+            done
+        else
+            echo "Failed files: 0"
+        fi
+        
+        if [[ ${#skipped_files[@]} -gt 0 ]]; then
+            echo "Skipped files: ${#skipped_files[@]}"
+            for f in "${skipped_files[@]}"; do
+                echo -e "   \e[33mSKIPPED\e[0m $f"
+            done
+        fi
+        echo ""
     fi
     
-    # Show detailed missing file information
+    # Copy Results Section
+    if [[ "$mode" == "copy" ]]; then
+        echo "Copy Results:"
+        echo "============="
+        
+        if [[ ${#processed_files[@]} -gt 0 ]]; then
+            echo "Processed files: ${#processed_files[@]}"
+            for f in "${processed_files[@]}"; do
+                echo -e "   \e[32mCOPIED\e[0m $f"
+            done
+        else
+            echo "Processed files: 0"
+        fi
+        
+        if [[ ${#skipped_files[@]} -gt 0 ]]; then
+            echo "Skipped files: ${#skipped_files[@]}"
+            for f in "${skipped_files[@]}"; do
+                echo -e "   \e[33mSKIPPED\e[0m $f"
+            done
+        fi
+        echo ""
+    fi
+    
+    # File Status Section
+    echo "File Status:"
+    echo "============"
+    # File Status Section
+    echo "File Status:"
+    echo "============"
+    
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
-        echo -e "\nMissing reference files (run 'copy' mode first):"
+        echo "Missing reference files (run 'copy' mode first): ${#missing_reference_files[@]}"
         for f in "${missing_reference_files[@]}"; do
             echo -e "   \e[33mMISSING\e[0m $f"
         done
+    else
+        echo "Missing reference files: 0"
     fi
     
     if [[ ${#missing_output_files[@]} -gt 0 ]]; then
-        echo -e "\nMissing output files (run 'make' mode first):"
+        echo "Missing output files (run 'make' mode first): ${#missing_output_files[@]}"
         for f in "${missing_output_files[@]}"; do
             echo -e "   \e[33mMISSING\e[0m $f"
         done
+    else
+        echo "Missing output files: 0"
     fi
     
     if [[ ${#empty_files[@]} -gt 0 ]]; then
-        echo -e "\nEmpty files detected:"
+        echo "Empty files detected: ${#empty_files[@]}"
         for f in "${empty_files[@]}"; do
             echo -e "   \e[33mEMPTY\e[0m $f"
         done
+    else
+        echo "Empty files: 0"
     fi
     
+    # Overall Status Assessment
+    echo ""
+    echo "Overall Status:"
+    echo "==============="
     if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
-        echo -e "\nAll files processed!"
-        elif [[ "$mode" != "copy" && ${#fail_files[@]} -eq 0 ]]; then
-        echo -e "\nAll files passed!"
-        elif [[ ${#missing_reference_files[@]} -gt 0 || ${#missing_output_files[@]} -gt 0 ]]; then
-        echo -e "\n\e[33mSome failures are due to missing files. Consider running the suggested modes first.\e[0m"
+        echo -e "\e[32mAll files processed successfully!\e[0m"
+    elif [[ "$mode" == "test" ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
+            echo -e "\e[32mAll tests passed!\e[0m"
+        elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
+            echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
+        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
+        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
+        fi
+    elif [[ "$mode" == "diff" ]]; then
+        if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
+            echo -e "\e[32mAll diffs passed!\e[0m"
+        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
+        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
+        fi
     fi
     echo "=============================="
 fi
