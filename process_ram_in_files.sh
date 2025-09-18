@@ -100,6 +100,23 @@ if [[ ! -d "$directory" ]]; then
     exit 1
 fi
 
+# Function to find the project root directory (where bin/ is located)
+find_project_root() {
+    local current_dir="$PWD"
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -d "$current_dir/bin" ]]; then
+            echo "$current_dir"
+            return 0
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    # If we can't find bin/, use current directory
+    echo "$PWD"
+}
+
+# Find the project root directory
+PROJECT_ROOT="$(find_project_root)"
+
 # Set the program to bin/ram1.5.exe
 PROG="bin/ram1.5.exe"
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
@@ -184,7 +201,7 @@ for infile in "${infiles[@]}"; do
     echo "Processing: $infile"
     LOG_FILE="$directory/$(basename "$infile" .in).log"
     basename_noext="$(basename "$infile" .in)"
-    parent_dir="$(dirname "$directory")"
+    parent_dir="$PROJECT_ROOT"
     
     # Run ram1.5.exe for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
     if [[ "$mode" == "make" || "$mode" == "test" ]]; then
@@ -272,13 +289,10 @@ for infile in "${infiles[@]}"; do
     # For diff mode, check if either test or ref exists
     # For test mode, we also need to handle the case where executable ran but produced no output
     if [[ ("$mode" == "test") ]] || [[ "$mode" == "copy" && -f "$test" && -s "$test" ]] || [[ "$mode" == "diff" && (-f "$test" || -f "$ref") ]]; then
-        # Handle test mode specially - check if output was produced
+        # Handle test mode specially - check if output was produced and moved successfully
         if [[ "$mode" == "test" ]]; then
-            if [[ -f "$parent_dir/tl.line" ]]; then
-                mv "$parent_dir/tl.line" "$test"
-                echo "   Renamed tl.line to $test"
-            else
-                # Executable ran successfully but produced no output
+            if [[ ! -f "$test" ]]; then
+                # Executable ran successfully but no output file was generated or moved
                 echo -e "\e[33m[[MISSING OUTPUT]]\e[0m"
                 echo -e "   \e[33mExecutable completed successfully but no output file 'tl.line' was generated\e[0m"
                 echo -e "   \e[33mExecutable completed successfully but no output file 'tl.line' was generated\e[0m" >> "$LOG_FILE"
@@ -548,22 +562,22 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
     echo "==============="
     if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
         echo -e "\e[32mAll files processed successfully!\e[0m"
-    elif [[ "$mode" == "test" ]]; then
+        elif [[ "$mode" == "test" ]]; then
         if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll tests passed!\e[0m"
-        elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
-        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
-        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
-    elif [[ "$mode" == "diff" ]]; then
+        elif [[ "$mode" == "diff" ]]; then
         if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll diffs passed!\e[0m"
-        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
-        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
     fi
