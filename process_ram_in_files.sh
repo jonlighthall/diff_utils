@@ -594,9 +594,9 @@ fi
 # Exit with appropriate code
 if [[ "$mode" == "make" && ${#exec_fail_files[@]} -gt 0 ]]; then
     exit 1
-elif [[ "$mode" == "test" && (${#exec_fail_files[@]} -gt 0 || ${#fail_files[@]} -gt 0) ]]; then
+    elif [[ "$mode" == "test" && (${#exec_fail_files[@]} -gt 0 || ${#fail_files[@]} -gt 0) ]]; then
     exit 1
-elif [[ "$mode" == "diff" && ${#fail_files[@]} -gt 0 ]]; then
+    elif [[ "$mode" == "diff" && ${#fail_files[@]} -gt 0 ]]; then
     exit 1
 else
     exit 0

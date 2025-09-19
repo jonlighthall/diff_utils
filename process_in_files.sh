@@ -522,13 +522,14 @@ for infile in "${infiles[@]}"; do
     printf '\n%*s\n' "$line_len" '' | tr ' ' '='
 done
 
-# Print summary if in test, diff, or copy mode
-if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
-    #printf '%*s\n' "$line_len" '' | tr ' ' '='
+# Print summary if in test, diff, copy, or make mode
+if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == "make" ]]; then
     if [[ "$mode" == "test" ]]; then
         echo "Test Summary:"
         elif [[ "$mode" == "copy" ]]; then
         echo "Copy Summary:"
+        elif [[ "$mode" == "make" ]]; then
+        echo "Make Summary:"
     else
         echo "Diff Summary:"
     fi
@@ -658,24 +659,41 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" ]]; then
     echo "==============="
     if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
         echo -e "\e[32mAll files processed successfully!\e[0m"
-    elif [[ "$mode" == "test" ]]; then
+        elif [[ "$mode" == "make" ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 ]]; then
+            echo -e "\e[32mAll files generated successfully!\e[0m"
+        else
+            echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
+        fi
+        elif [[ "$mode" == "test" ]]; then
         if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll tests passed!\e[0m"
-        elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
-        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
-        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
-    elif [[ "$mode" == "diff" ]]; then
+        elif [[ "$mode" == "diff" ]]; then
         if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll diffs passed!\e[0m"
-        elif [[ ${#fail_files[@]} -gt 0 ]]; then
+            elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
-        elif [[ ${#skipped_files[@]} -gt 0 ]]; then
+            elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
     fi
     echo "=============================="
+fi
+
+# Exit with appropriate code
+if [[ "$mode" == "make" && ${#exec_fail_files[@]} -gt 0 ]]; then
+    exit 1
+    elif [[ "$mode" == "test" && (${#exec_fail_files[@]} -gt 0 || ${#fail_files[@]} -gt 0) ]]; then
+    exit 1
+    elif [[ "$mode" == "diff" && ${#fail_files[@]} -gt 0 ]]; then
+    exit 1
+else
+    exit 0
 fi
