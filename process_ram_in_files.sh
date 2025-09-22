@@ -262,13 +262,22 @@ for infile in "${infiles[@]}"; do
             exec_fail_files+=("$infile")
         fi
         
-        # After running the executable, move the output file to the target directory
+        # After running the executable, move the output files to the target directory
         test="$directory/${basename_noext}.line"
+        grid="$directory/${basename_noext}.grid"
+        # Move tl.line
         if [[ -f "$parent_dir/tl.line" ]]; then
             mv "$parent_dir/tl.line" "$test"
             echo "   Moved tl.line to $test"
         else
             echo -e "   \e[33mWarning: Expected output file tl.line not found in parent directory\e[0m"
+        fi
+        # Move tl.grid
+        if [[ -f "$parent_dir/tl.grid" ]]; then
+            mv "$parent_dir/tl.grid" "$grid"
+            echo "   Moved tl.grid to $grid"
+        else
+            echo -e "   \e[33mWarning: Expected output file tl.grid not found in parent directory\e[0m"
         fi
     fi
     
