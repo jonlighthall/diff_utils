@@ -17,6 +17,7 @@
 # Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
 #
 # Additional options:
+#   --exe <path>        Specify executable path (default: bin/ram1.5.exe)
 #   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
 #   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
 #   --skip-existing     Skip files where outputs already exist
@@ -44,6 +45,7 @@ Modes:
   diff    Compare existing output files to reference files (no RAM execution)
 
 Options:
+  --exe <path>        Specify executable path (default: bin/ram1.5.exe)
   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
   --skip-existing     Skip files where outputs already exist
@@ -54,9 +56,13 @@ Options:
   -h, --help          Show this help message
 
 Examples:
+  $0 test std --exe ./bin/ram2.0.exe --pattern 'case*'
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
+
+Environment variables:
+  RAM_EXE             Alternative way to specify RAM executable path
 EOF
 }
 
@@ -68,6 +74,7 @@ skip_newer=false
 force=false
 dry_run=false
 debug=false
+cli_exe=""
 
 # First, extract mode and directory from positional args
 mode="$1"
@@ -79,6 +86,7 @@ shift 2 2>/dev/null || true
 # Parse remaining options
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --exe) cli_exe="$2"; shift 2;;
         --pattern) patterns+=("$2"); shift 2;;
         --exclude) excludes+=("$2"); shift 2;;
         --skip-existing) skip_existing=true; shift;;
@@ -155,8 +163,15 @@ find_project_root() {
 # Find the project root directory
 PROJECT_ROOT="$(find_project_root)"
 
-# Set the program to bin/ram1.5.exe
-PROG="bin/ram1.5.exe"
+# Set the program executable
+# Priority: command line --exe > RAM_EXE environment variable > default
+if [[ -n "$cli_exe" ]]; then
+    PROG="$cli_exe"
+elif [[ -n "$RAM_EXE" ]]; then
+    PROG="$RAM_EXE"
+else
+    PROG="bin/ram1.5.exe"
+fi
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
 # Detect the appropriate ram program (skip for diff and copy modes)
