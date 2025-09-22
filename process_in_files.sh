@@ -4,13 +4,13 @@
 # =============================
 # EXPLANATION SECTION
 #
-# This script processes .in files in a directory using nspe.exe.
+# This script processes .in files in a directory using the specified executable.
 #
 # Input options (first argument):
-#   make - Runs nspe.exe only (no file operations)
-#   copy - Copies output files to reference names (.tl, .rtl, .ftl)
-#   test - Runs nspe.exe, logs output, and compares results to reference files
-#   diff - Compares existing output files to reference files (does not run nspe.exe)
+#   make - Runs the executable only (no file operations)
+#   copy - Copies existing output files to reference names (.tl, .rtl, .ftl)
+#   test - Runs the executable, logs output, and compares results to reference files
+#   diff - Compares existing output files to reference files (does not run the executable)
 #
 # PROMPT: To process files, run:
 #   ./process_in_files.sh <mode> [directory] [options]
@@ -29,7 +29,7 @@
 #
 # Dependencies:
 #   - lib_diff_utils.sh (must be in same directory or PATH)
-#   - nspe.exe
+#   - Executable (auto-detected or specified via --exe)
 #   - Optional: tldiff, uband_diff for advanced comparisons
 #
 # Replaces functionality of:
@@ -48,10 +48,10 @@ usage() {
 Usage: $0 <mode> [directory] [options]
 
 Modes:
-  make    Run NSPE only (no file operations)
-  copy    Copy output files to reference names (.tl, .rtl, .ftl)
-  test    Run NSPE and compare outputs to reference files
-  diff    Compare existing output files to reference files (no NSPE execution)
+  make    Run executable only (no file operations)
+  copy    Copy existing output files to reference names (.tl, .rtl, .ftl)
+  test    Run executable and compare outputs to reference files
+  diff    Compare existing output files to reference files (no program execution)
 
 Options:
   --exe <path>        Specify executable path (default: auto-detected)
@@ -65,13 +65,13 @@ Options:
   -h, --help          Show this help message
 
 Examples:
-  $0 test std --exe ./nspe.x --pattern 'case*'
+  $0 test std --exe ./prog.x --pattern 'case*'
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
 
 Environment variables:
-  NSPE_EXE            Alternative way to specify NSPE executable path
+  NSPE_EXE            Alternative way to specify executable path
 EOF
 }
 
@@ -168,10 +168,10 @@ if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != 
     echo "Valid modes are: make, copy, test, or diff"
     echo ""
     echo "Mode descriptions:"
-    echo "  make - Run NSPE only (no file operations) [mkstd]"
+    echo "  make - Run executable only (no file operations) [mkstd]"
     echo "  copy - Copy existing output files to reference files [copy_std.bat]"
-    echo "  test - Time and run NSPE and compare outputs to reference files [testram or testram_getarg]"
-    echo "  diff - Compare existing output files to reference files (no NSPE execution)"
+    echo "  test - Time and run executable and compare outputs to reference files [testram or testram_getarg]"
+    echo "  diff - Compare existing output files to reference files (no program execution)"
     exit 1
 fi
 
@@ -180,10 +180,10 @@ if [[ ! -d "$directory" ]]; then
     exit 1
 fi
 
-# Intelligent program detection - handles nspe.x, nspe.exe, or makefile targets
+# Intelligent program detection - handles various executable names or makefile targets
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
-detect_nspe_program() {
+detect_program() {
     local candidates=("./nspe.x" "./nspe.exe" "nspe.x" "nspe.exe")
     local makefile_targets=()
     
@@ -198,9 +198,9 @@ detect_nspe_program() {
     
     # If no executable found, check makefile for available targets
     if [[ -f "makefile" ]] || [[ -f "Makefile" ]]; then
-        echo "No executable found. Checking makefile for nspe targets..." >&2
+        echo "No executable found. Checking makefile for executable targets..." >&2
         
-        # Look for nspe targets in makefile (case insensitive)
+        # Look for executable targets in makefile (case insensitive)
         if command -v make >/dev/null 2>&1; then
             # Try to get makefile targets (this works with GNU make)
             local make_targets
@@ -243,16 +243,16 @@ detect_nspe_program() {
     return 0
 }
 
-# Detect the appropriate nspe program (skip for diff and copy modes)
+# Detect the appropriate executable program (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     # Set the program executable
     # Priority: command line --exe > NSPE_EXE environment variable > auto-detect
     if [[ -n "$cli_exe" ]]; then
         PROG="$cli_exe"
-    elif [[ -n "$NSPE_EXE" ]]; then
+        elif [[ -n "$NSPE_EXE" ]]; then
         PROG="$NSPE_EXE"
     else
-        PROG=$(detect_nspe_program)
+        PROG=$(detect_program)
     fi
     echo "Selected program: $PROG"
     
@@ -285,7 +285,7 @@ if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
         chmod +x "$PROG"
     fi
 else
-    echo "Copy/Diff mode: Skipping program detection and execution"
+    echo "Copy/Diff mode: Skipping $PROG program detection and execution"
 fi
 
 # Create array of files to process, sorted by size
@@ -391,7 +391,7 @@ echo "Mode: $mode"
 if [[ "$mode" == "make" ]]; then
     echo "Will run ${PROG} only (no file operations)"
     elif [[ "$mode" == "copy" ]]; then
-    echo "Will copy existing output files to reference files (.tl, .rtl, .ftl)"
+    echo "Will copy existing output files (.asc) to reference files (.tl, .rtl, .ftl)"
     elif [[ "$mode" == "test" ]]; then
     echo "Will run ${PROG} and compare outputs to reference files"
     elif [[ "$mode" == "diff" ]]; then
@@ -415,7 +415,7 @@ for infile in "${infiles[@]}"; do
         skip_reason=""
         
         if ($skip_existing || $skip_newer) && ! $force; then
-            # Define potential output files for NSPE
+            # Define potential output files
             potential_outputs=(
                 "$directory/${basename_noext}_01.asc"
                 "$directory/${basename_noext}_02.asc"
@@ -486,7 +486,7 @@ for infile in "${infiles[@]}"; do
             
             echo -n "   Running: $PROG $infile... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
-            set +e  # Temporarily disable exit on error to handle nspe failures gracefully
+            set +e  # Temporarily disable exit on error to handle executable failures gracefully
             if [[ "$mode" == "test" ]]; then
                 { time "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
                 RETVAL=$?

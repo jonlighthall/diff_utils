@@ -4,16 +4,16 @@
 # =============================
 # EXPLANATION SECTION
 #
-# This script processes .in files in a directory using bin/ram1.5.exe.
+# This script processes .in files in a directory using the specified executable.
 #
 # Input options (first argument):
-#   make - Runs ram1.5.exe only (no file operations)
-#   copy - Copies existing output files (basename.line) to reference names (.tl)
-#   test - Runs ram1.5.exe, logs output, and compares results to reference files
-#   diff - Compares existing output files to reference files (does not run ram1.5.exe)
+#   make - Runs the executable only (no file operations)
+#   copy - Copies existing output files (.line) to reference names (.tl, .rtl, .ftl)
+#   test - Runs the executable, logs output, and compares results to reference files
+#   diff - Compares existing output files to reference files (does not run the executable)
 #
 # PROMPT: To process files, run:
-#   ./process_ram_in_files.sh <mode> [directory] [options]
+#   ./process_in_files.sh <mode> [directory] [options]
 # Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
 #
 # Additional options:
@@ -39,10 +39,10 @@ usage() {
 Usage: $0 <mode> [directory] [options]
 
 Modes:
-  make    Run RAM only (no file operations)
+  make    Run executable only (no file operations)
   copy    Copy existing output files (.line) to reference files (.tl)
-  test    Run RAM and compare outputs to reference files
-  diff    Compare existing output files to reference files (no RAM execution)
+  test    Run executable and compare outputs to reference files
+  diff    Compare existing output files to reference files (no program execution)
 
 Options:
   --exe <path>        Specify executable path (default: bin/ram1.5.exe)
@@ -56,7 +56,7 @@ Options:
   -h, --help          Show this help message
 
 Examples:
-  $0 test std --exe ./bin/ram2.0.exe --pattern 'case*'
+  $0 test std --exe ./prog.x --pattern 'case*'
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
@@ -159,10 +159,10 @@ if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != 
     echo "Valid modes are: make, copy, test, or diff"
     echo ""
     echo "Mode descriptions:"
-    echo "  make - Run RAM only (no file operations)"
-    echo "  copy - Copy existing output files (.line) to reference files (.tl)"
-    echo "  test - Time and run RAM and compare outputs to reference files"
-    echo "  diff - Compare existing output files to reference files (no RAM execution)"
+    echo "  make - Run executable only (no file operations)"
+    echo "  copy - Copy existing output files to reference files"
+    echo "  test - Time and run executable and compare outputs to reference files"
+    echo "  diff - Compare existing output files to reference files (no program execution)"
     exit 1
 fi
 
@@ -199,7 +199,7 @@ else
 fi
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
-# Detect the appropriate ram program (skip for diff and copy modes)
+# Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     echo "Selected program: $PROG"
     
@@ -385,7 +385,7 @@ for infile in "${infiles[@]}"; do
         continue
     fi
     
-    # Run ram1.5.exe for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
+    # Run $PROG for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
     if [[ "$mode" == "make" || "$mode" == "test" ]]; then
         # Copy infile to ram.in in parent directory
         cp "$infile" "$parent_dir/ram.in"
@@ -415,7 +415,7 @@ for infile in "${infiles[@]}"; do
         
         echo -n "   Running: $PROG... "
         echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
-        set +e  # Temporarily disable exit on error to handle ram failures gracefully
+        set +e  # Temporarily disable exit on error to handle executable failures gracefully
         if [[ "$mode" == "test" ]]; then
             { time "$PROG"; } >> "$LOG_FILE" 2>&1
             RETVAL=$?
@@ -479,7 +479,7 @@ for infile in "${infiles[@]}"; do
         fi
     fi
     
-    # For 'make' mode, we're done after running ram1.5.exe and moving output - skip file operations
+    # For 'make' mode, we're done after running $PROG and moving output - skip file operations
     if [[ "$mode" == "make" ]]; then
         printf '%*s\n' "$line_len" '' | tr '  ' '='
         continue
@@ -730,9 +730,6 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         echo ""
     fi
     
-    # File Status Section
-    echo "File Status:"
-    echo "============"
     # File Status Section
     echo "File Status:"
     echo "============"
