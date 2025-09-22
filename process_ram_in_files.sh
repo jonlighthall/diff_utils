@@ -265,6 +265,8 @@ for infile in "${infiles[@]}"; do
         # After running the executable, move the output files to the target directory
         test="$directory/${basename_noext}.line"
         grid="$directory/${basename_noext}.grid"
+        vert="$directory/${basename_noext}.vert"
+        check="$directory/${basename_noext}.check"
         # Move tl.line
         if [[ -f "$parent_dir/tl.line" ]]; then
             mv "$parent_dir/tl.line" "$test"
@@ -278,6 +280,20 @@ for infile in "${infiles[@]}"; do
             echo "   Moved tl.grid to $grid"
         else
             echo -e "   \e[33mWarning: Expected output file tl.grid not found in parent directory\e[0m"
+        fi
+        # Move p.vert
+        if [[ -f "$parent_dir/p.vert" ]]; then
+            mv "$parent_dir/p.vert" "$vert"
+            echo "   Moved p.vert to $vert"
+        else
+            echo -e "   \e[33mWarning: Expected output file p.vert not found in parent directory\e[0m"
+        fi
+        # Move pade.check
+        if [[ -f "$parent_dir/pade.check" ]]; then
+            mv "$parent_dir/pade.check" "$check"
+            echo "   Moved pade.check to $check"
+        else
+            echo -e "   \e[33mWarning: Expected output file pade.check not found in parent directory\e[0m"
         fi
     fi
     
