@@ -17,6 +17,7 @@
 # Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
 #
 # Additional options:
+#   --exe <path>        Specify executable path (default: auto-detected)
 #   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
 #   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
 #   --skip-existing     Skip files where outputs already exist
@@ -53,6 +54,7 @@ Modes:
   diff    Compare existing output files to reference files (no NSPE execution)
 
 Options:
+  --exe <path>        Specify executable path (default: auto-detected)
   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
   --skip-existing     Skip files where outputs already exist
@@ -63,9 +65,13 @@ Options:
   -h, --help          Show this help message
 
 Examples:
+  $0 test std --exe ./nspe.x --pattern 'case*'
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
+
+Environment variables:
+  NSPE_EXE            Alternative way to specify NSPE executable path
 EOF
 }
 
@@ -77,17 +83,44 @@ skip_newer=false
 force=false
 dry_run=false
 debug=false
+cli_exe=""
 
-# First, extract mode and directory from positional args
+# Handle help first
+if [[ $# -eq 0 ]]; then
+    echo "Error: Mode must be specified as first argument" >&2
+    usage
+    exit 1
+fi
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
+# First argument must be mode
+if [[ "$1" =~ ^- ]]; then
+    echo "Error: Mode must be specified as first argument" >&2
+    usage
+    exit 1
+fi
+
 mode="$1"
-directory="$2"
+shift
 
-# Shift past the positional arguments
-shift 2 2>/dev/null || true
+# Check if second argument is directory or an option
+if [[ $# -gt 0 && ! "$1" =~ ^- ]]; then
+    # Second argument is directory
+    directory="$1"
+    shift
+else
+    # No directory specified, use default
+    directory="std"
+fi
 
 # Parse remaining options
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --exe) cli_exe="$2"; shift 2;;
         --pattern) patterns+=("$2"); shift 2;;
         --exclude) excludes+=("$2"); shift 2;;
         --skip-existing) skip_existing=true; shift;;
@@ -212,7 +245,15 @@ detect_nspe_program() {
 
 # Detect the appropriate nspe program (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
-    PROG=$(detect_nspe_program)
+    # Set the program executable
+    # Priority: command line --exe > NSPE_EXE environment variable > auto-detect
+    if [[ -n "$cli_exe" ]]; then
+        PROG="$cli_exe"
+    elif [[ -n "$NSPE_EXE" ]]; then
+        PROG="$NSPE_EXE"
+    else
+        PROG=$(detect_nspe_program)
+    fi
     echo "Selected program: $PROG"
     
     # Check if the program exists, and build it if not

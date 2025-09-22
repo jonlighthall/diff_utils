@@ -76,12 +76,37 @@ dry_run=false
 debug=false
 cli_exe=""
 
-# First, extract mode and directory from positional args
-mode="$1"
-directory="$2"
+# Handle help first
+if [[ $# -eq 0 ]]; then
+    echo "Error: Mode must be specified as first argument" >&2
+    usage
+    exit 1
+fi
 
-# Shift past the positional arguments
-shift 2 2>/dev/null || true
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
+# First argument must be mode
+if [[ "$1" =~ ^- ]]; then
+    echo "Error: Mode must be specified as first argument" >&2
+    usage
+    exit 1
+fi
+
+mode="$1"
+shift
+
+# Check if second argument is directory or an option
+if [[ $# -gt 0 && ! "$1" =~ ^- ]]; then
+    # Second argument is directory
+    directory="$1"
+    shift
+else
+    # No directory specified, use default
+    directory="std"
+fi
 
 # Parse remaining options
 while [[ $# -gt 0 ]]; do
@@ -167,7 +192,7 @@ PROJECT_ROOT="$(find_project_root)"
 # Priority: command line --exe > RAM_EXE environment variable > default
 if [[ -n "$cli_exe" ]]; then
     PROG="$cli_exe"
-elif [[ -n "$RAM_EXE" ]]; then
+    elif [[ -n "$RAM_EXE" ]]; then
     PROG="$RAM_EXE"
 else
     PROG="bin/ram1.5.exe"
