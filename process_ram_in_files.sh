@@ -468,14 +468,14 @@ for infile in "${infiles[@]}"; do
             mv "$parent_dir/p.vert" "$vert"
             echo "   Moved p.vert to $vert"
         else
-            echo -e "   \e[33mWarning: Expected output file p.vert not found in parent directory\e[0m"
+            : #echo -e "   \e[33mWarning: Expected output file p.vert not found in parent directory\e[0m"
         fi
         # Move pade.check
         if [[ -f "$parent_dir/pade.check" ]]; then
             mv "$parent_dir/pade.check" "$check"
             echo "   Moved pade.check to $check"
         else
-            echo -e "   \e[33mWarning: Expected output file pade.check not found in parent directory\e[0m"
+            : #echo -e "   \e[33mWarning: Expected output file pade.check not found in parent directory\e[0m"
         fi
     fi
     
