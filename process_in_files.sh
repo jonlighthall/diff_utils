@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: ./process_in_files.sh <mode> [directory]
+# Usage: ./process_in_files.sh <mode> [directory] [options]
 # Aug 2025 JCL
 # =============================
 # EXPLANATION SECTION
@@ -13,8 +13,18 @@
 #   diff - Compares existing output files to reference files (does not run nspe.exe)
 #
 # PROMPT: To process files, run:
-#   ./process_in_files.sh <mode> [directory]
+#   ./process_in_files.sh <mode> [directory] [options]
 # Where <mode> is 'make', 'copy', 'test', or 'diff'. Directory defaults to 'std'.
+#
+# Additional options:
+#   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
+#   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
+#   --skip-existing     Skip files where outputs already exist
+#   --skip-newer        Skip files where outputs are newer than input
+#   --force             Override skip options and process all matched files
+#   --dry-run           Show what would be processed without running
+#   --debug             Show detailed file filtering information
+#   -h, --help          Show this help message
 #
 # Dependencies:
 #   - lib_diff_utils.sh (must be in same directory or PATH)
@@ -32,6 +42,64 @@
 #
 # =============================
 
+usage() {
+  cat <<EOF
+Usage: $0 <mode> [directory] [options]
+
+Modes:
+  make    Run NSPE only (no file operations)
+  copy    Copy output files to reference names (.tl, .rtl, .ftl)
+  test    Run NSPE and compare outputs to reference files
+  diff    Compare existing output files to reference files (no NSPE execution)
+
+Options:
+  --pattern <glob>    Include files matching glob pattern (can be used multiple times)
+  --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
+  --skip-existing     Skip files where outputs already exist
+  --skip-newer        Skip files where outputs are newer than input
+  --force             Override skip options and process all matched files
+  --dry-run           Show what would be processed without running
+  --debug             Show detailed file filtering information
+  -h, --help          Show this help message
+
+Examples:
+  $0 test std --pattern 'case*' --exclude 'case_old*'
+  $0 make . --skip-existing --debug
+  $0 diff std --pattern 'test1*' --pattern 'test2*'
+EOF
+}
+
+# Parse command line arguments
+patterns=()
+excludes=()
+skip_existing=false
+skip_newer=false
+force=false
+dry_run=false
+debug=false
+
+# First, extract mode and directory from positional args
+mode="$1"
+directory="$2"
+
+# Shift past the positional arguments
+shift 2 2>/dev/null || true
+
+# Parse remaining options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pattern) patterns+=("$2"); shift 2;;
+        --exclude) excludes+=("$2"); shift 2;;
+        --skip-existing) skip_existing=true; shift;;
+        --skip-newer) skip_newer=true; shift;;
+        --force) force=true; shift;;
+        --dry-run) dry_run=true; shift;;
+        --debug) debug=true; shift;;
+        -h|--help) usage; exit 0;;
+        *) echo "Unknown option: $1" >&2; usage; exit 1;;
+    esac
+done
+
 # Source the utility library
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 LIBRARY_FILE="${SCRIPT_DIR}/lib_diff_utils.sh"
@@ -45,39 +113,9 @@ else
 fi
 
 set -e
-mode="$1"
-# =============================
-# MODE EXPLANATION
-#
-# What do you want to do with respect to the output files?
-#
-# The script operates in four modes: 'make', 'copy', 'test', and 'diff'.
-#
-# 'make':
-#   - Runs nspe.exe on each .in file (generates output files)
-#   - Does not perform any file operations (move, copy, diff)
-#   - Use when you just want to generate output files
-#
-# 'copy':
-#   - Does NOT run nspe.exe
-#   - Copies existing output files (_01.asc, _02.asc, _03.asc) to reference names (.tl, .rtl, .ftl)
-#   - Cleans up extra files
-#   - Use when you want to prepare existing outputs for reference
-#
-# 'test':
-#   - Runs nspe.exe on each .in file
-#   - Logs output to a .log file
-#   - Compares output files to reference files using diff_files
-#   - Reports PASS/FAIL for each test
-#   - Use to verify correctness of outputs by running fresh simulations
-#
-# 'diff':
-#   - Does NOT run nspe.exe
-#   - Compares existing output files (_01.asc, _02.asc, _03.asc) to reference files (.tl, .rtl, .ftl)
-#   - Shows differences using diff_files
-#   - Use to manually inspect differences between existing outputs and references
-# =============================
-directory="${2:-std}"
+
+# Set default directory if not provided
+directory="${directory:-std}"
 
 # Remove trailing slash from directory to avoid double slashes in file paths
 directory="${directory%/}"
@@ -215,8 +253,63 @@ mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec 
 if [[ ${#infiles[@]} -eq 0 ]]; then
     echo
     echo -e "\e[31mNo input files (*.in) found in directory: $directory\e[0m"
-    
     exit 1
+fi
+
+# Apply pattern filtering
+if [[ ${#patterns[@]} -gt 0 ]]; then
+    if $debug; then
+        printf "[DEBUG] Applying include patterns: %s\n" "${patterns[*]}"
+    fi
+    filtered=()
+    for f in "${infiles[@]}"; do
+        b=$(basename "$f")
+        matched=false
+        for pattern in "${patterns[@]}"; do
+            if [[ $b == $pattern ]]; then
+                matched=true
+                break
+            fi
+        done
+        if $matched; then
+            filtered+=("$f")
+        fi
+    done
+    infiles=("${filtered[@]}")
+    if $debug; then
+        printf "[DEBUG] After include filtering: %d files remain\n" "${#infiles[@]}"
+    fi
+fi
+
+# Apply exclude pattern filtering
+if [[ ${#excludes[@]} -gt 0 ]]; then
+    if $debug; then
+        printf "[DEBUG] Applying exclude patterns: %s\n" "${excludes[*]}"
+    fi
+    filtered=()
+    for f in "${infiles[@]}"; do
+        b=$(basename "$f")
+        excluded=false
+        for exclude in "${excludes[@]}"; do
+            if [[ $b == $exclude ]]; then
+                excluded=true
+                break
+            fi
+        done
+        if ! $excluded; then
+            filtered+=("$f")
+        fi
+    done
+    infiles=("${filtered[@]}")
+    if $debug; then
+        printf "[DEBUG] After exclude filtering: %d files remain\n" "${#infiles[@]}"
+    fi
+fi
+
+if [[ ${#infiles[@]} -eq 0 ]]; then
+    echo
+    echo -e "\e[33mNo input files match the specified patterns in directory: $directory\e[0m"
+    exit 0
 fi
 pass_files=()
 fail_files=()
@@ -268,8 +361,59 @@ printf '%*s\n' "$line_len" '' | tr '  ' '='
 for infile in "${infiles[@]}"; do
     # Check for required strings (case-insensitive)
     if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
+        if $dry_run; then
+            echo "[DRY-RUN] Would process: $infile"
+            continue
+        fi
+        
         echo "Processing: $infile"
         LOG_FILE="$directory/$(basename "$infile" .in).log"
+        basename_noext="$(basename "$infile" .in)"
+        
+        # Check if we should skip this file
+        skip_reason=""
+        
+        if ($skip_existing || $skip_newer) && ! $force; then
+            # Define potential output files for NSPE
+            potential_outputs=(
+                "$directory/${basename_noext}_01.asc"
+                "$directory/${basename_noext}_02.asc"
+                "$directory/${basename_noext}_03.asc"
+                "$directory/${basename_noext}.tl"
+                "$directory/${basename_noext}.rtl"
+                "$directory/${basename_noext}.ftl"
+                "$directory/${basename_noext}.log"
+            )
+            
+            if $skip_existing; then
+                # Check if any output files exist
+                existing_count=0
+                for output in "${potential_outputs[@]}"; do
+                    if [[ -f "$output" ]]; then
+                        ((existing_count++))
+                    fi
+                done
+                if [[ $existing_count -gt 0 ]]; then
+                    skip_reason="output files exist"
+                fi
+            fi
+            
+            if $skip_newer && [[ -z "$skip_reason" ]]; then
+                # Check if any output files are newer than input
+                for output in "${potential_outputs[@]}"; do
+                    if [[ -f "$output" && "$output" -nt "$infile" ]]; then
+                        skip_reason="outputs newer than input"
+                        break
+                    fi
+                done
+            fi
+        fi
+        
+        if [[ -n "$skip_reason" ]]; then
+            echo "  [SKIP] $infile ($skip_reason)"
+            add_to_array_if_not_present "skipped_files" "$infile"
+            continue
+        fi
         
         # Run $PROG for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
         if [[ "$mode" == "make" || "$mode" == "test" ]]; then
