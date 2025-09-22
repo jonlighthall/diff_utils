@@ -181,7 +181,6 @@ if [[ ! -d "$directory" ]]; then
 fi
 
 # Intelligent program detection - handles various executable names or makefile targets
-PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
 detect_program() {
     local candidates=("./nspe.x" "./nspe.exe" "nspe.x" "nspe.exe")
@@ -242,8 +241,9 @@ detect_program() {
     echo "./nspe.x"
     return 0
 }
+PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
-# Detect the appropriate executable program (skip for diff and copy modes)
+# Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     # Set the program executable
     # Priority: command line --exe > NSPE_EXE environment variable > auto-detect
