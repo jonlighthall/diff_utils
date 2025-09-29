@@ -1798,9 +1798,17 @@ void FileComparator::print_additional_diff_info(
 
   // Handle case with no printed differences
   if (counter.diff_print == 0) {
-    std::cout << "\033[1;32m   Files " << params.file1 << " and "
-              << params.file2 << " are identical within print threshold\033[0m"
-              << std::endl;
+    // Only show this message if there are no significant differences at all
+    // If there are significant differences but none printed, this is misleading
+    // The "Not printed differences" summary line already handles this case
+    if (thresh.print > thresh.significant && counter.diff_significant > 0) {
+      std::cout << "\033[1;33m   Warning: All significant differences are below the print threshold ("
+                << thresh.print << ")\033[0m" << std::endl;
+    } else if (counter.diff_significant == 0) {
+      std::cout << "\033[1;32m   Files " << params.file1 << " and "
+                << params.file2 << " are identical within print threshold\033[0m"
+                << std::endl;
+    }
   }
 }
 
