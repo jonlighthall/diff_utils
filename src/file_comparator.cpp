@@ -1190,7 +1190,16 @@ void FileComparator::print_maximum_difference_analysis(
 // Simplified main print_diff_like_summary function
 void FileComparator::print_diff_like_summary(
     const SummaryParams& params) const {
-  // Handle structure incompatibility first
+  // Handle file errors first - don't print any comparison results if files
+  // couldn't be opened
+  if (flag.error_found) {
+    std::cout
+        << "\033[1;31m   Cannot compare files due to file access errors\033[0m"
+        << std::endl;
+    return;
+  }
+
+  // Handle structure incompatibility
   if (!flag.structures_compatible) {
     std::cout << "\033[1;31m   Files " << params.file1 << " and "
               << params.file2 << " have incompatible column structures\033[0m"
@@ -1802,12 +1811,13 @@ void FileComparator::print_additional_diff_info(
     // If there are significant differences but none printed, this is misleading
     // The "Not printed differences" summary line already handles this case
     if (thresh.print > thresh.significant && counter.diff_significant > 0) {
-      std::cout << "\033[1;33m   Warning: All significant differences are below the print threshold ("
+      std::cout << "\033[1;33m   Warning: All significant differences are "
+                   "below the print threshold ("
                 << thresh.print << ")\033[0m" << std::endl;
     } else if (counter.diff_significant == 0) {
       std::cout << "\033[1;32m   Files " << params.file1 << " and "
-                << params.file2 << " are identical within print threshold\033[0m"
-                << std::endl;
+                << params.file2
+                << " are identical within print threshold\033[0m" << std::endl;
     }
   }
 }
@@ -1833,6 +1843,15 @@ void FileComparator::print_summary(const std::string& file1,
                                    char* argv[]) const {
   print_arguments_and_files(file1, file2, argc, argv);
 
+  // Early return for file access errors - don't print meaningless statistics
+  if (flag.error_found) {
+    std::cout << "SUMMARY:" << std::endl;
+    std::cout << "\033[1;31m   Cannot perform comparison due to file access "
+                 "errors\033[0m"
+              << std::endl;
+    return;
+  }
+
   auto fmt_wid = static_cast<int>(std::to_string(counter.elem_number).length());
   SummaryParams params{file1, file2, fmt_wid};
   print_settings(params.file1, params.file2);
@@ -1845,10 +1864,6 @@ void FileComparator::print_summary(const std::string& file1,
       (print.level >= 0 || counter.diff_non_zero > 0)) {
     std::cout << "SUMMARY:" << std::endl;
   }
-
-  // Early return for errors
-  // Do not abort summary on error; continue to print detailed breakdowns
-  // so the rest of the file is processed and reported.
 
   print_detailed_summary(params);
   print_additional_diff_info(params);
