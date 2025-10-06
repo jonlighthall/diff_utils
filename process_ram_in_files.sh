@@ -195,20 +195,20 @@ if [[ -n "$cli_exe" ]]; then
     elif [[ -n "$RAM_EXE" ]]; then
     PROG="$RAM_EXE"
 else
-    PROG="bin/ram1.5.exe"
+    PROG="bin/ram1.5.x"
 fi
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 
 # Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
     echo "Selected program: $PROG"
-    
+
     # Check if the program exists, and build it if not
     if [[ ! -f "$PROG" ]]; then
         echo "Program $PROG not found. Attempting to build it..."
         make
     fi
-    
+
     # Verify the program is now executable
     if [[ ! -x "$PROG" ]]; then
         echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
@@ -288,6 +288,7 @@ fail_files=()
 missing_reference_files=()
 missing_output_files=()
 empty_files=()
+empty_output_files=()
 processed_files=()
 skipped_files=()
 exec_success_files=()
@@ -299,7 +300,7 @@ add_to_array_if_not_present() {
     local array_name="$1"
     local file="$2"
     local -n array_ref="$array_name"
-    
+
     # Check if file is already in array
     local item
     for item in "${array_ref[@]}"; do
@@ -307,7 +308,7 @@ add_to_array_if_not_present() {
             return 0  # File already present, don't add
         fi
     done
-    
+
     # File not found, add it
     array_ref+=("$file")
 }
@@ -335,15 +336,15 @@ for infile in "${infiles[@]}"; do
         echo "[DRY-RUN] Would process: $infile"
         continue
     fi
-    
+
     echo "Processing: $infile"
     LOG_FILE="$directory/$(basename "$infile" .in).log"
     basename_noext="$(basename "$infile" .in)"
     parent_dir="$PROJECT_ROOT"
-    
+
     # Check if we should skip this file
     skip_reason=""
-    
+
     if ($skip_existing || $skip_newer) && ! $force; then
         # Define potential output files
         potential_outputs=(
@@ -354,7 +355,7 @@ for infile in "${infiles[@]}"; do
             "$directory/${basename_noext}_p.vert"
             "$directory/${basename_noext}_pade.check"
         )
-        
+
         if $skip_existing; then
             # Check if any output files exist
             existing_count=0
@@ -367,7 +368,7 @@ for infile in "${infiles[@]}"; do
                 skip_reason="output files exist"
             fi
         fi
-        
+
         if $skip_newer && [[ -z "$skip_reason" ]]; then
             # Check if any output files are newer than input
             for output in "${potential_outputs[@]}"; do
@@ -378,25 +379,25 @@ for infile in "${infiles[@]}"; do
             done
         fi
     fi
-    
+
     if [[ -n "$skip_reason" ]]; then
         echo "  [SKIP] $infile ($skip_reason)"
         add_to_array_if_not_present "skipped_files" "$infile"
         continue
     fi
-    
+
     # Run $PROG for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
     if [[ "$mode" == "make" || "$mode" == "test" ]]; then
         # Copy infile to ram.in in parent directory
         cp "$infile" "$parent_dir/ram.in"
-        
+
         # Check for existing output files and warn user
         existing_files=()
         potential_output="$parent_dir/tl.line"
         if [[ -f "$potential_output" ]]; then
             existing_files+=("$potential_output")
         fi
-        
+
         # Also check for other common output files
         for ext in .log; do
             potential_output="$parent_dir/${basename_noext}${ext}"
@@ -404,7 +405,7 @@ for infile in "${infiles[@]}"; do
                 existing_files+=("$potential_output")
             fi
         done
-        
+
         # Show warning if any existing files found
         if [[ ${#existing_files[@]} -gt 0 ]] && [[ "$mode" != "test" ]]; then
             echo -e "   \e[90mWarning: Existing output files will be overwritten:\e[0m"
@@ -412,7 +413,7 @@ for infile in "${infiles[@]}"; do
                 echo -e "     \e[90m- $(basename "$existing_file")\e[0m"
             done
         fi
-        
+
         echo -n "   Running: $PROG... "
         echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
         set +e  # Temporarily disable exit on error to handle executable failures gracefully
@@ -443,7 +444,7 @@ for infile in "${infiles[@]}"; do
             echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
             exec_fail_files+=("$infile")
         fi
-        
+
         # After running the executable, move the output files to the target directory
         test="$directory/${basename_noext}.line"
         grid="$directory/${basename_noext}.grid"
@@ -453,6 +454,21 @@ for infile in "${infiles[@]}"; do
         if [[ -f "$parent_dir/tl.line" ]]; then
             mv "$parent_dir/tl.line" "$test"
             echo "   Moved tl.line to $test"
+            # Check if the moved output file is empty
+            if [[ ! -s "$test" ]]; then
+                echo -e "   \e[33mWarning: Output file $test is empty\e[0m"
+                empty_output_files+=("$test")
+                # Reclassify this as execution failure since empty output indicates a problem
+                # Remove from success array and add to fail array
+                temp_array=()
+                for f in "${exec_success_files[@]}"; do
+                    if [[ "$f" != "$infile" ]]; then
+                        temp_array+=("$f")
+                    fi
+                done
+                exec_success_files=("${temp_array[@]}")
+                exec_fail_files+=("$infile")
+            fi
         else
             echo -e "   \e[33mWarning: Expected output file tl.line not found in parent directory\e[0m"
         fi
@@ -478,17 +494,17 @@ for infile in "${infiles[@]}"; do
             : #echo -e "   \e[33mWarning: Expected output file pade.check not found in parent directory\e[0m"
         fi
     fi
-    
+
     # For 'make' mode, we're done after running $PROG and moving output - skip file operations
     if [[ "$mode" == "make" ]]; then
         printf '%*s\n' "$line_len" '' | tr '  ' '='
         continue
     fi
-    
+
     # Handle the output file
     test="$directory/${basename_noext}.line"
     ref="$directory/${basename_noext}.tl"
-    
+
     # For make and test modes, check if test file exists (after moving from parent directory)
     # For copy mode, check if basename.line exists directly
     # For diff mode, check if either test or ref exists
@@ -508,7 +524,7 @@ for infile in "${infiles[@]}"; do
                 continue
             fi
         fi
-        
+
         # For diff mode, we need to check files even if test doesn't exist
         if [[ "$mode" == "diff" && ! -f "$test" ]]; then
             # In diff mode, check if ref exists
@@ -529,15 +545,30 @@ for infile in "${infiles[@]}"; do
             elif [[ -f "$test" && -s "$test" ]]; then
             if [[ "$mode" == "copy" ]]; then
                 # COPY mode: Copy basename.line to .tl
+                # Check if source file is empty before copying
+                if [[ ! -s "$test" ]]; then
+                    echo -e "   \e[33mWarning: Source file $test is empty\e[0m"
+                    empty_output_files+=("$test")
+                fi
                 cp -v "$test" "$ref"
                 echo "   Copied $test to $ref"
                 processed_files+=("$infile")
                 elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                 # TEST and DIFF modes: Compare files
                 echo -n "   Comparing $test to $ref... "
-                
+
+                # Check if output file is empty
+                if [[ ! -s "$test" ]]; then
+                    echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m"
+                    echo "   Output file '$test' is empty"
+                    empty_output_files+=("$test")
+                    if [[ "$mode" == "test" ]]; then
+                        echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m" >> "$LOG_FILE"
+                        echo "   Output file '$test' is empty" >> "$LOG_FILE"
+                    fi
+                    add_to_array_if_not_present "skipped_files" "$infile"
                 # Check if reference file exists
-                if [[ ! -f "$ref" ]]; then
+                elif [[ ! -f "$ref" ]]; then
                     echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist"
                     if [[ "$mode" == "test" ]]; then
                         echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
@@ -604,7 +635,7 @@ for infile in "${infiles[@]}"; do
             fi
         fi
     fi
-    
+
     # Clean up extra files
     for f in "$directory/$basename_noext"*; do
         # Skip .in, reference, output, and log
@@ -619,7 +650,7 @@ for infile in "${infiles[@]}"; do
             fi
         fi
     done
-    
+
     # Clean up ram.in from parent directory if it exists
     if [[ -f "$parent_dir/ram.in" ]]; then
         rm "$parent_dir/ram.in"
@@ -642,12 +673,12 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         echo "Diff Summary:"
     fi
     printf '%*s\n' "$line_len" '' | tr ' ' '='
-    
+
     # Execution Results Section (for modes that run executable)
     if [[ "$mode" == "test" || "$mode" == "make" ]]; then
         echo "Execution Results:"
         echo "=================="
-        
+
         if [[ ${#exec_success_files[@]} -gt 0 ]]; then
             echo "Executable successful: ${#exec_success_files[@]}"
             for f in "${exec_success_files[@]}"; do
@@ -656,7 +687,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Executable successful: 0"
         fi
-        
+
         if [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo "Executable failed: ${#exec_fail_files[@]}"
             for f in "${exec_fail_files[@]}"; do
@@ -665,21 +696,28 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Executable failed: 0"
         fi
-        
+
         if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
             echo "Executable ran but no output: ${#missing_exec_output_files[@]}"
             for f in "${missing_exec_output_files[@]}"; do
                 echo -e "   \e[33mNO_OUTPUT\e[0m $(basename "$f" .line)"
             done
         fi
+
+        if [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo "Empty output files: ${#empty_output_files[@]}"
+            for f in "${empty_output_files[@]}"; do
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+            done
+        fi
         echo ""
     fi
-    
+
     # Diff Results Section (for modes that compare files)
     if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
         echo "Diff Results:"
         echo "============="
-        
+
         if [[ ${#pass_files[@]} -gt 0 ]]; then
             echo "Passed files: ${#pass_files[@]}"
             for f in "${pass_files[@]}"; do
@@ -688,7 +726,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Passed files: 0"
         fi
-        
+
         if [[ ${#fail_files[@]} -gt 0 ]]; then
             echo "Failed files: ${#fail_files[@]}"
             for f in "${fail_files[@]}"; do
@@ -697,7 +735,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Failed files: 0"
         fi
-        
+
         if [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo "Skipped files: ${#skipped_files[@]}"
             for f in "${skipped_files[@]}"; do
@@ -706,12 +744,12 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         fi
         echo ""
     fi
-    
+
     # Copy Results Section
     if [[ "$mode" == "copy" ]]; then
         echo "Copy Results:"
         echo "============="
-        
+
         if [[ ${#processed_files[@]} -gt 0 ]]; then
             echo "Processed files: ${#processed_files[@]}"
             for f in "${processed_files[@]}"; do
@@ -720,20 +758,27 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Processed files: 0"
         fi
-        
+
         if [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo "Skipped files: ${#skipped_files[@]}"
             for f in "${skipped_files[@]}"; do
                 echo -e "   \e[33mSKIPPED\e[0m $f"
             done
         fi
+
+        if [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo "Empty output files detected: ${#empty_output_files[@]}"
+            for f in "${empty_output_files[@]}"; do
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+            done
+        fi
         echo ""
     fi
-    
+
     # File Status Section
     echo "File Status:"
     echo "============"
-    
+
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
         echo "Missing reference files (run 'copy' mode first): ${#missing_reference_files[@]}"
         for f in "${missing_reference_files[@]}"; do
@@ -742,7 +787,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Missing reference files: 0"
     fi
-    
+
     if [[ ${#missing_output_files[@]} -gt 0 ]]; then
         echo "Missing output files (run 'make' mode first): ${#missing_output_files[@]}"
         for f in "${missing_output_files[@]}"; do
@@ -751,7 +796,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Missing output files: 0"
     fi
-    
+
     if [[ ${#empty_files[@]} -gt 0 ]]; then
         echo "Empty files detected: ${#empty_files[@]}"
         for f in "${empty_files[@]}"; do
@@ -760,32 +805,40 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Empty files: 0"
     fi
-    
+
     # Overall Status Assessment
     echo ""
     echo "Overall Status:"
     echo "==============="
-    if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
+    if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
         echo -e "\e[32mAll files processed successfully!\e[0m"
+        elif [[ "$mode" == "copy" && ${#empty_output_files[@]} -gt 0 ]]; then
+        echo -e "\e[33mSome output files are empty. Check copy results above.\e[0m"
         elif [[ "$mode" == "make" ]]; then
-        if [[ ${#exec_fail_files[@]} -eq 0 ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll files generated successfully!\e[0m"
+        elif [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome output files are empty. Check execution results above.\e[0m"
         else
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
         fi
         elif [[ "$mode" == "test" ]]; then
-        if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll tests passed!\e[0m"
             elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
+            elif [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome output files are empty. Check execution results above.\e[0m"
             elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
             elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
         elif [[ "$mode" == "diff" ]]; then
-        if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
+        if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll diffs passed!\e[0m"
+            elif [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome output files are empty. Check diff results above.\e[0m"
             elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
             elif [[ ${#skipped_files[@]} -gt 0 ]]; then
@@ -796,11 +849,11 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
 fi
 
 # Exit with appropriate code
-if [[ "$mode" == "make" && ${#exec_fail_files[@]} -gt 0 ]]; then
+if [[ "$mode" == "make" && (${#exec_fail_files[@]} -gt 0 || ${#empty_output_files[@]} -gt 0) ]]; then
     exit 1
-    elif [[ "$mode" == "test" && (${#exec_fail_files[@]} -gt 0 || ${#fail_files[@]} -gt 0) ]]; then
+    elif [[ "$mode" == "test" && (${#exec_fail_files[@]} -gt 0 || ${#fail_files[@]} -gt 0 || ${#empty_output_files[@]} -gt 0) ]]; then
     exit 1
-    elif [[ "$mode" == "diff" && ${#fail_files[@]} -gt 0 ]]; then
+    elif [[ "$mode" == "diff" && (${#fail_files[@]} -gt 0 || ${#empty_output_files[@]} -gt 0) ]]; then
     exit 1
 else
     exit 0
