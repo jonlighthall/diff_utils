@@ -458,16 +458,19 @@ for infile in "${infiles[@]}"; do
             if [[ ! -s "$test" ]]; then
                 echo -e "   \e[33mWarning: Output file $test is empty\e[0m"
                 empty_output_files+=("$test")
-                # Reclassify this as execution failure since empty output indicates a problem
-                # Remove from success array and add to fail array
-                temp_array=()
-                for f in "${exec_success_files[@]}"; do
-                    if [[ "$f" != "$infile" ]]; then
-                        temp_array+=("$f")
-                    fi
-                done
-                exec_success_files=("${temp_array[@]}")
-                exec_fail_files+=("$infile")
+                # Only reclassify from success to failure if not already in fail array
+                # This prevents double-counting when execution failed AND produced empty output
+                if [[ ! " ${exec_fail_files[*]} " =~ " $infile " ]]; then
+                    # Remove from success array and add to fail array
+                    temp_array=()
+                    for f in "${exec_success_files[@]}"; do
+                        if [[ "$f" != "$infile" ]]; then
+                            temp_array+=("$f")
+                        fi
+                    done
+                    exec_success_files=("${temp_array[@]}")
+                    exec_fail_files+=("$infile")
+                fi
             fi
         else
             echo -e "   \e[33mWarning: Expected output file tl.line not found in parent directory\e[0m"
