@@ -693,8 +693,14 @@ for infile in "${infiles[@]}"; do
                     # Remove binary files and other extra outputs
                     for binfile in "$directory/${basename_noext}"_*.bin "$directory/${basename_noext}"_*.dat "$directory/${basename_noext}".003 "$directory/${basename_noext}".prs "$directory/${basename_noext}".pulse "$directory/${basename_noext}"_angles.asc; do
                         if [[ -f "$binfile" ]]; then
-                            rm "$binfile"
-                            echo "   Removed $(basename "$binfile") (binary/extra output)"
+                            # Check if file is binary or ASCII
+                            if file "$binfile" | grep -q "ASCII\|text"; then
+                                rm "$binfile"
+                                echo "   Removed $(basename "$binfile") (extra output)"
+                            else
+                                rm "$binfile"
+                                echo "   Removed $(basename "$binfile") (binary output)"
+                            fi
                         fi
                     done
 
