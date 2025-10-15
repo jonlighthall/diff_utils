@@ -198,6 +198,7 @@ else
     PROG="bin/ram1.5.x"
 fi
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
+PROG_OUTPUT_COLOR="\x1B[0m" # Reset color for PROG output
 
 # Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then

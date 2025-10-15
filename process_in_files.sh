@@ -188,7 +188,7 @@ fi
 detect_program() {
     local candidates=("./nspe.x" "./nspe.exe" "nspe.x" "nspe.exe")
     local makefile_targets=()
-    
+
     # Check for existing executables first
     for prog in "${candidates[@]}"; do
         if [[ -f "$prog" && -x "$prog" ]]; then
@@ -197,21 +197,21 @@ detect_program() {
             return 0
         fi
     done
-    
+
     # If no executable found, check makefile for available targets
     if [[ -f "makefile" ]] || [[ -f "Makefile" ]]; then
         echo "No executable found. Checking makefile for executable targets..." >&2
-        
+
         # Look for executable targets in makefile (case insensitive)
         if command -v make >/dev/null 2>&1; then
             # Try to get makefile targets (this works with GNU make)
             local make_targets
             make_targets=$(make -qp 2>/dev/null | grep -E '^[^.%#[:space:]][^=]*:' | cut -d: -f1 | grep -i nspe || true)
-            
+
             if [[ -n "$make_targets" ]]; then
                 echo "Found makefile targets containing 'nspe':" >&2
                 echo "$make_targets" | sed 's/^/  /' >&2
-                
+
                 # Prefer .x over .exe, then first match
                 for target in nspe.x nspe.exe $make_targets; do
                     if echo "$make_targets" | grep -q "^$target$"; then
@@ -224,7 +224,7 @@ detect_program() {
                         return 0
                     fi
                 done
-                
+
                 # If no exact match, use first target found
                 local first_target
                 first_target=$(echo "$make_targets" | head -n1)
@@ -238,7 +238,7 @@ detect_program() {
             fi
         fi
     fi
-    
+
     # Default fallback
     echo "No executable or makefile target found. Using default: ./nspe.x" >&2
     echo "./nspe.x"
@@ -411,14 +411,14 @@ for infile in "${infiles[@]}"; do
             echo "[DRY-RUN] Would process: $infile"
             continue
         fi
-        
+
         echo "Processing: $infile"
         LOG_FILE="$directory/$(basename "$infile" .in).log"
         basename_noext="$(basename "$infile" .in)"
-        
+
         # Check if we should skip this file
         skip_reason=""
-        
+
         if ($skip_existing || $skip_newer) && ! $force; then
             # Define potential output files
             potential_outputs=(
@@ -430,7 +430,7 @@ for infile in "${infiles[@]}"; do
                 "$directory/${basename_noext}.ftl"
                 "$directory/${basename_noext}.log"
             )
-            
+
             if $skip_existing; then
                 # Check if any output files exist
                 existing_count=0
@@ -443,7 +443,7 @@ for infile in "${infiles[@]}"; do
                     skip_reason="output files exist"
                 fi
             fi
-            
+
             if $skip_newer && [[ -z "$skip_reason" ]]; then
                 # Check if any output files are newer than input
                 for output in "${potential_outputs[@]}"; do
@@ -454,13 +454,13 @@ for infile in "${infiles[@]}"; do
                 done
             fi
         fi
-        
+
         if [[ -n "$skip_reason" ]]; then
             echo "  [SKIP] $infile ($skip_reason)"
             add_to_array_if_not_present "skipped_files" "$infile"
             continue
         fi
-        
+
         # Run $PROG for 'make' and 'test' modes, but not for 'copy' or 'diff' mode
         if [[ "$mode" == "make" || "$mode" == "test" ]]; then
             # Check for existing output files and warn user
@@ -472,7 +472,7 @@ for infile in "${infiles[@]}"; do
                     existing_files+=("$potential_output")
                 fi
             done
-            
+
             # Also check for other common output files
             for ext in .003 _41.dat _42.dat .log; do
                 potential_output="$directory/${basename_noext}${ext}"
@@ -480,7 +480,7 @@ for infile in "${infiles[@]}"; do
                     existing_files+=("$potential_output")
                 fi
             done
-            
+
             # Show warning if any existing files found
             if [[ ${#existing_files[@]} -gt 0 ]] && [[ "$mode" != "test" ]]; then
                 echo -e "   \e[90mWarning: Existing output files will be overwritten:\e[0m"
@@ -488,11 +488,11 @@ for infile in "${infiles[@]}"; do
                     echo -e "     \e[90m- $(basename "$existing_file")\e[0m"
                 done
             fi
-            
+
             # Copy input file to nspe.in in the same directory
             cp "$infile" "$directory/nspe.in"
             echo "   Copied $infile to $directory/nspe.in"
-            
+
             # Get absolute path to executable for running from different directory
             if [[ "$PROG" = /* ]]; then
                 # Already absolute path
@@ -501,7 +501,7 @@ for infile in "${infiles[@]}"; do
                 # Convert relative path to absolute
                 prog_path="$(readlink -f "$PROG")"
             fi
-            
+
             echo -n "   Running: $PROG nspe.in... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
@@ -528,7 +528,7 @@ for infile in "${infiles[@]}"; do
                     echo "   Success: ${PROG} completed successfully for $infile"
                 fi
                 exec_success_files+=("$infile")
-                
+
                 # Rename output files from nspe*.asc to basename_*.asc
                 echo "   Renaming output files..."
                 renamed_count=0
@@ -545,7 +545,7 @@ for infile in "${infiles[@]}"; do
                         fi
                     done
                 done
-                
+
                 # Also rename other common output files
                 for ext in .003 _41.dat _42.dat; do
                     default_output="$directory/nspe${ext}"
@@ -556,11 +556,11 @@ for infile in "${infiles[@]}"; do
                         ((renamed_count++))
                     fi
                 done
-                
+
                 if [[ $renamed_count -eq 0 ]]; then
                     echo -e "   \e[33mWarning: No output files found to rename\e[0m"
                 fi
-                
+
                 # Clean up nspe.in after successful execution
                 if [[ -f "$directory/nspe.in" ]]; then
                     rm "$directory/nspe.in"
@@ -570,24 +570,24 @@ for infile in "${infiles[@]}"; do
                 echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
                 exec_fail_files+=("$infile")
-                
+
                 # Clean up nspe.in after failed execution
                 if [[ -f "$directory/nspe.in" ]]; then
                     rm "$directory/nspe.in"
                 fi
-                
+
                 echo "   Aborting..."
                 break
                 #continue
             fi
         fi
-        
+
         # For 'make' mode, we're done after running $PROG - skip file operations
         if [[ "$mode" == "make" ]]; then
             printf '%*s\n' "$line_len" '' | tr '  ' '='
             continue
         fi
-        
+
         # Find the first available file pair by priority: 03, 02, 01
         found_files=false
         for suffix in 03 02 01; do
@@ -597,7 +597,7 @@ for infile in "${infiles[@]}"; do
                 02) ref="$directory/$(basename "$infile" .in).rtl" ;;
                 03) ref="$directory/$(basename "$infile" .in).ftl" ;;
             esac
-            
+
             # For copy and test modes, check if test file exists
             # For diff mode, check if either test or ref exists to provide meaningful feedback
             if [[ "$mode" == "test" && -f "$test" && -s "$test" ]] || [[ "$mode" == "copy" && -f "$test" && -s "$test" ]] || [[ "$mode" == "diff" && (-f "$test" || -f "$ref") ]]; then
@@ -622,7 +622,7 @@ for infile in "${infiles[@]}"; do
                     fi
                     break  # Exit the suffix loop since we handled this case
                 fi
-                
+
                 # Continue with existing logic for cases where test file exists
                 if [[ -f "$test" && -s "$test" ]]; then
                     if [[ "$mode" == "copy" ]]; then
@@ -633,7 +633,7 @@ for infile in "${infiles[@]}"; do
                         elif [[ "$mode" == "test" || "$mode" == "diff" ]]; then
                         # TEST and DIFF modes: Compare files
                         echo -n "   Comparing $test to $ref... "
-                        
+
                         # Check if reference file exists
                         if [[ ! -f "$ref" ]]; then
                             echo -e "\e[33m[[MISSING]]\e[0m\n   Reference file '$ref' does not exist"
@@ -649,7 +649,7 @@ for infile in "${infiles[@]}"; do
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
-                        
+
                         # Check if reference file is empty
                         if [[ ! -s "$ref" ]]; then
                             echo
@@ -667,7 +667,7 @@ for infile in "${infiles[@]}"; do
                             found_files=true  # Mark as processed to avoid "no files found" message
                             break  # Exit the suffix loop since we handled this case
                         fi
-                        
+
                         # For diff mode, also check if test file exists (since we're not running $PROG)
                         if [[ "$mode" == "diff" && ! -f "$test" ]]; then
                             echo -e "\e[33m[[MISSING OUTPUT]]\e[0m\n   Output file '$test' does not exist"
@@ -677,7 +677,7 @@ for infile in "${infiles[@]}"; do
                             add_to_array_if_not_present "skipped_files" "$infile"
                             continue
                         fi
-                        
+
                         # For diff mode, check if test file is empty
                         if [[ "$mode" == "diff" && ! -s "$test" ]]; then
                             echo -e "\e[33m[[EMPTY OUTPUT]]\e[0m\n   Output file '$test' is empty"
@@ -686,7 +686,7 @@ for infile in "${infiles[@]}"; do
                             add_to_array_if_not_present "skipped_files" "$infile"
                             continue
                         fi
-                        
+
                         # Perform the actual comparison
                         if [[ "$mode" == "test" ]]; then
                             # TEST mode: Log comparison results
@@ -741,7 +741,7 @@ for infile in "${infiles[@]}"; do
                 fi  # End of the "if [[ -f "$test" && -s "$test" ]]; then" block
             fi  # End of the main suffix condition
         done
-        
+
         # If no files were found, report it
         if [[ "$found_files" == false ]]; then
             if [[ "$mode" == "copy" ]]; then
