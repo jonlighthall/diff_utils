@@ -26,6 +26,7 @@
 #   --skip-existing     Skip files where outputs already exist
 #   --skip-newer        Skip files where outputs are newer than input
 #   --force             Override skip options and process all matched files
+#   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
 #   --dry-run           Show what would be processed without running
 #   --debug             Show detailed file filtering information
 #   -h, --help          Show this help message
@@ -63,6 +64,7 @@ Options:
   --skip-existing     Skip files where outputs already exist
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
+  --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
   -h, --help          Show this help message
@@ -86,6 +88,7 @@ skip_newer=false
 force=false
 dry_run=false
 debug=false
+keep_bin=false
 cli_exe=""
 
 # Handle help first
@@ -129,6 +132,7 @@ while [[ $# -gt 0 ]]; do
         --skip-existing) skip_existing=true; shift;;
         --skip-newer) skip_newer=true; shift;;
         --force) force=true; shift;;
+        --keep-bin) keep_bin=true; shift;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
         -h|--help) usage; exit 0;;
@@ -580,14 +584,14 @@ for infile in "${infiles[@]}"; do
                         renamed_count=$((renamed_count + 1))
                     fi
                 done
-                
+
                 # Special handling for for003.dat -> basename.003
                 if [[ -f "$directory/for003.dat" ]]; then
                     mv "$directory/for003.dat" "$directory/${basename_noext}.003"
                     echo "   Renamed for003.dat to ${basename_noext}.003"
                     renamed_count=$((renamed_count + 1))
                 fi
-                
+
                 # Rename nspeXX.bin files (nspe09.bin -> basename_09.bin)
                 for nspefile in "$directory"/nspe[0-9][0-9].*; do
                     if [[ -f "$nspefile" ]]; then
@@ -600,7 +604,7 @@ for infile in "${infiles[@]}"; do
                         renamed_count=$((renamed_count + 1))
                     fi
                 done
-                
+
                 # Rename _41.dat and _42.dat specifically (these use underscores)
                 for suffix in 41 42; do
                     default_output="$directory/nspe_${suffix}.dat"
@@ -658,6 +662,49 @@ for infile in "${infiles[@]}"; do
                     echo -e "   \e[33mWarning: No output files found to rename\e[0m"
                     # Track that executable ran but produced no output files
                     missing_exec_output_files+=("$infile")
+                fi
+
+                # If --keep-bin is not set, remove extra files that don't have corresponding reference files
+                if [[ "$keep_bin" == false ]]; then
+                    echo "   Cleaning up extra output files (only keeping files with references)..."
+
+                    # Determine which reference files exist
+                    has_tl=false
+                    has_rtl=false
+                    has_ftl=false
+                    [[ -f "$directory/${basename_noext}.tl" ]] && has_tl=true
+                    [[ -f "$directory/${basename_noext}.rtl" ]] && has_rtl=true
+                    [[ -f "$directory/${basename_noext}.ftl" ]] && has_ftl=true
+
+                    # Remove .asc files that don't have corresponding references
+                    if [[ "$has_tl" == false && -f "$directory/${basename_noext}_01.asc" ]]; then
+                        rm "$directory/${basename_noext}_01.asc"
+                        echo "   Removed ${basename_noext}_01.asc (no .tl reference)"
+                    fi
+                    if [[ "$has_rtl" == false && -f "$directory/${basename_noext}_02.asc" ]]; then
+                        rm "$directory/${basename_noext}_02.asc"
+                        echo "   Removed ${basename_noext}_02.asc (no .rtl reference)"
+                    fi
+                    if [[ "$has_ftl" == false && -f "$directory/${basename_noext}_03.asc" ]]; then
+                        rm "$directory/${basename_noext}_03.asc"
+                        echo "   Removed ${basename_noext}_03.asc (no .ftl reference)"
+                    fi
+
+                    # Remove binary files and other extra outputs
+                    for binfile in "$directory/${basename_noext}"_*.bin "$directory/${basename_noext}"_*.dat "$directory/${basename_noext}".003 "$directory/${basename_noext}".prs "$directory/${basename_noext}".pulse "$directory/${basename_noext}"_angles.asc; do
+                        if [[ -f "$binfile" ]]; then
+                            rm "$binfile"
+                            echo "   Removed $(basename "$binfile") (binary/extra output)"
+                        fi
+                    done
+
+                    # Keep log file only for case6 and case7
+                    if [[ ! "$basename_noext" =~ case[67] ]]; then
+                        if [[ -f "$directory/${basename_noext}.log" ]]; then
+                            rm "$directory/${basename_noext}.log"
+                            echo "   Removed ${basename_noext}.log (only kept for case6/case7)"
+                        fi
+                    fi
                 fi
 
                 # Clean up nspe.in and other temporary files after successful execution
