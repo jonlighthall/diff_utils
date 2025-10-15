@@ -301,6 +301,22 @@ if [[ ${#infiles[@]} -eq 0 ]]; then
     exit 1
 fi
 
+# Exclude nspe.in from processing (it's a temporary file created by the script)
+filtered=()
+for f in "${infiles[@]}"; do
+    b=$(basename "$f")
+    if [[ "$b" != "nspe.in" ]]; then
+        filtered+=("$f")
+    fi
+done
+infiles=("${filtered[@]}")
+
+if [[ ${#infiles[@]} -eq 0 ]]; then
+    echo
+    echo -e "\e[31mNo input files (*.in) found in directory: $directory (after excluding nspe.in)\e[0m"
+    exit 1
+fi
+
 # Apply pattern filtering
 if [[ ${#patterns[@]} -gt 0 ]]; then
     if $debug; then
@@ -540,8 +556,8 @@ for infile in "${infiles[@]}"; do
                         if [[ -f "$default_output" ]]; then
                             mv "$default_output" "$renamed_output"
                             echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
-                            ((renamed_count++))
-                            
+                            renamed_count=$((renamed_count + 1))
+
                             # Check if the renamed output file is empty
                             if [[ ! -s "$renamed_output" ]]; then
                                 echo -e "   \e[33mWarning: Output file $renamed_output is empty\e[0m"
@@ -572,7 +588,7 @@ for infile in "${infiles[@]}"; do
                     if [[ -f "$default_output" ]]; then
                         mv "$default_output" "$renamed_output"
                         echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
-                        ((renamed_count++))
+                        renamed_count=$((renamed_count + 1))
                     fi
                 done
 
@@ -580,9 +596,19 @@ for infile in "${infiles[@]}"; do
                     echo -e "   \e[33mWarning: No output files found to rename\e[0m"
                 fi
 
-                # Clean up nspe.in after successful execution
-                if [[ -f "$directory/nspe.in" ]]; then
-                    rm "$directory/nspe.in"
+                # Clean up nspe.in and other temporary files after successful execution
+                temp_files_cleaned=0
+                for temp_file in nspe.in nspe.log for041.dat for003.dat; do
+                    if [[ -f "$directory/$temp_file" ]]; then
+                        rm "$directory/$temp_file"
+                        if [[ "$mode" != "test" ]]; then
+                            echo "   Cleaned up $directory/$temp_file"
+                        fi
+                        temp_files_cleaned=$((temp_files_cleaned + 1))
+                    fi
+                done
+                if [[ "$mode" == "test" && $temp_files_cleaned -gt 0 ]]; then
+                    echo "   Cleaned up $temp_files_cleaned temporary file(s)"
                 fi
             else
                 echo -e "\e[31mFAIL\e[0m"
@@ -590,10 +616,12 @@ for infile in "${infiles[@]}"; do
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
                 exec_fail_files+=("$infile")
 
-                # Clean up nspe.in after failed execution
-                if [[ -f "$directory/nspe.in" ]]; then
-                    rm "$directory/nspe.in"
-                fi
+                # Clean up nspe.in and other temporary files after failed execution
+                for temp_file in nspe.in nspe.log for041.dat for003.dat; do
+                    if [[ -f "$directory/$temp_file" ]]; then
+                        rm "$directory/$temp_file"
+                    fi
+                done
 
                 echo "   Aborting..."
                 break
