@@ -871,6 +871,17 @@ for infile in "${infiles[@]}"; do
                                 echo -e "\e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
                                 add_to_array_if_not_present "pass_files" "$infile"
+                                
+                                # Even for passing files, track which intermediate diffs failed
+                                if tail -100 "$LOG_FILE" | grep -q "diff FAILED"; then
+                                    if tail -100 "$LOG_FILE" | grep -q "tldiff OK"; then
+                                        # Simple diff failed but tldiff passed
+                                        simple_diff_fail_files+=("$infile")
+                                    elif tail -100 "$LOG_FILE" | grep -q "uband_diff OK"; then
+                                        # tldiff also failed but uband_diff passed
+                                        tldiff_fail_files+=("$infile")
+                                    fi
+                                fi
                             else
                                 echo -e "\e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                                 echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
@@ -879,11 +890,11 @@ for infile in "${infiles[@]}"; do
                                 # Determine which diff tool failed by checking the log
                                 if tail -100 "$LOG_FILE" | grep -q "diff FAILED"; then
                                     if tail -100 "$LOG_FILE" | grep -q "tldiff OK\|uband_diff OK"; then
-                                        # Simple diff failed but advanced tools passed
+                                        # Simple diff failed but advanced tools passed (shouldn't reach here)
                                         simple_diff_fail_files+=("$infile")
                                     elif tail -100 "$LOG_FILE" | grep -q "tldiff FAILED"; then
                                         if tail -100 "$LOG_FILE" | grep -q "uband_diff OK"; then
-                                            # tldiff failed but uband_diff passed
+                                            # tldiff failed but uband_diff passed (shouldn't reach here)
                                             tldiff_fail_files+=("$infile")
                                         elif tail -100 "$LOG_FILE" | grep -q "uband_diff FAILED"; then
                                             # All diffs failed
@@ -905,6 +916,17 @@ for infile in "${infiles[@]}"; do
                             if [[ $diff_exit_code -eq 0 ]]; then
                                 echo -e "$infile \e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 add_to_array_if_not_present "pass_files" "$infile"
+                                
+                                # Even for passing files, track which intermediate diffs failed
+                                if grep -q "diff FAILED" "$diff_output_file"; then
+                                    if grep -q "tldiff OK" "$diff_output_file"; then
+                                        # Simple diff failed but tldiff passed
+                                        simple_diff_fail_files+=("$infile")
+                                    elif grep -q "uband_diff OK" "$diff_output_file"; then
+                                        # tldiff also failed but uband_diff passed
+                                        tldiff_fail_files+=("$infile")
+                                    fi
+                                fi
                             else
                                 echo -e "$infile \e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                                 add_to_array_if_not_present "fail_files" "$infile"
