@@ -751,9 +751,8 @@ for infile in "${infiles[@]}"; do
                     fi
                 done
 
-                echo "   Aborting..."
-                break
-                #continue
+                #echo "   Aborting..."; break
+                echo "   Continuing..."; continue
             fi
         fi
 
@@ -871,7 +870,7 @@ for infile in "${infiles[@]}"; do
                                 echo -e "\e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
                                 add_to_array_if_not_present "pass_files" "$infile"
-                                
+
                                 # Even for passing files, track which intermediate diffs failed
                                 if tail -100 "$LOG_FILE" | grep -q "diff FAILED"; then
                                     if tail -100 "$LOG_FILE" | grep -q "tldiff OK"; then
@@ -916,7 +915,7 @@ for infile in "${infiles[@]}"; do
                             if [[ $diff_exit_code -eq 0 ]]; then
                                 echo -e "$infile \e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 add_to_array_if_not_present "pass_files" "$infile"
-                                
+
                                 # Even for passing files, track which intermediate diffs failed
                                 if grep -q "diff FAILED" "$diff_output_file"; then
                                     if grep -q "tldiff OK" "$diff_output_file"; then
@@ -1066,37 +1065,8 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
 
     # Diff Results Section (for modes that compare files)
     if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
-        echo "Diff Results:"
-        echo "============="
-
-        if [[ ${#pass_files[@]} -gt 0 ]]; then
-            echo "Passed files: ${#pass_files[@]}"
-            for f in "${pass_files[@]}"; do
-                echo -e "   \e[32mPASS\e[0m $f"
-            done
-        else
-            echo "Passed files: 0"
-        fi
-
-        if [[ ${#fail_files[@]} -gt 0 ]]; then
-            echo "Failed files: ${#fail_files[@]}"
-            for f in "${fail_files[@]}"; do
-                echo -e "   \e[31mFAIL\e[0m $f"
-            done
-        else
-            echo "Failed files: 0"
-        fi
-
-        if [[ ${#skipped_files[@]} -gt 0 ]]; then
-            echo "Skipped files: ${#skipped_files[@]}"
-            for f in "${skipped_files[@]}"; do
-                echo -e "   \e[33mSKIPPED\e[0m $f"
-            done
-        fi
-
-        # Diff Details Section (show which diff tool failed)
+        # Diff Details Section (show which diff tool failed) - FIRST
         if [[ ${#simple_diff_fail_files[@]} -gt 0 || ${#tldiff_fail_files[@]} -gt 0 || ${#uband_diff_fail_files[@]} -gt 0 ]]; then
-            echo ""
             echo "Diff Details:"
             echo "-------------"
 
@@ -1120,6 +1090,34 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
                     echo -e "   \e[31mUBAND_DIFF_FAIL\e[0m $f"
                 done
             fi
+            echo ""
+        fi
+
+        echo "Diff Results:"
+        echo "============="
+        if [[ ${#pass_files[@]} -gt 0 ]]; then
+            echo "Passed files: ${#pass_files[@]}"
+            for f in "${pass_files[@]}"; do
+                echo -e "   \e[32mPASS\e[0m $f"
+            done
+        else
+            echo "Passed files: 0"
+        fi
+
+        if [[ ${#fail_files[@]} -gt 0 ]]; then
+            echo "Failed files: ${#fail_files[@]}"
+            for f in "${fail_files[@]}"; do
+                echo -e "   \e[31mFAIL\e[0m $f"
+            done
+        else
+            echo "Failed files: 0"
+        fi
+
+        if [[ ${#skipped_files[@]} -gt 0 ]]; then
+            echo "Skipped files: ${#skipped_files[@]}"
+            for f in "${skipped_files[@]}"; do
+                echo -e "   \e[33mSKIPPED\e[0m $f"
+            done
         fi
         echo ""
     fi
