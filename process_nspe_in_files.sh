@@ -570,13 +570,86 @@ for infile in "${infiles[@]}"; do
                     done
                 done
 
-                # Also rename other common output files
-                for ext in .003 _41.dat _42.dat; do
+                # Rename other common output files (simple extensions)
+                for ext in .prs .pulse; do
                     default_output="$directory/nspe${ext}"
                     renamed_output="$directory/${basename_noext}${ext}"
                     if [[ -f "$default_output" ]]; then
                         mv "$default_output" "$renamed_output"
                         echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
+                        renamed_count=$((renamed_count + 1))
+                    fi
+                done
+                
+                # Special handling for for003.dat -> basename.003
+                if [[ -f "$directory/for003.dat" ]]; then
+                    mv "$directory/for003.dat" "$directory/${basename_noext}.003"
+                    echo "   Renamed for003.dat to ${basename_noext}.003"
+                    renamed_count=$((renamed_count + 1))
+                fi
+                
+                # Rename nspeXX.bin files (nspe09.bin -> basename_09.bin)
+                for nspefile in "$directory"/nspe[0-9][0-9].*; do
+                    if [[ -f "$nspefile" ]]; then
+                        # Extract the number and extension
+                        suffix=$(basename "$nspefile" | sed 's/^nspe\([0-9][0-9]\).*/\1/')
+                        ext=$(basename "$nspefile" | sed 's/^nspe[0-9][0-9]//')
+                        renamed_output="$directory/${basename_noext}_${suffix}${ext}"
+                        mv "$nspefile" "$renamed_output"
+                        echo "   Renamed $(basename "$nspefile") to $(basename "$renamed_output")"
+                        renamed_count=$((renamed_count + 1))
+                    fi
+                done
+                
+                # Rename _41.dat and _42.dat specifically (these use underscores)
+                for suffix in 41 42; do
+                    default_output="$directory/nspe_${suffix}.dat"
+                    renamed_output="$directory/${basename_noext}_${suffix}.dat"
+                    if [[ -f "$default_output" ]]; then
+                        mv "$default_output" "$renamed_output"
+                        echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
+                        renamed_count=$((renamed_count + 1))
+                    fi
+                done
+
+                # Rename angles.asc to basename_angles.asc
+                if [[ -f "$directory/angles.asc" ]]; then
+                    mv "$directory/angles.asc" "$directory/${basename_noext}_angles.asc"
+                    echo "   Renamed angles.asc to ${basename_noext}_angles.asc"
+                    renamed_count=$((renamed_count + 1))
+                fi
+
+                # Copy (not move) ram.in to basename_ram.in
+                if [[ -f "$directory/ram.in" ]]; then
+                    cp "$directory/ram.in" "$directory/${basename_noext}_ram.in"
+                    echo "   Copied ram.in to ${basename_noext}_ram.in"
+                    renamed_count=$((renamed_count + 1))
+                fi
+
+                # Rename Fortran unit files (for009.bin -> basename_09.bin, for041.dat -> basename_41.dat, etc.)
+                # Note: for003.dat is skipped here because nspe.003 is handled separately above
+                for forfile in "$directory"/for[0-9][0-9][0-9].*; do
+                    if [[ -f "$forfile" ]]; then
+                        basename_for=$(basename "$forfile")
+                        # Skip for003.dat as it's handled via nspe.003 above
+                        if [[ "$basename_for" == "for003.dat" ]]; then
+                            continue
+                        fi
+                        # Extract the unit number
+                        unit_num=$(basename "$forfile" | sed 's/^for\([0-9][0-9][0-9]\).*/\1/')
+                        # Extract extension from filename (e.g., ".dat" from "for042.dat", ".bin" from "for009.bin")
+                        ext=$(basename "$forfile" | sed 's/^for[0-9][0-9][0-9]//')
+                        # Convert unit number to integer to drop leading zeros (009 → 9, 041 → 41, 042 → 42)
+                        unit_num_int=$((10#$unit_num))
+                        # Format with zero-padding for single digits (9 → 09)
+                        if [[ $unit_num_int -lt 10 ]]; then
+                            unit_formatted=$(printf "%02d" $unit_num_int)
+                        else
+                            unit_formatted=$unit_num_int
+                        fi
+                        renamed_output="$directory/${basename_noext}_${unit_formatted}${ext}"
+                        mv "$forfile" "$renamed_output"
+                        echo "   Renamed $(basename "$forfile") to $(basename "$renamed_output")"
                         renamed_count=$((renamed_count + 1))
                     fi
                 done
@@ -589,7 +662,8 @@ for infile in "${infiles[@]}"; do
 
                 # Clean up nspe.in and other temporary files after successful execution
                 temp_files_cleaned=0
-                for temp_file in nspe.in nspe.log for041.dat for003.dat; do
+                # Clean up specific known temporary files
+                for temp_file in nspe.in nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
                     if [[ -f "$directory/$temp_file" ]]; then
                         rm "$directory/$temp_file"
                         if [[ "$mode" != "test" ]]; then
@@ -598,6 +672,7 @@ for infile in "${infiles[@]}"; do
                         temp_files_cleaned=$((temp_files_cleaned + 1))
                     fi
                 done
+                # Note: for*.* files are now renamed, not cleaned up
                 if [[ "$mode" == "test" && $temp_files_cleaned -gt 0 ]]; then
                     echo "   Cleaned up $temp_files_cleaned temporary file(s)"
                 fi
@@ -608,9 +683,15 @@ for infile in "${infiles[@]}"; do
                 exec_fail_files+=("$infile")
 
                 # Clean up nspe.in and other temporary files after failed execution
-                for temp_file in nspe.in nspe.log for041.dat for003.dat; do
+                for temp_file in nspe.in nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
                     if [[ -f "$directory/$temp_file" ]]; then
                         rm "$directory/$temp_file"
+                    fi
+                done
+                # Clean up any for*.* files after failure
+                for temp_file in "$directory"/for[0-9][0-9][0-9].*; do
+                    if [[ -f "$temp_file" ]]; then
+                        rm "$temp_file"
                     fi
                 done
 
