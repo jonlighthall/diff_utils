@@ -5,6 +5,9 @@
 # EXPLANATION SECTION
 #
 # This script processes .in files in a directory using the specified executable.
+# Note: Input files are copied to nspe.in before execution (for compatibility with
+# executables that only read the default input name). Output files are then renamed
+# to match the original input file basename.
 #
 # Input options (first argument):
 #   make - Runs the executable only (no file operations)
@@ -242,6 +245,7 @@ detect_program() {
     return 0
 }
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
+PROG_OUTPUT_COLOR="\x1B[0m" # Reset color for PROG output
 
 # Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
@@ -255,7 +259,7 @@ if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
         PROG=$(detect_program)
     fi
     echo "Selected program: $PROG"
-    
+
     # Check if the program exists, and build it if not
     if [[ ! -f "$PROG" ]]; then
         echo "Program $PROG not found. Attempting to build it..."
@@ -277,7 +281,7 @@ if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
             exit 1
         fi
     fi
-    
+
     # Verify the program is now executable
     if [[ ! -x "$PROG" ]]; then
         echo -e "\e[31mError: $PROG exists but is not executable.\e[0m"
@@ -357,6 +361,7 @@ fail_files=()
 missing_reference_files=()
 missing_output_files=()
 empty_files=()
+empty_output_files=()
 processed_files=()
 skipped_files=()
 exec_success_files=()
@@ -368,7 +373,7 @@ add_to_array_if_not_present() {
     local array_name="$1"
     local file="$2"
     local -n array_ref="$array_name"
-    
+
     # Check if file is already in array
     local item
     for item in "${array_ref[@]}"; do
@@ -376,7 +381,7 @@ add_to_array_if_not_present() {
             return 0  # File already present, don't add
         fi
     done
-    
+
     # File not found, add it
     array_ref+=("$file")
 }
@@ -484,15 +489,30 @@ for infile in "${infiles[@]}"; do
                 done
             fi
             
-            echo -n "   Running: $PROG $infile... "
+            # Copy input file to nspe.in in the same directory
+            cp "$infile" "$directory/nspe.in"
+            echo "   Copied $infile to $directory/nspe.in"
+            
+            # Get absolute path to executable for running from different directory
+            if [[ "$PROG" = /* ]]; then
+                # Already absolute path
+                prog_path="$PROG"
+            else
+                # Convert relative path to absolute
+                prog_path="$(readlink -f "$PROG")"
+            fi
+            
+            echo -n "   Running: $PROG nspe.in... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
             if [[ "$mode" == "test" ]]; then
-                { time "$PROG" "$infile"; } >> "$LOG_FILE" 2>&1
+                # Change to directory before running to ensure nspe.in is found
+                (cd "$directory" && { time "$prog_path" nspe.in; }) >> "$LOG_FILE" 2>&1
                 RETVAL=$?
             else
                 echo
-                "$PROG" "$infile"
+                # Change to directory before running to ensure nspe.in is found
+                (cd "$directory" && "$prog_path" nspe.in)
                 RETVAL=$?
                 echo -n "   "
             fi
@@ -508,11 +528,54 @@ for infile in "${infiles[@]}"; do
                     echo "   Success: ${PROG} completed successfully for $infile"
                 fi
                 exec_success_files+=("$infile")
+                
+                # Rename output files from nspe*.asc to basename_*.asc
+                echo "   Renaming output files..."
+                renamed_count=0
+                for suffix in 01 02 03; do
+                    # Try both formats: nspe_01.asc and nspe01.asc
+                    for pattern in "nspe_${suffix}.asc" "nspe${suffix}.asc"; do
+                        default_output="$directory/$pattern"
+                        renamed_output="$directory/${basename_noext}_${suffix}.asc"
+                        if [[ -f "$default_output" ]]; then
+                            mv "$default_output" "$renamed_output"
+                            echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
+                            ((renamed_count++))
+                            break  # Don't try the other pattern if we found one
+                        fi
+                    done
+                done
+                
+                # Also rename other common output files
+                for ext in .003 _41.dat _42.dat; do
+                    default_output="$directory/nspe${ext}"
+                    renamed_output="$directory/${basename_noext}${ext}"
+                    if [[ -f "$default_output" ]]; then
+                        mv "$default_output" "$renamed_output"
+                        echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
+                        ((renamed_count++))
+                    fi
+                done
+                
+                if [[ $renamed_count -eq 0 ]]; then
+                    echo -e "   \e[33mWarning: No output files found to rename\e[0m"
+                fi
+                
+                # Clean up nspe.in after successful execution
+                if [[ -f "$directory/nspe.in" ]]; then
+                    rm "$directory/nspe.in"
+                fi
             else
                 echo -e "\e[31mFAIL\e[0m"
                 echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
                 exec_fail_files+=("$infile")
+                
+                # Clean up nspe.in after failed execution
+                if [[ -f "$directory/nspe.in" ]]; then
+                    rm "$directory/nspe.in"
+                fi
+                
                 echo "   Aborting..."
                 break
                 #continue
@@ -719,12 +782,12 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         echo "Diff Summary:"
     fi
     printf '%*s\n' "$line_len" '' | tr ' ' '='
-    
+
     # Execution Results Section (for modes that run executable)
     if [[ "$mode" == "test" || "$mode" == "make" ]]; then
         echo "Execution Results:"
         echo "=================="
-        
+
         if [[ ${#exec_success_files[@]} -gt 0 ]]; then
             echo "Executable successful: ${#exec_success_files[@]}"
             for f in "${exec_success_files[@]}"; do
@@ -733,7 +796,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Executable successful: 0"
         fi
-        
+
         if [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo "Executable failed: ${#exec_fail_files[@]}"
             for f in "${exec_fail_files[@]}"; do
@@ -742,21 +805,28 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Executable failed: 0"
         fi
-        
+
         if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
             echo "Executable ran but no output: ${#missing_exec_output_files[@]}"
             for f in "${missing_exec_output_files[@]}"; do
                 echo -e "   \e[33mNO_OUTPUT\e[0m $(basename "$f" .line)"
             done
         fi
+
+        if [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo "Empty output files: ${#empty_output_files[@]}"
+            for f in "${empty_output_files[@]}"; do
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+            done
+        fi
         echo ""
     fi
-    
+
     # Diff Results Section (for modes that compare files)
     if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
         echo "Diff Results:"
         echo "============="
-        
+
         if [[ ${#pass_files[@]} -gt 0 ]]; then
             echo "Passed files: ${#pass_files[@]}"
             for f in "${pass_files[@]}"; do
@@ -765,7 +835,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Passed files: 0"
         fi
-        
+
         if [[ ${#fail_files[@]} -gt 0 ]]; then
             echo "Failed files: ${#fail_files[@]}"
             for f in "${fail_files[@]}"; do
@@ -774,7 +844,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Failed files: 0"
         fi
-        
+
         if [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo "Skipped files: ${#skipped_files[@]}"
             for f in "${skipped_files[@]}"; do
@@ -783,12 +853,12 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         fi
         echo ""
     fi
-    
+
     # Copy Results Section
     if [[ "$mode" == "copy" ]]; then
         echo "Copy Results:"
         echo "============="
-        
+
         if [[ ${#processed_files[@]} -gt 0 ]]; then
             echo "Processed files: ${#processed_files[@]}"
             for f in "${processed_files[@]}"; do
@@ -797,20 +867,27 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         else
             echo "Processed files: 0"
         fi
-        
+
         if [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo "Skipped files: ${#skipped_files[@]}"
             for f in "${skipped_files[@]}"; do
                 echo -e "   \e[33mSKIPPED\e[0m $f"
             done
         fi
+
+        if [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo "Empty output files detected: ${#empty_output_files[@]}"
+            for f in "${empty_output_files[@]}"; do
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+            done
+        fi
         echo ""
     fi
-    
+
     # File Status Section
     echo "File Status:"
     echo "============"
-    
+
     if [[ ${#missing_reference_files[@]} -gt 0 ]]; then
         echo "Missing reference files (run 'copy' mode first): ${#missing_reference_files[@]}"
         for f in "${missing_reference_files[@]}"; do
@@ -819,7 +896,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Missing reference files: 0"
     fi
-    
+
     if [[ ${#missing_output_files[@]} -gt 0 ]]; then
         echo "Missing output files (run 'make' mode first): ${#missing_output_files[@]}"
         for f in "${missing_output_files[@]}"; do
@@ -828,7 +905,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Missing output files: 0"
     fi
-    
+
     if [[ ${#empty_files[@]} -gt 0 ]]; then
         echo "Empty files detected: ${#empty_files[@]}"
         for f in "${empty_files[@]}"; do
@@ -837,7 +914,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     else
         echo "Empty files: 0"
     fi
-    
+
     # Overall Status Assessment
     echo ""
     echo "Overall Status:"
