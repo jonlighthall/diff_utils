@@ -541,6 +541,25 @@ for infile in "${infiles[@]}"; do
                             mv "$default_output" "$renamed_output"
                             echo "   Renamed $(basename "$default_output") to $(basename "$renamed_output")"
                             ((renamed_count++))
+                            
+                            # Check if the renamed output file is empty
+                            if [[ ! -s "$renamed_output" ]]; then
+                                echo -e "   \e[33mWarning: Output file $renamed_output is empty\e[0m"
+                                empty_output_files+=("$renamed_output")
+                                # Only reclassify from success to failure if not already in fail array
+                                # This prevents double-counting when execution failed AND produced empty output
+                                if [[ ! " ${exec_fail_files[*]} " =~ " $infile " ]]; then
+                                    # Remove from success array and add to fail array
+                                    temp_array=()
+                                    for f in "${exec_success_files[@]}"; do
+                                        if [[ "$f" != "$infile" ]]; then
+                                            temp_array+=("$f")
+                                        fi
+                                    done
+                                    exec_success_files=("${temp_array[@]}")
+                                    exec_fail_files+=("$infile")
+                                fi
+                            fi
                             break  # Don't try the other pattern if we found one
                         fi
                     done
@@ -809,14 +828,14 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
             echo "Executable ran but no output: ${#missing_exec_output_files[@]}"
             for f in "${missing_exec_output_files[@]}"; do
-                echo -e "   \e[33mNO_OUTPUT\e[0m $(basename "$f" .line)"
+                echo -e "   \e[33mNO_OUTPUT\e[0m $(basename "$f" .asc)"
             done
         fi
 
         if [[ ${#empty_output_files[@]} -gt 0 ]]; then
             echo "Empty output files: ${#empty_output_files[@]}"
             for f in "${empty_output_files[@]}"; do
-                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f")"
             done
         fi
         echo ""
@@ -878,7 +897,7 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
         if [[ ${#empty_output_files[@]} -gt 0 ]]; then
             echo "Empty output files detected: ${#empty_output_files[@]}"
             for f in "${empty_output_files[@]}"; do
-                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f" .line)"
+                echo -e "   \e[33mEMPTY_OUTPUT\e[0m $(basename "$f")"
             done
         fi
         echo ""
@@ -919,21 +938,27 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     echo ""
     echo "Overall Status:"
     echo "==============="
-    if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 ]]; then
+    if [[ "$mode" == "copy" && ${#skipped_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
         echo -e "\e[32mAll files processed successfully!\e[0m"
+        elif [[ "$mode" == "copy" && ${#empty_output_files[@]} -gt 0 ]]; then
+        echo -e "\e[33mSome output files were empty. Check copy results above.\e[0m"
         elif [[ "$mode" == "make" ]]; then
-        if [[ ${#exec_fail_files[@]} -eq 0 ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll files generated successfully!\e[0m"
+        elif [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome output files were empty. Check execution results above.\e[0m"
         else
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
         fi
         elif [[ "$mode" == "test" ]]; then
-        if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 ]]; then
+        if [[ ${#exec_fail_files[@]} -eq 0 && ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 && ${#empty_output_files[@]} -eq 0 ]]; then
             echo -e "\e[32mAll tests passed!\e[0m"
             elif [[ ${#exec_fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome executables failed. Check execution errors above.\e[0m"
             elif [[ ${#fail_files[@]} -gt 0 ]]; then
             echo -e "\e[31mSome diff comparisons failed. Check diff results above.\e[0m"
+            elif [[ ${#empty_output_files[@]} -gt 0 ]]; then
+            echo -e "\e[33mSome output files were empty. Check execution results above.\e[0m"
             elif [[ ${#skipped_files[@]} -gt 0 ]]; then
             echo -e "\e[33mSome files were skipped due to missing dependencies. Check file status above.\e[0m"
         fi
