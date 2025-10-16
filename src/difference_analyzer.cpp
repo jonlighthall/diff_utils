@@ -82,13 +82,35 @@ void DifferenceAnalyzer::process_rounded_values(
 
   // LEVEL 2: non_zero = trivial + non_trivial (based on printed precision)
   // A raw non-zero difference is TRIVIAL if, after rounding to the minimum
-  // printed precision, the two values are identical OR the rounded difference
+  // printed precision, the two values are identical OR the raw difference
   // is within half an LSB (big_zero). Otherwise it is NON-TRIVIAL.
+  //
+  // SUB-LSB DETECTION:
+  // The key insight is that differences smaller than the minimum representable
+  // difference at the coarser precision (LSB) are indistinguishable and should
+  // be treated as equivalent for cross-platform robustness.
+  //
+  // Example: 30.8 (1dp) vs 30.85 (2dp)
+  //   - LSB = 0.1 (minimum step at 1 decimal place)
+  //   - raw_diff = 0.05 < LSB/2 = 0.05
+  //   - This is a sub-LSB difference, classified as TRIVIAL
+  //   - Even though rounded_diff = 0.1 after rounding both to 1dp
+  //
+  // CRITICAL FIX: Check raw_diff, not rounded_diff, against big_zero
   double raw_diff = std::abs(column_data.value1 - column_data.value2);
   double lsb = std::pow(10, -minimum_deci);    // one unit in last place
   double big_zero = lsb / 2.0;                 // half-ulp criterion
   bool raw_non_zero = raw_diff > thresh.zero;  // raw difference observed
-  bool trivial_after_rounding = (rounded_diff <= big_zero);
+
+  // FLOATING POINT ROBUSTNESS: Use epsilon tolerance for sub-LSB comparison
+  // to handle cases like 30.8 vs 30.85 where floating point arithmetic may
+  // result in raw_diff slightly exceeding big_zero due to representation error
+  constexpr double FP_TOLERANCE =
+      1e-12;  // relative tolerance for FP comparison
+  bool sub_lsb_diff =
+      (raw_diff < big_zero) || (std::abs(raw_diff - big_zero) <
+                                FP_TOLERANCE * std::max(raw_diff, big_zero));
+  bool trivial_after_rounding = (rounded_diff == 0.0 || sub_lsb_diff);
 
   if (raw_non_zero) {
     if (trivial_after_rounding) {
