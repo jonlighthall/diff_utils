@@ -58,10 +58,15 @@ LineData LineParser::parse_line(const std::string& line, Flags& flags,
 
 bool LineParser::validate_decimal_places(int ndp, size_t line_number,
                                          Flags& flags) const {
-  if (ndp < 0 || ndp > 10) {  // Arbitrary limit for decimal places
+  // Double precision (IEEE 754) can represent ~15-17 significant digits
+  // For values around 1-10, this translates to ~15-16 decimal places
+  // We allow up to 17 to be conservative with edge cases
+  constexpr int MAX_DECIMAL_PLACES = 17;
+
+  if (ndp < 0 || ndp > MAX_DECIMAL_PLACES) {
     std::cerr << "Invalid number of decimal places found on line "
-              << line_number << ": " << ndp << ". Must be between 0 and 10."
-              << std::endl;
+              << line_number << ": " << ndp << ". Must be between 0 and "
+              << MAX_DECIMAL_PLACES << "." << std::endl;
     flags.error_found = true;
     return false;
   }
