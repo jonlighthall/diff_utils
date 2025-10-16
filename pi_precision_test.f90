@@ -33,40 +33,20 @@ max_decimal_places = -int(log10(epsilon_machine)) - 1
  ! Cap at 15 for double precision (conservative)
 if (max_decimal_places > 15) max_decimal_places = 15
 
- ! Get output filename from command line or use default
+ ! Get base filename from command line or use default
 if (command_argument_count() > 0) then
    call get_command_argument(1, output_filename)
 else
    output_filename = 'pi_output.txt'
 end if
 
- ! Open output file
-unit_num = 10
-open(unit=unit_num, file=trim(output_filename), &
-   status='replace', action='write')
+ ! Generate ascending precision file (0 to max decimal places)
+call write_precision_file(trim(output_filename) // '.asc', &
+   pi_calculated, 0, max_decimal_places, 1)
 
- ! Write header comment
-write(unit_num, '(a)') &
-   '! Pi calculated with increasing decimal precision'
-write(unit_num, '(a,es12.5)') '! Machine epsilon: ', &
-   epsilon_machine
-write(unit_num, '(a,i0)') &
-   '! Maximum valid decimal places: ', max_decimal_places
-
- ! Loop over decimal places from 0 to max
-do i = 0, max_decimal_places
-   ! For 0 decimal places, use integer format
-   if (i == 0) then
-      write(unit_num, '(i0)') int(pi_calculated)
-   else
-      ! Build format string dynamically: f<width>.<decimals>
-      write(format_string, '(a,i0,a,i0,a)') &
-         '(f', i+2, '.', i, ')'
-      write(unit_num, format_string) pi_calculated
-   end if
-end do
-
-close(unit_num)
+ ! Generate descending precision file (max to 0 decimal places)
+call write_precision_file(trim(output_filename) // '.desc', &
+   pi_calculated, max_decimal_places, 0, -1)
 
  ! Print summary to console
 print '(a)', 'Pi Precision Test Program'
@@ -74,8 +54,10 @@ print '(a)', '=========================='
 print '(a,f20.15)', 'Calculated pi:           ', pi_calculated
 print '(a,es12.5)', 'Machine epsilon:         ', epsilon_machine
 print '(a,i0)', 'Max valid decimal places:', max_decimal_places
-print '(a,a)', 'Output written to:       ', trim(output_filename)
-print '(a,i0,a)', 'Generated ', max_decimal_places + 1, ' lines'
+print '(a)', ''
+print '(a,a)', 'Ascending file:  ', trim(output_filename) // '.asc'
+print '(a,a)', 'Descending file: ', trim(output_filename) // '.desc'
+print '(a,i0,a)', 'Each contains ', max_decimal_places + 1, ' lines'
 
 contains
 
@@ -90,5 +72,42 @@ real(kind=8) :: pi
 pi = 4.0d0 * atan(1.0d0)
 
 end function calculate_pi
+
+subroutine write_precision_file(filename, value, start_dp, &
+   end_dp, step)
+ ! Write value with varying decimal precision to file
+ ! Arguments:
+ !   filename: output file name
+ !   value: the number to write (e.g., pi, sqrt(2), etc.)
+ !   start_dp: starting decimal places
+ !   end_dp: ending decimal places
+ !   step: increment (+1 for ascending, -1 for descending)
+
+implicit none
+character(len=*), intent(in) :: filename
+real(kind=8), intent(in) :: value
+integer, intent(in) :: start_dp, end_dp, step
+character(len=20) :: format_string
+integer :: unit_num, i
+
+unit_num = 10
+
+open(unit=unit_num, file=filename, status='replace', &
+   action='write')
+
+ ! Loop over decimal places
+do i = start_dp, end_dp, step
+   if (i == 0) then
+      write(unit_num, '(i0)') int(value)
+   else
+      write(format_string, '(a,i0,a,i0,a)') &
+         '(f', i+2, '.', i, ')'
+      write(unit_num, format_string) value
+   end if
+end do
+
+close(unit_num)
+
+end subroutine write_precision_file
 
 end program pi_precision_test
