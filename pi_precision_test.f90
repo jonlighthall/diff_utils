@@ -52,20 +52,17 @@ write(unit_num, '(a,es12.5)') '! Machine epsilon: ', &
    epsilon_machine
 write(unit_num, '(a,i0)') &
    '! Maximum valid decimal places: ', max_decimal_places
-write(unit_num, '(a)') '! Format: index value'
 
  ! Loop over decimal places from 0 to max
 do i = 0, max_decimal_places
    ! For 0 decimal places, use integer format
    if (i == 0) then
-      write(unit_num, '(i0,1x,i0)') i+1, int(pi_calculated)
+      write(unit_num, '(i0)') int(pi_calculated)
    else
       ! Build format string dynamically: f<width>.<decimals>
-      ! Width needs to accommodate: sign + integer part +
-      ! decimal point + decimal places
       write(format_string, '(a,i0,a,i0,a)') &
-         '(i0,1x,f', i+3, '.', i, ')'
-      write(unit_num, format_string) i+1, pi_calculated
+         '(f', i+2, '.', i, ')'
+      write(unit_num, format_string) pi_calculated
    end if
 end do
 
