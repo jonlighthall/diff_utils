@@ -428,8 +428,29 @@ fi
 printf '%*s\n' "$line_len" '' | tr '  ' '='
 
 for infile in "${infiles[@]}"; do
-    # Check for required strings (case-insensitive)
-    if grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"; then
+    # Check columns 76-80 on the first line for override behavior
+    # Read the first line safely (handle empty files)
+    first_line=""
+    if IFS= read -r line < "$infile"; then
+        first_line="$line"
+    fi
+    # Extract columns 76-80 (1-based). If line shorter than 80 chars, substring will be empty
+    col76_80="${first_line:75:5}"
+    # Trim trailing and leading whitespace
+    col76_80_trimmed="$(echo -n "$col76_80" | awk '{gsub(/^\s+|\s+$/,"",$0); print $0}')"
+
+    if [[ -z "$col76_80_trimmed" ]]; then
+        echo "   Columns 76-80: [blank] — overriding content checks and proceeding"
+        echo "   Running split-step Fourier method (PE)..."
+        model_blank=true
+    else
+        echo "   Columns 76-80: '$col76_80_trimmed' — content found"
+        echo "   Running split-step Pade method (RAM)..."
+        model_blank=false
+    fi
+
+    # Check for required strings (case-insensitive). If columns 76-80 are blank, override and allow processing.
+    if $model_blank || (grep -qi '^tl' "$infile" || grep -qi '^rtl' "$infile" || grep -Eiq '^hrfa|^hfra|^hari' "$infile"); then
         if $dry_run; then
             echo "[DRY-RUN] Would process: $infile"
             continue
