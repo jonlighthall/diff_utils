@@ -326,6 +326,9 @@ printvars:
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
+	@echo "GTEST_AVAILABLE = $(GTEST_AVAILABLE)"
+	@echo "TEST_TARGETS    = $(TEST_TARGETS)"
+	@echo
 
 	@echo "EXES = $(EXES)"
 	@echo
@@ -354,6 +357,9 @@ printvars:
 TESTDIR := tests
 TESTBINDIR := $(BINDIR)/tests
 
+# Check if Google Test is available
+GTEST_AVAILABLE := $(shell echo '\#include <gtest/gtest.h>' | $(CXX) -x c++ -E - > /dev/null 2>&1 && echo yes || echo no)
+
 # Google Test flags
 GTEST_CFLAGS = -isystem /usr/include/gtest
 GTEST_LIBS = -lgtest -lgtest_main -pthread
@@ -364,10 +370,19 @@ TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/test_%.o)
 # Single test executable
 TEST_EXECUTABLE = $(TESTBINDIR)/run_tests
 
+# Conditionally set test targets based on gtest availability
+ifeq ($(GTEST_AVAILABLE),yes)
+    TEST_TARGETS = $(TEST_EXECUTABLE)
+else
+    TEST_TARGETS =
+endif
+
 # Create test directory
-$(TESTBINDIR):
+$(TESTBINDIR): | $(BINDIR)
 	@mkdir -v $(TESTBINDIR)
 
+# Only define test compilation rules if Google Test is available
+ifeq ($(GTEST_AVAILABLE),yes)
 # Test compilation rule
 $(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
 	@echo "compiling test object $@..."
@@ -377,6 +392,7 @@ $(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
 $(TEST_EXECUTABLE): $(TEST_OBJECTS) $(OBJS) | $(TESTBINDIR)
 	@echo "linking test executable $@..."
 	$(CXX) $(LDFLAGS) $^ $(GTEST_LIBS) -o $@
+endif
 
 #
 # generic recipes
@@ -585,6 +601,7 @@ run: all
 
 .PHONY: test tests clean-tests
 test: tests
+ifeq ($(GTEST_AVAILABLE),yes)
 	@echo "Running all tests..."
 	@echo "Running $(TEST_EXECUTABLE)..."
 	@if $(TEST_EXECUTABLE); then \
@@ -593,8 +610,19 @@ test: tests
 		echo "FAILED: Some tests failed"; \
 		exit 1; \
 	fi
+else
+	@echo "ERROR: Google Test is not installed."
+	@echo "Please install libgtest-dev to run tests:"
+	@echo "  sudo apt-get install libgtest-dev"
+	@exit 1
+endif
 
-tests: $(TEST_EXECUTABLE)
+tests: $(TEST_TARGETS)
+ifeq ($(GTEST_AVAILABLE),no)
+	@echo "WARNING: Google Test is not installed. Skipping test build."
+	@echo "To build and run tests, please install libgtest-dev:"
+	@echo "  sudo apt-get install libgtest-dev"
+endif
 
 clean-tests:
 	@echo "removing test files..."
@@ -616,8 +644,8 @@ help:
 	@echo "  clean     - remove all generated files"
 	@echo "  remake    - clean then build all"
 	@echo "  run       - build and run the first executable"
-	@echo "  test      - build and run all unit tests"
-	@echo "  tests     - build unit tests only"
+	@echo "  test      - build and run all unit tests (requires libgtest-dev)"
+	@echo "  tests     - build unit tests only (requires libgtest-dev)"
 	@echo "  clean-tests - remove test files only"
 	@echo "  help      - show this help message"
 

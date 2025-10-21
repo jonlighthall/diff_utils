@@ -8,6 +8,7 @@ sudo apt upgrade -y
 sudo apt -y install git
 sudo apt -y install make
 sudo apt -y install gfortran
+sudo apt -y install libgtest-dev
 
 # re-check and cleanup
 sudo apt upgrade -y --fix-missing
