@@ -12,10 +12,9 @@ real(kind=8) :: epsilon_machine
 integer :: max_decimal_places
 
  ! Loop variables
-integer :: i
 character(len=100) :: output_filename
-character(len=20) :: format_string
-integer :: unit_num
+integer :: l
+character(len=200) :: asc_name, desc_name
 
  ! Calculate pi using arctan series: pi = 4 * arctan(1)
  ! Using Machin's formula: pi/4 = 4*arctan(1/5) - arctan(1/239)
@@ -40,13 +39,34 @@ else
    output_filename = 'pi_output.txt'
 end if
 
- ! Generate ascending precision file (0 to max decimal places)
-call write_precision_file(trim(output_filename) // '.asc', &
-   pi_calculated, 0, max_decimal_places, 1)
+! Normalize base filename by stripping trailing .txt if present
+l = len_trim(output_filename)
+if (l > 4) then
+   if (output_filename(l-3:l) == '.txt') then
+      output_filename = output_filename(1:l-4)
+   else
+      output_filename = trim(output_filename)
+   end if
+else
+   output_filename = trim(output_filename)
+end if
 
- ! Generate descending precision file (max to 0 decimal places)
-call write_precision_file(trim(output_filename) // '.desc', &
-   pi_calculated, max_decimal_places, 0, -1)
+! Program identifier
+write(*,*) 'Using program id: pi-precision-test'
+
+! Build output filenames (use continuation to avoid long source lines)
+asc_name = trim(output_filename) // &
+   '-pi-precision-test-ascending.txt'
+desc_name = trim(output_filename) // &
+   '-pi-precision-test-descending.txt'
+
+! Generate ascending precision file (0 to max decimal places)
+call write_precision_file(asc_name, pi_calculated, 0, &
+   max_decimal_places, 1)
+
+! Generate descending precision file (max to 0 decimal places)
+call write_precision_file(desc_name, pi_calculated, &
+   max_decimal_places, 0, -1)
 
  ! Print summary to console
 print '(a)', 'Pi Precision Test Program'
@@ -55,8 +75,10 @@ print '(a,f20.15)', 'Calculated pi:           ', pi_calculated
 print '(a,es12.5)', 'Machine epsilon:         ', epsilon_machine
 print '(a,i0)', 'Max valid decimal places:', max_decimal_places
 print '(a)', ''
-print '(a,a)', 'Ascending file:  ', trim(output_filename) // '.asc'
-print '(a,a)', 'Descending file: ', trim(output_filename) // '.desc'
+print '(a,a)', 'Ascending file:  ', &
+   asc_name
+print '(a,a)', 'Descending file: ', &
+   desc_name
 print '(a,i0,a)', 'Each contains ', max_decimal_places + 1, ' lines'
 
 contains
