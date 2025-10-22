@@ -27,13 +27,26 @@ target_dir="${src_dir_phys}/bin"
 link_dir=$HOME/bin
 
 cbar "Start Making Links"
-# list of files to be linked
+# list of C++ executables
 ext=''
+for my_link in uband_diff; do
+
+    # define target (source)
+    target=${target_dir}/${my_link}${ext}
+
+    # define link (destination)
+    link=${link_dir}/${my_link}
+
+    # create link
+    decho "linking $target to $link..."
+    do_link_exe "$target" "$link"
+done
+
+# list of Fortran executables
 for my_link in cpddiff \
 prsdiff \
 tldiff \
-tsdiff \
-uband_diff; do
+tsdiff; do
 
     # define target (source)
     target=${target_dir}/${my_link}${ext}
