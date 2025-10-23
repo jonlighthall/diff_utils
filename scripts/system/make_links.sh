@@ -19,11 +19,14 @@ print_source
 
 # generate executables before linking
 cbar "Start Compiling"
+# Change to project root (two levels up from scripts/system/)
+project_root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$project_root"
 make
 cbar "Done Compiling"
 
 # set target and link directories
-target_dir="${src_dir_phys}/build/bin"
+target_dir="${project_root}/build/bin"
 link_dir=$HOME/bin
 
 cbar "Start Making Links"
@@ -59,7 +62,7 @@ tsdiff; do
     do_link_exe "$target" "$link"
 done
 
-target_dir="${src_dir_phys}/scripts"
+target_dir="${project_root}/scripts/drivers"
 ext='.sh'
 for my_link in process_nspe_in_files process_ram_in_files; do
     # define target (source)
