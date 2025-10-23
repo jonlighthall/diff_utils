@@ -1,17 +1,28 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 
 #include "uband_diff.h"
 
+// Directory for temporary test files
+static constexpr const char* TEST_DIR = "../../build/tmp/";
+
 // Helper to create a temporary test file with provided lines.
-static void writeFile(const std::string& path,
+static void writeFile(const std::string& filename,
                       const std::vector<std::string>& lines) {
+  std::filesystem::create_directories(TEST_DIR);
+  std::string path = std::string(TEST_DIR) + filename;
   std::ofstream f(path);
   for (const auto& l : lines) {
     f << l << "\n";
   }
+}
+
+// Helper to get full path for test file
+static std::string getTestFilePath(const std::string& filename) {
+  return std::string(TEST_DIR) + filename;
 }
 
 // 1. Zero-threshold semantic invariant:
@@ -36,7 +47,8 @@ TEST(SemanticInvariants, HighIgnoreIsolation) {
   writeFile("test_ignore1.txt", {"150.0 160.0 170.0"});
   writeFile("test_ignore2.txt", {"151.0 161.5 175.0"});
   FileComparator cmp(0.05, 2.0, 0.0, 0);
-  cmp.compare_files("test_ignore1.txt", "test_ignore2.txt");
+  cmp.compare_files(getTestFilePath("test_ignore1.txt"),
+                    getTestFilePath("test_ignore2.txt"));
   const auto& c = cmp.getCountStats();
   EXPECT_GT(c.diff_non_trivial, 0u);
   EXPECT_EQ(c.diff_significant, 0u);
@@ -52,7 +64,8 @@ TEST(SemanticInvariants, CriticalSuppressionStopsPrinting) {
   writeFile("test_crit_sup2.txt",
             {"0.5", "2.0"});  // second line is critical (>1.0)
   FileComparator cmp(0.1, 1.0, 0.0, 0);
-  cmp.compare_files("test_crit_sup1.txt", "test_crit_sup2.txt");
+  cmp.compare_files(getTestFilePath("test_crit_sup1.txt"),
+                    getTestFilePath("test_crit_sup2.txt"));
   const auto& c = cmp.getCountStats();
   const auto& f = cmp.getFlag();
   EXPECT_TRUE(f.has_critical_diff);
@@ -74,7 +87,8 @@ TEST(SemanticInvariants, PrintThresholdDecouplesCounting) {
             {"0.200 0.150 0.120"});  // all diffs > user(0.05)
   FileComparator cmp(0.05, 5.0, /*print threshold*/ 1.0,
                      0);  // print threshold higher than diffs
-  cmp.compare_files("test_print_decouple1.txt", "test_print_decouple2.txt");
+  cmp.compare_files(getTestFilePath("test_print_decouple1.txt"),
+                    getTestFilePath("test_print_decouple2.txt"));
   const auto& c = cmp.getCountStats();
   EXPECT_GT(c.diff_significant, 0u);
   EXPECT_EQ(c.diff_print, 0u)

@@ -33,11 +33,14 @@ obj/
 *.app
 bin/
 
+# Build artifacts
+build/tmp/
+
 # Emacs
 *~
 \#*#
 
-# Git 
+# Git
 *.~*~
 
 # diff test files

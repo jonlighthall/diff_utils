@@ -9,8 +9,14 @@
 
 class FileComparatorTest : public ::testing::Test {
  protected:
+  // Directory for temporary test files
+  static constexpr const char* TEST_DIR = "../../build/tmp/";
+
   // Keep SetUp() and TearDown() protected (required by Google Test)
   void SetUp() override {
+    // Create test directory if it doesn't exist
+    std::filesystem::create_directories(TEST_DIR);
+
     // Set up test with default thresholds
     comparator = std::make_unique<FileComparator>(0.05, 10.0, 1.0);
 
@@ -25,14 +31,20 @@ class FileComparatorTest : public ::testing::Test {
 
   std::unique_ptr<FileComparator> comparator;
 
-  // Helper function to create test files
+  // Helper function to create test files in the test directory
   void createTestFile(const std::string& filename,
                       const std::vector<std::string>& lines) const {
-    std::ofstream file(filename);
+    std::string filepath = std::string(TEST_DIR) + filename;
+    std::ofstream file(filepath);
     for (const auto& line : lines) {
       file << line << std::endl;
     }
     file.close();
+  }
+
+  // Helper function to get full path for test file
+  std::string getTestFilePath(const std::string& filename) const {
+    return std::string(TEST_DIR) + filename;
   }
 
   // Helper function to clean up test files
@@ -44,7 +56,8 @@ class FileComparatorTest : public ::testing::Test {
         "test_6level2.txt"};
 
     for (const auto& file : test_files) {
-      std::remove(file.c_str());
+      std::string filepath = std::string(TEST_DIR) + file;
+      std::remove(filepath.c_str());
     }
   }
 };
@@ -108,7 +121,8 @@ TEST_F(FileComparatorTest, CompareIdenticalFiles) {
   createTestFile("test_identical2.txt", {"1.0 2.0", "3.0 4.0"});
 
   bool result =
-      comparator->compare_files("test_identical1.txt", "test_identical2.txt");
+      comparator->compare_files(getTestFilePath("test_identical1.txt"),
+                                getTestFilePath("test_identical2.txt"));
   EXPECT_TRUE(result);
   EXPECT_TRUE(comparator->getFlag().files_are_same);
   EXPECT_FALSE(comparator->getFlag().error_found);
@@ -120,7 +134,8 @@ TEST_F(FileComparatorTest, CompareDifferentFilesWithinTolerance) {
   createTestFile("test_different2.txt", {"1.001 2.001"});  // Small differences
 
   bool result =
-      comparator->compare_files("test_different1.txt", "test_different2.txt");
+      comparator->compare_files(getTestFilePath("test_different1.txt"),
+                                getTestFilePath("test_different2.txt"));
   EXPECT_TRUE(result);  // Should pass within tolerance
   EXPECT_TRUE(comparator->getFlag().has_non_zero_diff);
   EXPECT_FALSE(comparator->getFlag().has_significant_diff);
@@ -133,7 +148,8 @@ TEST_F(FileComparatorTest, CompareDifferentFilesSignificant) {
                  {"1.5 2.8"});  // Clearly significant differences (0.5 and 0.8)
 
   bool result =
-      comparator->compare_files("test_different1.txt", "test_different2.txt");
+      comparator->compare_files(getTestFilePath("test_different1.txt"),
+                                getTestFilePath("test_different2.txt"));
   EXPECT_FALSE(result);
   EXPECT_TRUE(comparator->getFlag().has_significant_diff);
   EXPECT_FALSE(comparator->getFlag().files_are_close_enough);
@@ -153,7 +169,8 @@ TEST_F(FileComparatorTest, HandleDifferentFileLengths) {
   createTestFile("test_different2.txt", {"1.0 2.0"});  // One line shorter
 
   bool result =
-      comparator->compare_files("test_different1.txt", "test_different2.txt");
+      comparator->compare_files(getTestFilePath("test_different1.txt"),
+                                getTestFilePath("test_different2.txt"));
   EXPECT_FALSE(result);
 }
 
@@ -162,8 +179,8 @@ TEST_F(FileComparatorTest, CompareComplexNumbers) {
   createTestFile("test_complex1.txt", {"(1.0, 2.0) (3.0, 4.0)"});
   createTestFile("test_complex2.txt", {"(1.0, 2.0) (3.0, 4.0)"});
 
-  bool result =
-      comparator->compare_files("test_complex1.txt", "test_complex2.txt");
+  bool result = comparator->compare_files(getTestFilePath("test_complex1.txt"),
+                                          getTestFilePath("test_complex2.txt"));
   EXPECT_TRUE(result);
   EXPECT_TRUE(comparator->getFlag().files_are_same);
 }
@@ -196,8 +213,9 @@ TEST_F(FileComparatorTest, StrictThresholdBehavior) {
   createTestFile("test_different2.txt",
                  {"1.005"});  // Difference of 0.005 > 0.001 threshold
 
-  bool result = strict_comparator.compare_files("test_different1.txt",
-                                                "test_different2.txt");
+  bool result =
+      strict_comparator.compare_files(getTestFilePath("test_different1.txt"),
+                                      getTestFilePath("test_different2.txt"));
 
   EXPECT_FALSE(result);
   EXPECT_TRUE(strict_comparator.getFlag().has_significant_diff);
@@ -368,7 +386,8 @@ TEST_F(FileComparatorSummationTest, CounterSummationInvariants) {
                                         "7.000 7.500"   // Large difference
                                     });
 
-  bool result = comparator->compare_files("test_mixed1.txt", "test_mixed2.txt");
+  bool result = comparator->compare_files(getTestFilePath("test_mixed1.txt"),
+                                          getTestFilePath("test_mixed2.txt"));
 
   // Validate all invariants
   validateCounterInvariants();
@@ -408,8 +427,8 @@ TEST_F(FileComparatorSummationTest, IgnoreHighTLValues) {
       {"155.0 220.0 330.0",  // Large differences but should be ignored
        "175.0 280.0 380.0"});
 
-  bool result =
-      comparator->compare_files("test_high_tl1.txt", "test_high_tl2.txt");
+  bool result = comparator->compare_files(getTestFilePath("test_high_tl1.txt"),
+                                          getTestFilePath("test_high_tl2.txt"));
 
   validateCounterInvariants();
 
@@ -443,7 +462,8 @@ TEST_F(FileComparatorSummationTest, MarginalTLDifferences) {
                  {"117.0 125.0 135.0"});  // Differences in marginal range
 
   bool result =
-      comparator->compare_files("test_marginal1.txt", "test_marginal2.txt");
+      comparator->compare_files(getTestFilePath("test_marginal1.txt"),
+                                getTestFilePath("test_marginal2.txt"));
 
   validateCounterInvariants();
 
@@ -475,8 +495,9 @@ TEST_F(FileComparatorSummationTest, CriticalTLDifferences) {
   createTestFile("test_critical2.txt",
                  {"53.0"});  // Difference > critical threshold (3.0 > 2.0)
 
-  bool result = critical_comparator.compare_files("test_critical1.txt",
-                                                  "test_critical2.txt");
+  bool result =
+      critical_comparator.compare_files(getTestFilePath("test_critical1.txt"),
+                                        getTestFilePath("test_critical2.txt"));
 
   const auto& counter = critical_comparator.getCountStats();
   const auto& flags = critical_comparator.getFlag();
@@ -517,7 +538,8 @@ TEST_F(FileComparatorSummationTest, MixedTLRanges) {
                   "250.0"});  // Large difference in ignore range
 
   bool result =
-      comparator->compare_files("test_mixed_tl1.txt", "test_mixed_tl2.txt");
+      comparator->compare_files(getTestFilePath("test_mixed_tl1.txt"),
+                                getTestFilePath("test_mixed_tl2.txt"));
 
   validateCounterInvariants();
 
@@ -555,7 +577,8 @@ TEST_F(FileComparatorSummationTest, ThresholdEdgeCases) {
                   "138.2",    // Within marginal range
                   "139.2"});  // Both above ignore
 
-  bool result = comparator->compare_files("test_edge1.txt", "test_edge2.txt");
+  bool result = comparator->compare_files(getTestFilePath("test_edge1.txt"),
+                                          getTestFilePath("test_edge2.txt"));
 
   validateCounterInvariants();
 
@@ -602,8 +625,9 @@ TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
   createTestFile("test_2percent_tl1.txt", lines1);
   createTestFile("test_2percent_tl2.txt", lines2);
 
-  bool result = comparator->compare_files("test_2percent_tl1.txt",
-                                          "test_2percent_tl2.txt");
+  bool result =
+      comparator->compare_files(getTestFilePath("test_2percent_tl1.txt"),
+                                getTestFilePath("test_2percent_tl2.txt"));
 
   validateCounterInvariants();
   validate2PercentLogic();
@@ -656,8 +680,8 @@ TEST_F(FileComparatorSummationTest, SixLevelHierarchyValidation) {
 
   createTestFile("test_6level1.txt", lines1);
   createTestFile("test_6level2.txt", lines2);
-  bool result =
-      test_comparator->compare_files("test_6level1.txt", "test_6level2.txt");
+  bool result = test_comparator->compare_files(
+      getTestFilePath("test_6level1.txt"), getTestFilePath("test_6level2.txt"));
 
   const auto& counter = test_comparator->getCountStats();
 

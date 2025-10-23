@@ -1,0 +1,419 @@
+# A makefile for Fortran programs
+# Mar 2023 JCL
+# Adapted from template by Thomas Daley (Sep 2021)
+
+# get name of this directory
+THISDIR=$(shell \pwd | sed 's%^.*/%%')
+DIR.NAME=$(shell basename $$PWD)
+
+# fortran compiler
+FC = gfortran
+
+# general flags
+compile = -c $<
+output = -o $@
+
+#
+# Fortran options
+foptions = -fimplicit-none -std=f2008
+fwarnings = -W -Waliasing -Wall -Warray-temporaries -Wcharacter-truncation	\
+		-Wfatal-errors -Wextra -Wimplicit-interface -Wintrinsics-std -Wsurprising		\
+		-Wuninitialized -pedantic
+fdebug = -g -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
+#
+# additional options for gfortran v4.5 and later
+foptions_new = -std=f2018
+fwarnings_new = -Wconversion-extra -Wimplicit-procedure -Winteger-division	\
+		-Wreal-q-constant -Wuse-without-only -Wrealloc-lhs-all
+fdebug_new = -fcheck=all
+#
+# concatenate options
+foptions := $(foptions) $(foptions_new)
+fwarnings := $(fwarnings) $(fwarnings_new)
+fdebug := $(fdebug) $(fdebug_new)
+#
+# fortran compiler flags
+FCFLAGS = $(fincludes) $(foptions) $(fwarnings) $(fdebug)
+F77.FLAGS = -fd-lines-as-comments
+F90.FLAGS =
+FC.COMPILE = $(FC) $(compile) $(FCFLAGS)
+FC.COMPILE.o = $(FC.COMPILE) $(output) $(F77.FLAGS)
+FC.COMPILE.o.f90 = $(FC.COMPILE) $(output) $(F90.FLAGS)
+FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
+#
+# fortran linker flags
+FLFLAGS = $(output) $^
+FC.LINK = $(FC) $(FLFLAGS)
+#
+
+# build directories - output to parent directories
+BINDIR := ../bin
+OBJDIR := obj
+#
+
+# source file lists
+
+# program driver files (correspond to executables)
+MAINS.F77 = $(wildcard *.f)
+MAINS.F90 = $(wildcard *.f90)
+# add driver directory, if present
+MAIN_DIR := main
+ifneq ("$(strip $(wildcard $(MAIN_DIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(MAIN_DIR)))
+	MAINS.F77 += $(wildcard $(MAIN_DIR)/*.f)
+	MAINS.F90 += $(wildcard $(MAIN_DIR)/*.f90)
+endif
+MAINS.F77 := $(strip $(MAINS.F77))
+MAINS.F90 := $(strip $(MAINS.F90))
+MAINS = $(strip $(MAINS.F77) $(MAINS.F90))
+#
+# program files (executable)
+SRCS.F77 = $(wildcard *.f)
+SRCS.F90 = $(wildcard *.f90)
+
+# source files (implementation, correspond to header files)
+# add source directory, if present
+SRCDIR := src
+ifneq ("$(strip $(wildcard $(SRCDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(SRCDIR)))
+	SRCS.F77 += $(wildcard $(SRCDIR)/*.f)
+	SRCS.F90 += $(wildcard $(SRCDIR)/*.f90)
+endif
+SRC = $(SRCS.F77) $(SRCS.F90)
+#
+# directory for "include" files (not executable, not compilable)
+INCDIR := inc
+# add INCDIR if present
+ifneq ("$(strip $(wildcard $(INCDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(INCDIR)))
+	fincludes = $(patsubst %,-I %,$(INCDIR))
+	INCS.F77 = $(wildcard $(INCDIR)/*.f)
+	INCS.F90 = $(wildcard $(INCDIR)/*.f90)
+	INCS. +=  $(patsubst $(INCDIR)/%.f, %, $(INCS.F77)) \
+	$(patsubst $(INCDIR)/%.f90, %, $(INCS.F90))
+endif
+
+# module files
+# fortran module complier flags
+FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
+# build directory for compiled modules
+MODDIR := mod
+# source directory
+MODDIR.in := modules
+# add MODDIR.in if present
+ifneq ("$(strip $(wildcard $(MODDIR.in)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(MODDIR.in)))
+	MODS.F77 = $(wildcard $(MODDIR.in)/*.f)
+	MODS.F90 = $(wildcard $(MODDIR.in)/*.f90)
+	MODS. +=  $(patsubst $(MODDIR.in)/%.f, %, $(MODS.F77)) \
+	$(patsubst $(MODDIR.in)/%.f90, %, $(MODS.F90))
+endif
+# add additional modules
+MODS. +=
+# add MODDIR to includes if MODS. not empty
+ifneq ("$(MODS.)","")
+	fincludes:=$(fincludes) -J $(MODDIR)
+endif
+# build list of modules
+MODS.mod = $(addsuffix .mod,$(MODS.))
+MODS := $(addprefix $(MODDIR)/,$(MODS.mod))
+#
+# Add any external procudures below. Note: shared procedures should be included in a module
+# unless written in a different language.
+#
+# function files
+FUNDIR := functions
+# add FUNDIR if present
+ifneq ("$(strip $(wildcard $(FUNDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(FUNDIR)))
+	FUNS.F77 = $(wildcard $(FUNDIR)/*.f)
+	FUNS.F90 = $(wildcard $(FUNDIR)/*.f90)
+	FUNS. +=  $(patsubst $(FUNDIR)/%.f, %, $(FUNS.F77)) \
+	$(patsubst $(FUNDIR)/%.f90, %, $(FUNS.F90))
+endif
+# add additional fucntions
+FUNS. +=
+#
+# subroutine files
+SUBDIR := subroutines
+# add SUBDIR if present
+ifneq ("$(strip $(wildcard $(SUBDIR)))","")
+	VPATH += $(subst $(subst ,, ),:,$(strip $(SUBDIR)))
+	SUBS.F77 = $(wildcard $(SUBDIR)/*.f)
+	SUBS.F90 = $(wildcard $(SUBDIR)/*.f90)
+	SUBS. +=  $(patsubst $(SUBDIR)/%.f, %, $(SUBS.F77)) \
+	$(patsubst $(SUBDIR)/%.f90, %, $(SUBS.F90))
+endif
+# add additional subroutines
+SUBS. +=
+#
+# concatonate procedure lists (non-executables)
+DEPS. = $(MODS.) $(SUBS.) $(FUNS.)
+#
+# build object lists
+OBJS.F77 = $(SRCS.F77:.f=.o)
+OBJS.F90 = $(SRCS.F90:.f90=.o)
+FORTRAN_OBJS.all = $(OBJS.F77) $(OBJS.F90)
+FORTRAN_OBJS.all := $(FORTRAN_OBJS.all:$(SRCDIR)/%=%)
+#
+FORTRAN_DEPS.o = $(addsuffix .o,$(DEPS.))
+FORTRAN_OBJS.o = $(filter-out $(FORTRAN_DEPS.o),$(FORTRAN_OBJS.all))
+FORTRAN_DEPS := $(addprefix $(OBJDIR)/,$(FORTRAN_DEPS.o))
+
+#
+# executables
+TARGET =
+# EXES should be built from main programs, not all source objects
+# EXES = $(addprefix $(BINDIR)/,$(FORTRAN_OBJS.o:.o=))
+#
+# sub-programs
+SUBDIRS :=
+
+# strip file extensions from main files
+EXECS.main = $(patsubst %.f90,%,$(patsubst %.f,%,$(MAINS)))
+EXECS.main := $(strip $(EXECS.main))
+# strip main directory from executable list
+# should be a list of executables with no directory
+EXECS.list := $(EXECS.main:$(MAIN_DIR)/%=%)
+# add executable directory
+EXECS := $(addprefix $(BINDIR)/,$(EXECS.list))
+
+.DEFAULT_GOAL = all
+#
+# recipes
+
+$(SUBDIRS):
+	@$(MAKE) --no-print-directory -C $@
+
+.PHONY: all
+all: $(OBJDIR) $(BINDIR) $(EXECS)
+	@/bin/echo -e "$${TAB}$(THISDIR) $@ done"
+
+printvars:
+	@echo
+	@echo "printing variables..."
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "fincludes = '$(fincludes)'"
+
+	@echo "VPATH = '$(VPATH)'"
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+	@echo "SUBDIRS = $(SUBDIRS)"
+
+	@echo
+	@echo "MAIN_DIR = $(MAIN_DIR)"
+	@echo "MAINS.F77 = $(MAINS.F77)"
+	@echo "MAINS.F90 = $(MAINS.F90)"
+	@echo "MAINS     = $(MAINS)"
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "SRCS.F77 = $(SRCS.F77)"
+	@echo
+	@echo "SRCS.F90 = $(SRCS.F90)"
+	@echo
+	@echo "SRC = $(SRC)"
+	@echo
+	@echo "FORTRAN_OBJS.all = $(FORTRAN_OBJS.all)"
+
+	@echo "SRCDIR  = $(SRCDIR)"
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "INCS. = $(INCS.)"
+	@echo
+	@echo "MODS. = $(MODS.)"
+	@echo
+	@echo "SUBS. = $(SUBS.)"
+	@echo
+	@echo "FUNS. = $(FUNS.)"
+	@echo
+	@echo "DEPS. = $(DEPS.)"
+
+	@echo "OBJS.src = $(OBJS.src)"
+	@echo "FORTRAN_OBJS.o   = $(FORTRAN_OBJS.o)"
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "FORTRAN_DEPS.o = $(FORTRAN_DEPS.o)"
+	@echo
+	@echo "MODS.mod = $(MODS.mod)"
+
+	@echo "EXECS.main = $(EXECS.main)"
+	@echo "EXECS.list = $(EXECS.list)"
+	@echo "EXECS      = $(EXECS)"
+	@echo
+	@echo "----------------------------------------------------"
+	@echo
+
+	@echo "EXES = $(EXES)"
+	@echo
+
+	@echo "FORTRAN_DEPS = $(FORTRAN_DEPS)"
+	@echo
+	@echo "MODS = $(MODS)"
+	@echo
+
+	@echo "----------------------------------------------------"
+	@echo "$@ done"
+	@echo
+#
+
+# specific recipes
+
+#
+# generic recipes
+$(BINDIR)/%: $(OBJDIR)/%.o $(FORTRAN_DEPS) | $(BINDIR)
+	@/bin/echo -e "\nlinking generic fortran executable $@..."
+	$(FC.LINK)
+$(OBJDIR)/%.o: %.f $(MODS) | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic object $@..."
+	$(FC.COMPILE.o)
+$(OBJDIR)/%.o: %.f90 $(MODS) | $(OBJDIR)
+	@/bin/echo -e "\ncompiling generic f90 object $@..."
+	$(FC.COMPILE.o.f90)
+$(MODDIR)/%.mod: %.f | $(MODDIR)
+	@/bin/echo -e "\ncompiling generic module $@..."
+	$(FC.COMPILE.mod)
+$(MODDIR)/%.mod: %.f90 | $(MODDIR)
+	@/bin/echo -e "\ncompiling generic f90 module $@..."
+	$(FC.COMPILE.mod)
+
+# Include dependency files (ignore missing files with -)
+
+#
+# define directory creation
+$(BINDIR):
+	@mkdir -v $(BINDIR)
+$(OBJDIR):
+	@mkdir -v $(OBJDIR)
+
+$(MODDIR):
+ifeq ("$(wildcard $(MODS))",)
+	@echo "no modules specified"
+else
+	@echo "creating $(MODDIR)..."
+	@mkdir -v $(MODDIR)
+endif
+
+# keep intermediate object files
+.SECONDARY: $(DEPS) $(OBJS) $(MODS)
+
+diff: $(BINDIR)/uband_diff
+
+#
+# recipes without outputs
+
+.PHONY: all $(SUBDIRS) mostlyclean clean force out realclean distclean reset
+
+.PHONY: mostlyclean clean force out realclean distclean reset
+#
+# clean up
+
+optSUBDIRS = $(addprefix $(MAKE) $@ --no-print-directory -C ,$(addsuffix ;,$(SUBDIRS)))
+
+RM = @rm -vfrd
+mostlyclean:
+# remove compiled binaries
+	@echo "removing compiled binary files..."
+# remove build files and object files
+	$(RM) $(OBJDIR)/*.o
+	$(RM) $(OBJDIR)
+	$(RM) *.o *.obj
+
+	$(RM) $(MODDIR)/*.mod
+	$(RM) $(MODDIR)
+	$(RM) *.mod
+	$(RM) fort.*
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
+clean: mostlyclean
+# remove binaries and executables
+	@/bin/echo -e "\nremoving compiled executable files..."
+	$(RM) $(BINDIR)/*
+	$(RM) $(BINDIR)
+
+	@echo "$(DIR.NAME) $@ done"
+	$(RM) *.exe
+	$(RM) *.out
+
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
+
+	@echo "$(DIR.NAME) $@ done"
+force: clean
+# force re-make
+	@$(MAKE) --no-print-directory
+out:
+# remove outputs produced by executables
+	@/bin/echo -e "\nremoving output files..."
+
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
+
+	@echo "$(DIR.NAME) $@ done"
+realclean: clean out
+# remove binaries and outputs
+
+	@$(optSUBDIRS)
+
+distclean: realclean
+# remove binaries, outputs, and backups
+	@/bin/echo -e "\nremoving backup files..."
+# remove Git versions
+	$(RM) *.~*~
+# remove Emacs backup files
+	$(RM) *~ \#*\#
+# clean sub-programs
+
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
+
+	@echo "$(DIR.NAME) $@ done"
+reset: distclean
+# remove untracked files
+	@/bin/echo -e "\nresetting repository..."
+	git reset HEAD
+	git stash
+	git clean -f
+
+	@$(optSUBDIRS)
+	@echo "$(THISDIR) $@ done"
+#
+# test the makefile
+ftest: distclean printvars all
+	@echo "$(THISDIR) $@ done"
+
+	@echo "$(DIR.NAME) $@ done"
+
+# force rebuild
+.PHONY: remake
+remake:	clean all
+
+# execute the program (runs first executable found)
+.PHONY: run
+run: all
+	@if [ -n "$(word 1,$(EXECS))" ]; then \
+		echo "Running $(word 1,$(EXECS))..."; \
+		./$(word 1,$(EXECS)); \
+	else \
+		echo "No executables found to run"; \
+	fi
+
+# =============================================================================
+# Help Target
+# =============================================================================
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all       - build all Fortran executables (default)"
+	@echo "  clean     - remove all generated files"
+	@echo "  remake    - clean then build all"
+	@echo "  run       - build and run the first executable"
+	@echo "  help      - show this help message"
