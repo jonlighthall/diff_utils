@@ -97,8 +97,6 @@ endif
 # module files
 # fortran module complier flags
 FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
-# build directory for compiled modules - already defined above
-# MODDIR is set to ../../build/mod
 # source directory
 MODDIR.in := modules
 # add MODDIR.in if present
