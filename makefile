@@ -49,8 +49,8 @@ LDLIBS =
 LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 
 # build directories
-BINDIR := bin
-OBJDIR := obj
+BINDIR := build/bin
+OBJDIR := build/obj
 
 # source file lists
 
@@ -97,7 +97,7 @@ TARGET =
 # EXES = $(addprefix $(BINDIR)/,$(FORTRAN_OBJS.o:.o=))
 #
 # sub-programs
-SUBDIRS := cpp fortran
+SUBDIRS := src/cpp src/fortran
 
 # dependency files
 DEPS := $(OBJS:.o=.d)
@@ -376,15 +376,15 @@ run: all
 .PHONY: test tests clean-tests
 test:
 	@echo "Delegating test command to cpp subdirectory..."
-	@$(MAKE) test --no-print-directory -C cpp
+	@$(MAKE) test --no-print-directory -C src/cpp
 
 tests:
 	@echo "Delegating tests command to cpp subdirectory..."
-	@$(MAKE) tests --no-print-directory -C cpp
+	@$(MAKE) tests --no-print-directory -C src/cpp
 
 clean-tests:
 	@echo "Delegating clean-tests command to cpp subdirectory..."
-	@$(MAKE) clean-tests --no-print-directory -C cpp
+	@$(MAKE) clean-tests --no-print-directory -C src/cpp
 
 # Note: test cleanup is handled by cpp/makefile
 clean: mostlyclean

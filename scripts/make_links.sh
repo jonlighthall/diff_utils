@@ -23,7 +23,7 @@ make
 cbar "Done Compiling"
 
 # set target and link directories
-target_dir="${src_dir_phys}/bin"
+target_dir="${src_dir_phys}/build/bin"
 link_dir=$HOME/bin
 
 cbar "Start Making Links"
@@ -59,7 +59,7 @@ tsdiff; do
     do_link_exe "$target" "$link"
 done
 
-target_dir="${src_dir_phys}"
+target_dir="${src_dir_phys}/scripts"
 ext='.sh'
 for my_link in process_nspe_in_files process_ram_in_files; do
     # define target (source)

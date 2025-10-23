@@ -46,9 +46,10 @@ FLFLAGS = $(output) $^
 FC.LINK = $(FC) $(FLFLAGS)
 #
 
-# build directories - output to parent directories
-BINDIR := ../bin
-OBJDIR := obj
+# build directories - output to root build/ directory
+BINDIR := ../../build/bin
+OBJDIR := ../../build/obj
+MODDIR := ../../build/mod
 #
 
 # source file lists
@@ -96,8 +97,8 @@ endif
 # module files
 # fortran module complier flags
 FC.COMPILE.mod = $(FC.COMPILE) -o $(OBJDIR)/$*.o $(F90.FLAGS)
-# build directory for compiled modules
-MODDIR := mod
+# build directory for compiled modules - already defined above
+# MODDIR is set to ../../build/mod
 # source directory
 MODDIR.in := modules
 # add MODDIR.in if present
@@ -289,20 +290,20 @@ $(MODDIR)/%.mod: %.f90 | $(MODDIR)
 #
 # define directory creation
 $(BINDIR):
-	@mkdir -v $(BINDIR)
+	@mkdir -pv $(BINDIR)
 $(OBJDIR):
-	@mkdir -v $(OBJDIR)
+	@mkdir -pv $(OBJDIR)
 
 $(MODDIR):
 ifeq ("$(wildcard $(MODS))",)
 	@echo "no modules specified"
 else
 	@echo "creating $(MODDIR)..."
-	@mkdir -v $(MODDIR)
+	@mkdir -pv $(MODDIR)
 endif
 
-# keep intermediate object files
-.SECONDARY: $(DEPS) $(OBJS) $(MODS)
+# keep all intermediate object files
+.SECONDARY:
 
 diff: $(BINDIR)/uband_diff
 
@@ -335,8 +336,7 @@ mostlyclean:
 clean: mostlyclean
 # remove binaries and executables
 	@/bin/echo -e "\nremoving compiled executable files..."
-	$(RM) $(BINDIR)/*
-	$(RM) $(BINDIR)
+	@echo "Note: bin/ is shared with parent - not removing"
 
 	@echo "$(DIR.NAME) $@ done"
 	$(RM) *.exe

@@ -34,7 +34,7 @@ CFLAGS =
 # C++ flags
 CXXFLAGS =
 # dependency generation flags
-DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.d
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 # compile C source
 COMPILE.c = $(CC) $(CFLAGS) $(UFLAGS) $(compile)
 # compile C++ source
@@ -48,9 +48,10 @@ LDLIBS =
 # link objects
 LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 
-# build directories
-BINDIR := ../bin
-OBJDIR := obj
+# build directories (relative to root)
+BINDIR := ../../build/bin
+OBJDIR := ../../build/obj
+DEPDIR := ../../build/deps
 
 # source file lists
 
@@ -91,7 +92,8 @@ OBJS.o := $(OBJS.src:$(SRCDIR)/%=%)
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 
 # dependency files
-DEPS := $(OBJS:.o=.d)
+DEPS.list := $(OBJS.o:.o=.d)
+DEPS := $(addprefix $(DEPDIR)/,$(DEPS.list))
 
 # strip file extensions from main files
 EXECS.main = $(patsubst %.cxx,%,$(patsubst %.cpp,%,$(patsubst %.cc,%,$(patsubst %.c,%,$(MAINS)))))
@@ -199,7 +201,7 @@ $(TESTBINDIR): | $(BINDIR)
 # Only define test compilation rules if Google Test is available
 ifeq ($(GTEST_AVAILABLE),yes)
 # Test compilation rule
-$(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
+$(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR) $(DEPDIR)
 	@echo "compiling test object $@..."
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(GTEST_CFLAGS) $(includes) $(warnings) $(debug) -c $< -o $@
 
@@ -243,29 +245,29 @@ $(BINDIR)/%: $(MAIN_DIR)/%.cxx $(OBJS) | $(BINDIR)
 
 # Rules to compile source files into object files
 
-$(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.c | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C (.c) object $@..."
 	$(COMPILE.c)
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cc | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
 	$(COMPILE.cxx)
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cpp | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cpp) object $@..."
 	$(COMPILE.cxx)
-$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR)
+$(OBJDIR)/%.o:	$(SRCDIR)/%.cxx | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cxx) object $@..."
 	$(COMPILE.cxx)
 
-$(OBJDIR)/%.o:	%.c | $(OBJDIR)
+$(OBJDIR)/%.o:	%.c | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C (.c) object $@..."
 	$(COMPILE.c)
-$(OBJDIR)/%.o: %.cc | $(OBJDIR)
+$(OBJDIR)/%.o: %.cc | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cc) object $@..."
 	$(COMPILE.cxx)
-$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cpp) object $@..."
 	$(COMPILE.cxx)
-$(OBJDIR)/%.o: %.cxx | $(OBJDIR)
+$(OBJDIR)/%.o: %.cxx | $(OBJDIR) $(DEPDIR)
 	@/bin/echo -e "\ncompiling generic C++ (.cxx) object $@..."
 	$(COMPILE.cxx)
 
@@ -278,6 +280,8 @@ $(BINDIR):
 	@mkdir -pv $(BINDIR)
 $(OBJDIR):
 	@mkdir -pv $(OBJDIR)
+$(DEPDIR):
+	@mkdir -pv $(DEPDIR)
 
 # keep intermediate object files
 .SECONDARY: $(DEPS) $(OBJS)
@@ -296,9 +300,11 @@ mostlyclean:
 	$(RM) $(OBJS)
 # remove dependency files
 	$(RM) $(DEPS)
-# remove remaining binaries
+# remove remaining binaries and dependencies
 	$(RM) $(OBJDIR)/*.o
 	$(RM) $(OBJDIR)
+	$(RM) $(DEPDIR)/*.d
+	$(RM) $(DEPDIR)
 	$(RM) *.o *.obj
 
 	@echo "$(THISDIR) $@ done"
@@ -399,6 +405,7 @@ clean-tests:
 	@echo "removing test files..."
 	$(RM) $(TESTBINDIR)
 	$(RM) $(OBJDIR)/test_*
+	$(RM) $(DEPDIR)/test_*
 	@echo "test cleanup done"
 
 # Add test cleanup to main clean target
