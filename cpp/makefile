@@ -49,7 +49,7 @@ LDLIBS =
 LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 
 # build directories
-BINDIR := bin
+BINDIR := ../bin
 OBJDIR := obj
 
 # source file lists
@@ -90,15 +90,6 @@ OBJS.o := $(OBJS.src:$(SRCDIR)/%=%)
 # add object directory
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS.o))
 
-#
-# executables
-TARGET =
-# EXES should be built from main programs, not all source objects
-# EXES = $(addprefix $(BINDIR)/,$(FORTRAN_OBJS.o:.o=))
-#
-# sub-programs
-SUBDIRS := cpp fortran
-
 # dependency files
 DEPS := $(OBJS:.o=.d)
 
@@ -115,12 +106,8 @@ EXECS := $(addprefix $(BINDIR)/,$(EXECS.list))
 
 #
 # recipes
-
-$(SUBDIRS):
-	@$(MAKE) --no-print-directory -C $@
-
 .PHONY: all
-all: $(SUBDIRS) $(OBJDIR) $(BINDIR) $(EXECS)
+all: $(OBJDIR) $(BINDIR) $(EXECS)
 	@/bin/echo -e "$${TAB}$(THISDIR) $@ done"
 
 printvars:
@@ -130,15 +117,12 @@ printvars:
 	@echo
 
 	@echo "includes = '$(includes)'"
-	@echo "fincludes = '$(fincludes)'"
 
 	@echo "VPATH = '$(VPATH)'"
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "SUBDIRS = $(SUBDIRS)"
 
-	@echo
 	@echo "MAIN_DIR = $(MAIN_DIR)"
 	@echo "MAINS.C   = $(MAINS.C)"
 	@echo "MAINS.CPP = $(MAINS.CPP)"
@@ -169,12 +153,7 @@ printvars:
 	@echo
 	@echo "----------------------------------------------------"
 	@echo
-	@echo "GTEST_AVAILABLE = $(GTEST_AVAILABLE)"
-	@echo "TEST_TARGETS    = $(TEST_TARGETS)"
-	@echo
 
-	@echo "EXES = $(EXES)"
-	@echo
 	@echo "OBJS = $(OBJS)"
 	@echo
 
@@ -184,16 +163,51 @@ printvars:
 	@echo "----------------------------------------------------"
 	@echo "$@ done"
 	@echo
-#
-
-# specific recipes
 
 # =============================================================================
 # Testing Configuration
 # =============================================================================
 
-# Tests are now in cpp/ subdirectory - delegate test commands there
+# Test configuration
+TESTDIR := tests
+TESTBINDIR := $(BINDIR)/tests
 
+# Check if Google Test is available
+GTEST_AVAILABLE := $(shell echo '\#include <gtest/gtest.h>' | $(CXX) -x c++ -E - > /dev/null 2>&1 && echo yes || echo no)
+
+# Google Test flags
+GTEST_CFLAGS = -isystem /usr/include/gtest
+GTEST_LIBS = -lgtest -lgtest_main -pthread
+
+# Test sources
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.cpp)
+TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/test_%.o)
+# Single test executable
+TEST_EXECUTABLE = $(TESTBINDIR)/run_tests
+
+# Conditionally set test targets based on gtest availability
+ifeq ($(GTEST_AVAILABLE),yes)
+    TEST_TARGETS = $(TEST_EXECUTABLE)
+else
+    TEST_TARGETS =
+endif
+
+# Create test directory
+$(TESTBINDIR): | $(BINDIR)
+	@mkdir -v $(TESTBINDIR)
+
+# Only define test compilation rules if Google Test is available
+ifeq ($(GTEST_AVAILABLE),yes)
+# Test compilation rule
+$(OBJDIR)/test_%.o: $(TESTDIR)/%.cpp | $(OBJDIR)
+	@echo "compiling test object $@..."
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(GTEST_CFLAGS) $(includes) $(warnings) $(debug) -c $< -o $@
+
+# Test linking rule - link all test objects with main library objects into single executable
+$(TEST_EXECUTABLE): $(TEST_OBJECTS) $(OBJS) | $(TESTBINDIR)
+	@echo "linking test executable $@..."
+	$(CXX) $(LDFLAGS) $^ $(GTEST_LIBS) -o $@
+endif
 
 #
 # generic recipes
@@ -270,16 +284,9 @@ $(OBJDIR):
 
 diff: $(BINDIR)/uband_diff
 
-#
-# recipes without outputs
-
-.PHONY: all $(SUBDIRS) mostlyclean clean force out realclean distclean reset
-
-.PHONY: mostlyclean clean force out realclean distclean reset
-#
 # clean up
 
-optSUBDIRS = $(addprefix $(MAKE) $@ --no-print-directory -C ,$(addsuffix ;,$(SUBDIRS)))
+.PHONY: mostlyclean clean force out realclean distclean reset
 
 RM = @rm -vfrd
 mostlyclean:
@@ -294,37 +301,33 @@ mostlyclean:
 	$(RM) $(OBJDIR)
 	$(RM) *.o *.obj
 
-	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
+
 clean: mostlyclean
 # remove binaries and executables
 	@/bin/echo -e "\nremoving compiled executable files..."
-	$(RM) $(BINDIR)/*
-	$(RM) $(BINDIR)
+	@echo "Note: bin/ is shared with parent - not removing"
 
 	@echo "$(DIR.NAME) $@ done"
 	$(RM) *.exe
 	$(RM) *.out
 
-	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
 
 	@echo "$(DIR.NAME) $@ done"
+
 force: clean
 # force re-make
 	@$(MAKE) --no-print-directory
+
 out:
 # remove outputs produced by executables
 	@/bin/echo -e "\nremoving output files..."
-
-	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
-
 	@echo "$(DIR.NAME) $@ done"
+
 realclean: clean out
 # remove binaries and outputs
-
-	@$(optSUBDIRS)
 
 distclean: realclean
 # remove binaries, outputs, and backups
@@ -333,26 +336,20 @@ distclean: realclean
 	$(RM) *.~*~
 # remove Emacs backup files
 	$(RM) *~ \#*\#
-# clean sub-programs
-
-	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
-
 	@echo "$(DIR.NAME) $@ done"
+
 reset: distclean
 # remove untracked files
 	@/bin/echo -e "\nresetting repository..."
 	git reset HEAD
 	git stash
 	git clean -f
-
-	@$(optSUBDIRS)
 	@echo "$(THISDIR) $@ done"
-#
+
 # test the makefile
 ftest: distclean printvars all
 	@echo "$(THISDIR) $@ done"
-
 	@echo "$(DIR.NAME) $@ done"
 
 # force rebuild
@@ -374,20 +371,38 @@ run: all
 # =============================================================================
 
 .PHONY: test tests clean-tests
-test:
-	@echo "Delegating test command to cpp subdirectory..."
-	@$(MAKE) test --no-print-directory -C cpp
+test: tests
+ifeq ($(GTEST_AVAILABLE),yes)
+	@echo "Running all tests..."
+	@echo "Running $(TEST_EXECUTABLE)..."
+	@if $(TEST_EXECUTABLE); then \
+		echo "PASSED: All tests"; \
+	else \
+		echo "FAILED: Some tests failed"; \
+		exit 1; \
+	fi
+else
+	@echo "ERROR: Google Test is not installed."
+	@echo "Please install libgtest-dev to run tests:"
+	@echo "  sudo apt-get install libgtest-dev"
+	@exit 1
+endif
 
-tests:
-	@echo "Delegating tests command to cpp subdirectory..."
-	@$(MAKE) tests --no-print-directory -C cpp
+tests: $(TEST_TARGETS)
+ifeq ($(GTEST_AVAILABLE),no)
+	@echo "WARNING: Google Test is not installed. Skipping test build."
+	@echo "To build and run tests, please install libgtest-dev:"
+	@echo "  sudo apt-get install libgtest-dev"
+endif
 
 clean-tests:
-	@echo "Delegating clean-tests command to cpp subdirectory..."
-	@$(MAKE) clean-tests --no-print-directory -C cpp
+	@echo "removing test files..."
+	$(RM) $(TESTBINDIR)
+	$(RM) $(OBJDIR)/test_*
+	@echo "test cleanup done"
 
-# Note: test cleanup is handled by cpp/makefile
-clean: mostlyclean
+# Add test cleanup to main clean target
+clean: mostlyclean clean-tests
 
 # =============================================================================
 # Help Target
@@ -396,7 +411,7 @@ clean: mostlyclean
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all       - build all executables (default)"
+	@echo "  all       - build all C++ executables (default)"
 	@echo "  clean     - remove all generated files"
 	@echo "  remake    - clean then build all"
 	@echo "  run       - build and run the first executable"
@@ -407,10 +422,10 @@ help:
 
 # =============================================================================
 case1: diff
-	./bin/uband_diff example_data/pe.std1.pe01.ref.txt example_data/pe.std1.pe01.test.txt 0 1 0 1
+	../bin/uband_diff ../example_data/pe.std1.pe01.ref.txt ../example_data/pe.std1.pe01.test.txt 0 1 0 1
 
 case2: diff
-	./bin/uband_diff example_data/pe.std2.pe01.ref.txt example_data/pe.std2.pe01.test.txt 0 1 0 1
+	../bin/uband_diff ../example_data/pe.std2.pe01.ref.txt ../example_data/pe.std2.pe01.test.txt 0 1 0 1
 
 case3: diff
-	./bin/uband_diff example_data/pe.std3.pe01.ref.txt example_data/pe.std3.pe01.test.txt 0 3 1
+	../bin/uband_diff ../example_data/pe.std3.pe01.ref.txt ../example_data/pe.std3.pe01.test.txt 0 3 1
