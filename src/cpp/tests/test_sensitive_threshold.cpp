@@ -7,7 +7,13 @@
 // This test validates the special behavior when the user-specified
 // significant threshold is zero: every non-trivial difference whose values
 // are not BOTH above the ignore threshold should be classified as significant.
-// Canonical dataset: example_data/pe.std1.pe01.ref.txt vs test.txt
+//
+// Tests for sensitive threshold behavior (threshold = 0.0)
+//
+// This test uses a canonical reference dataset to validate the classification
+// distribution at zero threshold.
+//
+// Canonical dataset: data/pe.std1.pe01.ref.txt vs test.txt
 // Expected (empirically validated):
 //   diff_non_trivial = 39
 //   diff_significant = 27
@@ -18,8 +24,8 @@
 // NOTE: We are asserting the public counters reflect this distribution.
 
 TEST(SensitiveThresholdTest, CanonicalZeroThresholdClassification) {
-  const std::string ref_file = "example_data/pe.std1.pe01.ref.txt";
-  const std::string test_file = "example_data/pe.std1.pe01.test.txt";
+  const std::string ref_file = "../../data/pe.std1.pe01.ref.txt";
+  const std::string test_file = "../../data/pe.std1.pe01.test.txt";
 
   // significant=0.0, critical=1.0, print=0.0, debug level 0
   FileComparator comparator(/*user_thresh*/ 0.0, /*hard_thresh*/ 1.0,

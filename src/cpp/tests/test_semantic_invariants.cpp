@@ -20,8 +20,8 @@ static void writeFile(const std::string& path,
 //    Invariant: diff_significant + diff_high_ignore == diff_non_trivial.
 TEST(SemanticInvariants, ZeroThresholdInvariant) {
   FileComparator cmp(0.0, /*critical*/ 1.0, /*print*/ 0.0, /*debug*/ 0);
-  bool ok = cmp.compare_files("example_data/pe.std1.pe01.ref.txt",
-                              "example_data/pe.std1.pe01.test.txt");
+  bool ok = cmp.compare_files("../../data/pe.std1.pe01.ref.txt",
+                              "../../data/pe.std1.pe01.test.txt");
   (void)ok;  // outcome not central to invariant
   const auto& c = cmp.getCountStats();
   EXPECT_EQ(c.diff_significant + c.diff_high_ignore, c.diff_non_trivial)
