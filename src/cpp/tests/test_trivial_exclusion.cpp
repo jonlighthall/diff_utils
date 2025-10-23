@@ -1,13 +1,20 @@
 #include <gtest/gtest.h>
+
+#include <filesystem>
+
 // Public interface header for the comparison engine
 #include "uband_diff.h"
 
+// Directory for temporary test files
+static constexpr const char* TEST_DIR = "../../build/test/";
+
 // Utility: create two temporary in-memory files via actual disk writes for
 // current comparator flow
-static std::string write_temp(const std::string &name,
-                              const std::string &contents) {
-  std::string path = name;
-  FILE *f = fopen(path.c_str(), "w");
+static std::string write_temp(const std::string& name,
+                              const std::string& contents) {
+  std::filesystem::create_directories(TEST_DIR);
+  std::string path = std::string(TEST_DIR) + name;
+  FILE* f = fopen(path.c_str(), "w");
   if (!f) throw std::runtime_error("Failed to open temp file: " + path);
   fwrite(contents.data(), 1, contents.size(), f);
   fclose(f);
@@ -48,8 +55,8 @@ TEST(TrivialExclusionTest, TrivialDifferencesRemainExcludedAtZeroThreshold) {
   (void)cmp_sensitive.compare_files(ref_path, test_path);
   (void)cmp_normal.compare_files(ref_path, test_path);
 
-  const auto &stats_sensitive = cmp_sensitive.getCountStats();
-  const auto &stats_normal = cmp_normal.getCountStats();
+  const auto& stats_sensitive = cmp_sensitive.getCountStats();
+  const auto& stats_normal = cmp_normal.getCountStats();
 
   // Basic sanity: all raw differences are *non-zero* but should collapse to
   // trivial after rounding. Therefore diff_trivial should equal number of
