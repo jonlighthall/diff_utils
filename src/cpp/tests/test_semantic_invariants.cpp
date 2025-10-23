@@ -7,7 +7,7 @@
 #include "uband_diff.h"
 
 // Directory for temporary test files
-static constexpr const char* TEST_DIR = "../../build/tmp/";
+static constexpr const char* TEST_DIR = "../../build/test/";
 
 // Helper to create a temporary test file with provided lines.
 static void writeFile(const std::string& filename,

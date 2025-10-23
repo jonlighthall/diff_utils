@@ -406,7 +406,7 @@ clean-tests:
 	$(RM) $(TESTBINDIR)
 	$(RM) $(OBJDIR)/test_*
 	$(RM) $(DEPDIR)/test_*
-	$(RM) -r ../../build/tmp
+	$(RM) -r ../../build/test
 	@echo "test cleanup done"
 
 # Add test cleanup to main clean target

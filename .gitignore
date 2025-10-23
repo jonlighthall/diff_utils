@@ -34,7 +34,7 @@ obj/
 bin/
 
 # Build artifacts
-build/tmp/
+build/test/
 
 # Emacs
 *~

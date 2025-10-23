@@ -10,7 +10,7 @@
 class FileComparatorTest : public ::testing::Test {
  protected:
   // Directory for temporary test files
-  static constexpr const char* TEST_DIR = "../../build/tmp/";
+  static constexpr const char* TEST_DIR = "../../build/test/";
 
   // Keep SetUp() and TearDown() protected (required by Google Test)
   void SetUp() override {
