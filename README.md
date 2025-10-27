@@ -30,6 +30,9 @@ This repository provides comparison tools for a family of acoustics / TL (Transm
 4. Controlled table output (with cap + truncation notice)
 5. Summary reporting with consistency (invariant) checks
 
+### Implementation summary (short)
+The C++ `uband_diff` engine now includes a precision-aware "sub‑LSB" detection fix: differences smaller than or equal to half the shared least-significant decimal (LSB/2) are treated as trivial (informationally equivalent) rather than failing comparisons. This improves cross-platform robustness (for example, `30.8` vs `30.85`), adds a small floating-point tolerance for edge cases, raises the decimal-place limit to 17, and includes 6 new unit tests. For full technical details, tests, and a file-level change list see `docs/IMPLEMENTATION_SUMMARY.md`.
+
 ### Six-Level Hierarchy (Conceptual)
 
 Level 1: Non-zero vs zero raw differences

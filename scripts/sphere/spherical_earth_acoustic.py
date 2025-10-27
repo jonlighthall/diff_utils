@@ -59,31 +59,60 @@ def calculate_surface_intersection(r_source, angle_rad, r_earth):
     # For a horizontal ray (angle = 0), the ray is tangent to the circle at source depth
     # The ray travels in a straight line in 3D space (isovelocity medium)
     #
-    # Geometry: The ray starts tangent to radius r_source and intersects surface at r_earth
-    # Central angle is: θ = arccos((r_source)/r_earth)
+    # Geometry: Triangle formed by Earth center (O), Source (S), and surface intersection (P)
+    # - Angle at source between radius and ray = 90° - angle_rad (complementary)
+    # - For angle = 0° (horizontal): ray perpendicular to radius (90°)
+    # - For angle = -90° (straight up): ray along radius toward center (0°)
+    # - For angle = +90° (straight down): ray along radius away from center (180°)
     #
-    # For non-zero angles:
-    # - Positive angle = ray angled downward (into Earth)
-    # - Negative angle = ray angled upward (toward surface)
+    # Using law of sines: r_earth/sin(angle_at_source) = r_source/sin(angle_at_P)
+    # Central angle θ can be found from the triangle geometry
 
-    # Effective source radius considering beam angle
-    # For horizontal (0°): use r_source
-    # For downward (+): ray starts at larger effective radius
-    # For upward (-): ray starts at smaller effective radius
-    r_effective = r_source * np.cos(angle_rad)
+    # Angle between the ray and the radius at the source point (measured from the radius)
+    # Input angle convention (from user specification):
+    # - beam_angle = 0°: horizontal (perpendicular to outward radius)
+    # - beam_angle = -90°: straight down/inward (toward Earth center) → 180° central angle
+    # - beam_angle = +90°: straight up/outward (away from Earth center) → 0° central angle
+    #
+    # The angle from the outward radius at the source:
+    # When beam_angle = 0°: angle_from_radius = 90° (perpendicular)
+    # When beam_angle = -90°: angle_from_radius = 0° (pointing toward center)
+    # When beam_angle = +90°: angle_from_radius = 180° (pointing away from center)
+    #
+    # The relationship is: angle_from_radius = 90° + beam_angle
+    angle_from_radius = np.pi / 2 + angle_rad
 
-    # Check if ray can reach surface
-    if r_effective <= 0 or r_effective > r_earth:
+    # Special case: beam pointing straight up/outward (angle = +90°, angle_from_radius = 180°)
+    # The ray hits the surface immediately at the source (central_angle = 0)
+    if angle_from_radius >= np.pi - 1e-10:  # Close to or equal to 180°
+        return 0.0, 0.0
+
+    # For angles pointing away from center (90° < angle_from_radius < 180°),
+    # we need to use a different geometry. The ray will curve back to intersect
+    # the surface on the same side as the source.
+    # But first check if it's too close to 180° (handled above)
+
+    # Using law of sines in triangle (O, S, P):
+    # The angle at S (between OS and SP) is angle_from_radius
+    # We need to find the angle at O (central angle)
+
+    # From law of sines: r_earth/sin(angle_at_S) = r_source/sin(angle_at_P)
+    # Also: angle_at_O + angle_at_S + angle_at_P = π
+
+    # For the case where ray is perpendicular to radius (horizontal):
+    # sin(angle_at_P) = r_source * sin(angle_at_S) / r_earth
+    # When angle_at_S = π/2, sin(angle_at_P) = r_source/r_earth
+
+    sin_angle_P = r_source * np.sin(angle_from_radius) / r_earth
+
+    # Check if solution exists
+    if sin_angle_P < 0 or sin_angle_P > 1:
         return -1.0, 0.0
 
-    # Calculate central angle using the tangent geometry formula
-    # θ = arccos(r_effective / r_earth)
-    cos_central = r_effective / r_earth
+    angle_P = np.arcsin(sin_angle_P)
 
-    if cos_central < -1.0 or cos_central > 1.0:
-        return -1.0, 0.0
-
-    central_angle = np.arccos(cos_central)
+    # Central angle (angle at O)
+    central_angle = np.pi - angle_from_radius - angle_P
 
     # Calculate horizontal range along Earth's surface
     range_m = r_earth * central_angle
@@ -399,9 +428,19 @@ def plot_geometry(source_depth, beam_angle, r_source, range_m, central_angle, r_
             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightcoral", alpha=0.8),
         )
 
-        # Set axis limits
-        ax.set_xlim(x_surface.min() / 1000 * 1.1, x_surface.max() / 1000 * 1.1)
-        ax.set_ylim(-source_depth * 0.2, depth_surface.max() * 1.1)
+        # Set axis limits - save for matching with panels 1 and 3
+        # Include all relevant points: surface, source, intersection, and chord
+        x_min_panel2 = (
+            min(x_surface.min(), chord_x.min(), x_source, x_intersect) / 1000 * 1.1
+        )
+        x_max_panel2 = (
+            max(x_surface.max(), chord_x.max(), x_source, x_intersect) / 1000 * 1.1
+        )
+        y_min_panel2 = min(-source_depth * 0.2, chord_depth.min() - source_depth * 0.2)
+        y_max_panel2 = max(depth_surface.max(), chord_depth.max(), depth_source) * 1.1
+
+        ax.set_xlim(x_min_panel2, x_max_panel2)
+        ax.set_ylim(y_min_panel2, y_max_panel2)
 
     # Invert y-axis so depth increases downward
     ax.invert_yaxis()
