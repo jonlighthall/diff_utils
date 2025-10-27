@@ -29,12 +29,16 @@ struct ColumnGroup {
  * @brief Structure to hold complete column structure analysis
  */
 struct ColumnStructure {
-  std::vector<ColumnGroup> groups;  // Different column format groups
-  size_t total_lines;               // Total number of lines analyzed
-  size_t data_start_line;           // Line where consistent data format begins
-  bool has_headers;                 // True if header lines detected
-  bool is_monotonic_first_column;   // True if first column increases
-                                    // monotonically
+  std::vector<ColumnGroup> groups;   // Different column format groups
+  size_t total_lines;                // Total number of lines analyzed
+  size_t data_start_line;            // Line where consistent data format begins
+  bool has_headers;                  // True if header lines detected
+  bool is_monotonic_first_column;    // True if first column increases
+                                     // monotonically
+  bool is_first_column_fixed_delta;  // True if first column has consistent step
+                                     // size
+  bool is_first_column_range_data;  // True if first column is likely range data
+                                    // (monotonic + fixed delta)
   std::string structure_summary;    // Human-readable summary
 };
 
@@ -85,6 +89,7 @@ class FileReader {
   // Helper methods for column structure analysis
   size_t count_columns_in_line(const std::string& line) const;
   bool is_first_column_monotonic(const std::string& filename) const;
+  bool is_first_column_fixed_delta(const std::string& filename) const;
   std::string generate_structure_summary(
       const ColumnStructure& structure) const;
 };

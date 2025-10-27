@@ -40,8 +40,10 @@ bool DifferenceAnalyzer::process_difference(
   // Check critical threshold - only annotate early if both values correspond
   // to meaningful pressure values (TL <= ignore threshold). We DO NOT abort
   // processing; instead we set flags and let the hierarchy logic count it.
+  // Skip TL threshold checks for column 0 if it's range data.
+  bool skip_tl_check = (column_index == 0 && flags.column1_is_range_data);
   if ((diff_rounded > thresh.critical) && (rounded1 <= thresh.ignore) &&
-      (rounded2 <= thresh.ignore)) {
+      (rounded2 <= thresh.ignore) && !skip_tl_check) {
     if (!flags.has_critical_diff) {
       // First critical difference encountered: print a concise notification
       print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index,
@@ -158,8 +160,11 @@ void DifferenceAnalyzer::process_rounded_values(
       //   (possibly
       //       precision-inflated) significance threshold passed in (threshold)
       // Otherwise it is SIGNIFICANT.
-      bool both_above_ignore = (column_data.value1 > thresh.ignore &&
-                                column_data.value2 > thresh.ignore);
+      // Skip TL ignore threshold check for column 0 if it's range data.
+      bool skip_tl_check = (column_index == 0 && flags.column1_is_range_data);
+      bool both_above_ignore =
+          !skip_tl_check && (column_data.value1 > thresh.ignore &&
+                             column_data.value2 > thresh.ignore);
       // Determine significance exceed condition. When the user-specified
       // significant threshold is zero, any non-trivial difference (not both
       // above ignore) should be considered significant regardless of the
@@ -216,7 +221,9 @@ void DifferenceAnalyzer::process_rounded_values(
         flags.files_are_close_enough = false;
 
         // LEVEL 4: significant = marginal + non_marginal (based on TL range)
-        if (column_data.value1 > thresh.marginal &&
+        // Skip TL marginal threshold check for column 0 if it's range data.
+        bool skip_tl_check = (column_index == 0 && flags.column1_is_range_data);
+        if (!skip_tl_check && column_data.value1 > thresh.marginal &&
             column_data.value1 < thresh.ignore &&
             column_data.value2 > thresh.marginal &&
             column_data.value2 < thresh.ignore) {
@@ -226,7 +233,8 @@ void DifferenceAnalyzer::process_rounded_values(
         } else {
           // NON-MARGINAL
           // LEVEL 5: non_marginal = critical + non_critical
-          if ((rounded_diff > thresh.critical) &&
+          // Skip TL ignore threshold check for column 0 if it's range data.
+          if (!skip_tl_check && (rounded_diff > thresh.critical) &&
               (column_data.value1 <= thresh.ignore) &&
               (column_data.value2 <= thresh.ignore)) {
             // CRITICAL

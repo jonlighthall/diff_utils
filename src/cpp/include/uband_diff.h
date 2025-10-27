@@ -149,6 +149,10 @@ struct Flags {
   size_t unit_mismatch_line = 0;
   double unit_mismatch_ratio = 0.0;
 
+  // Range data detection: if column 1 is monotonically increasing with fixed
+  // delta, it's likely range data and TL thresholds don't apply
+  bool column1_is_range_data = false;
+
   // Overall comparison state flags
   bool files_are_same = true;  // Files are identical
   bool files_have_same_values =

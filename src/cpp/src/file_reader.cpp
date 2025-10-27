@@ -115,6 +115,64 @@ bool FileReader::is_first_column_monotonic(const std::string& filename) const {
   return true;
 }
 
+bool FileReader::is_first_column_fixed_delta(
+    const std::string& filename) const {
+  std::ifstream infile(filename);
+  if (!infile.is_open()) {
+    return false;
+  }
+
+  std::string line;
+  double prev_value = 0.0;
+  double first_value_seen = 0.0;
+  double expected_delta = 0.0;
+  bool first_value = true;
+  bool second_value = true;
+  const double TOLERANCE = 0.01;  // 1% tolerance for delta consistency
+  const double MAX_STARTING_VALUE = 100.0;  // Range data typically starts small
+  const double MIN_DELTA = 1e-10;           // Delta must be non-zero
+
+  while (std::getline(infile, line)) {
+    if (line.empty()) continue;
+
+    std::istringstream stream(line);
+    double current_value;
+
+    if (stream >> current_value) {
+      if (first_value) {
+        first_value_seen = current_value;
+        // If first value is too large, unlikely to be range data
+        if (std::abs(first_value_seen) > MAX_STARTING_VALUE) {
+          return false;
+        }
+        first_value = false;
+      } else if (second_value) {
+        // Calculate the expected delta from first two values
+        expected_delta = current_value - prev_value;
+        // Delta must be non-zero for range data
+        if (std::abs(expected_delta) < MIN_DELTA) {
+          return false;
+        }
+        second_value = false;
+      } else {
+        // Check if delta is consistent
+        double actual_delta = current_value - prev_value;
+        double delta_diff = std::abs(actual_delta - expected_delta);
+        double relative_error = (std::abs(expected_delta) > 1e-10)
+                                    ? delta_diff / std::abs(expected_delta)
+                                    : delta_diff;
+
+        if (relative_error > TOLERANCE) {
+          return false;
+        }
+      }
+      prev_value = current_value;
+    }
+  }
+
+  return !second_value;  // Return true only if we had at least 3 values
+}
+
 std::string FileReader::generate_structure_summary(
     const ColumnStructure& structure) const {
   std::ostringstream summary;
@@ -154,6 +212,8 @@ ColumnStructure FileReader::analyze_column_structure(
   structure.data_start_line = 0;
   structure.has_headers = false;
   structure.is_monotonic_first_column = false;
+  structure.is_first_column_fixed_delta = false;
+  structure.is_first_column_range_data = false;
 
   std::ifstream infile(filename);
   if (!infile.is_open()) {
@@ -234,6 +294,14 @@ ColumnStructure FileReader::analyze_column_structure(
 
   // Check if first column is monotonic
   structure.is_monotonic_first_column = is_first_column_monotonic(filename);
+
+  // Check if first column has fixed delta
+  structure.is_first_column_fixed_delta = is_first_column_fixed_delta(filename);
+
+  // Determine if first column is likely range data (both monotonic and fixed
+  // delta)
+  structure.is_first_column_range_data = structure.is_monotonic_first_column &&
+                                         structure.is_first_column_fixed_delta;
 
   // Generate summary
   structure.structure_summary = generate_structure_summary(structure);
