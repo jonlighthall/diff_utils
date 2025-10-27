@@ -33,6 +33,11 @@ struct ProgramArgs {
   double stop_level = 10.0;
   double print_level = 1.0;
   int debug_level = 0;
+  // If true, interpret count_level as a percent threshold (fraction stored
+  // in count_percent). This is set when the user supplies a negative
+  // threshold on the command line (e.g. -1 -> 1%).
+  bool count_level_is_percent = false;
+  double count_percent = 0.0;  // fractional (0.01 == 1%)
 };
 
 bool show_help_if_requested(int argc, char* argv[]);
@@ -59,7 +64,10 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "  threshold       Soft difference threshold for counting "
                  "differences"
               << std::endl;
-    std::cout << "                  (default: 0.05, must be ≥ 0)" << std::endl;
+    std::cout
+        << "                  (default: 0.05). If negative, interpreted as "
+           "a percent relative to the second file (e.g. -1 => 1%)"
+        << std::endl;
     std::cout
         << "  hard_threshold  Hard difference threshold for failure detection"
         << std::endl;
@@ -227,9 +235,34 @@ bool parse_debug_level_argument(const char* arg, int& value) {
 
 bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   // Parse threshold arguments
-  if (argc >= 4 &&
-      !parse_threshold_argument(argv[3], args.count_level, "Diff threshold")) {
-    return false;
+  if (argc >= 4) {
+    try {
+      double parsed = std::stod(argv[3]);
+      if (parsed < 0.0) {
+        // Negative indicates percent-mode: -1 => 1%
+        args.count_level_is_percent = true;
+        args.count_percent = std::abs(parsed) / 100.0;  // store fractional
+        // Set count_level to zero for internal absolute-threshold usages
+        args.count_level = 0.0;
+      } else {
+        // Non-negative: regular absolute threshold
+        args.count_level = parsed;
+      }
+    } catch (const std::invalid_argument&) {
+      std::cerr << "\n\033[1;31mERROR:\033[0m Invalid Diff threshold format."
+                << std::endl;
+      std::cerr
+          << "       Expected: floating-point number (e.g., 0.05, 1.5, -1)"
+          << std::endl;
+      std::cerr << "       Got: '" << argv[3] << "'" << std::endl;
+      return false;
+    } catch (const std::out_of_range&) {
+      std::cerr
+          << "\n\033[1;31mERROR:\033[0m Diff threshold value out of range."
+          << std::endl;
+      std::cerr << "       Got: '" << argv[3] << "'" << std::endl;
+      return false;
+    }
   }
 
   if (argc >= 5) {
@@ -296,7 +329,8 @@ int main(int argc, char* argv[]) {
 
   // Create comparator and run comparison
   FileComparator comparator(args.count_level, args.stop_level, args.print_level,
-                            args.debug_level);
+                            args.debug_level, args.count_level_is_percent,
+                            args.count_percent);
   bool result = comparator.compare_files(args.file1, args.file2);
   comparator.print_summary(args.file1, args.file2, argc, argv);
 

@@ -64,6 +64,12 @@ struct Thresholds {
   mutable double cached_log10_significant = 0.0;
   mutable bool log10_significant_cached = false;
 
+  // Percent-mode support: when true, interpret 'significant_percent' as a
+  // fractional value (e.g. 0.01 for 1%). This overrides the usual
+  // absolute 'significant' comparison for deciding significance.
+  bool significant_is_percent = false;
+  double significant_percent = 0.0;  // fractional (0.01 == 1%)
+
   // Helper method to get log10(significant) with caching
   double get_log10_significant() const {
     if (!log10_significant_cached || significant <= 0) {
@@ -116,7 +122,9 @@ struct CountStats {
 struct Flags {
   bool new_fmt = false;
   bool file_end_reached = false;  // Indicates if the end of file was reached
-  bool error_found = false;       // Global error flag
+  bool error_found =
+      false;  // Global error flag (critical threshold or file access)
+  bool file_access_error = false;     // Specific flag for file access errors
   bool structures_compatible = true;  // Files have compatible column structures
 
   // Counter-associated flags (correspond to CountStats)
@@ -135,6 +143,12 @@ struct Flags {
 
   bool has_printed_diff = false;  // Difference exceeds print threshold
 
+  // Unit mismatch detection: if column 1 appears scaled by a factor
+  // approximately equal to one nautical mile in meters (1852), set true.
+  bool unit_mismatch = false;
+  size_t unit_mismatch_line = 0;
+  double unit_mismatch_ratio = 0.0;
+
   // Overall comparison state flags
   bool files_are_same = true;  // Files are identical
   bool files_have_same_values =
@@ -148,6 +162,12 @@ struct DiffStats {
   double max_non_zero = 0;
   double max_non_trivial = 0;
   double max_significant = 0;  // maximum significant difference
+
+  // maximum percentage error observed for non-trivial differences (%),
+  // calculated as 100 * |v1 - v2| / |v2| when |v2| > thresh.zero. If the
+  // reference is effectively zero, this value may remain 0 (or be set to
+  // a large sentinel by the analyzer).
+  double max_percent_error = 0.0;
 
   int ndp_non_zero = 0;     // number of decimal places for non-zero values
   int ndp_non_trivial = 0;  // number of decimal places for non-trivial values
@@ -189,7 +209,8 @@ class FileComparator {
  public:
   // Constructor
   FileComparator(double user_thresh, double hard_thresh, double print_thresh,
-                 int debug_level = 0)
+                 int debug_level = 0, bool significant_is_percent = false,
+                 double significant_percent = 0.0)
       : thresh{user_thresh, hard_thresh, print_thresh},
         print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
               debug_level >= 3},
@@ -198,7 +219,15 @@ class FileComparator {
         format_tracker_(std::make_unique<FormatTracker>(
             PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
                        debug_level >= 2, debug_level >= 3})),
-        difference_analyzer_(std::make_unique<DifferenceAnalyzer>(thresh)) {};
+        difference_analyzer_(thresh) {
+    // Apply percent-mode significant settings (if any) before constructing
+    // the DifferenceAnalyzer which relies on Thresholds. Note: thresh is an
+    // aggregate-initialized member and will be constructed before
+    // difference_analyzer_ (member init order is declaration order). We still
+    // set the percent flags here to ensure correct runtime behavior.
+    thresh.significant_is_percent = significant_is_percent;
+    thresh.significant_percent = significant_percent;
+  };
 
   // ========================================================================
   // Friend declarations for testing
@@ -240,7 +269,7 @@ class FileComparator {
   PrintLevel print;
   // Cap for number of difference table rows to print. Analysis continues
   // after the cap; only additional table rows are suppressed.
-  size_t max_print_rows_ = 50;  // reasonable default to avoid terminal spam
+  size_t max_print_rows_ = 32;  // reasonable default to avoid terminal spam
   bool truncation_notice_printed_ = false;  // ensure single truncation notice
 
   // ========================================================================
@@ -249,7 +278,7 @@ class FileComparator {
   std::unique_ptr<FileReader> file_reader_;
   std::unique_ptr<LineParser> line_parser_;
   std::unique_ptr<FormatTracker> format_tracker_;
-  std::unique_ptr<DifferenceAnalyzer> difference_analyzer_;
+  DifferenceAnalyzer difference_analyzer_;
 
   // ========================================================================
   // State Members
@@ -308,7 +337,7 @@ class FileComparator {
                                      size_t column_index) const;
   void print_table(const ColumnValues& column_data, size_t column_index,
                    double line_threshold, double diff_rounded,
-                   double diff_unrounded);
+                   double diff_unrounded, double percent_error);
   std::string format_number(double value, int prec, int max_integer_width,
                             int max_decimals) const;
   void print_hard_threshold_error(double rounded1, double rounded2,

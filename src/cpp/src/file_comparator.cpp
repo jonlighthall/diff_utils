@@ -439,7 +439,15 @@ bool FileComparator::compare_files(const std::string& file1,
 
   if (!file_reader_->open_files(file1, file2, infile1, infile2)) {
     flag.error_found = true;
+    flag.file_access_error = true;
     return false;
+  }
+
+  // Diagnostic: print the pointer value for difference_analyzer_ to help
+  // debug possible memory corruption seen in unit tests.
+  if (print.debug) {
+    std::cerr << "DIAG: difference_analyzer_ at start = "
+              << &difference_analyzer_ << std::endl;
   }
 
   // Perform column structure analysis before numerical comparison
@@ -589,6 +597,29 @@ bool FileComparator::process_column(const LineData& data1,
   ColumnValues column_data = extract_column_values(data1, data2, column_index);
   process_raw_values(column_data);
 
+  // Check for unit mismatch in column 1 (range/distance): meters vs nautical
+  // miles (1 nmi = 1852 meters). If a consistent scale factor close to 1852
+  // is observed (within a small relative tolerance), warn once and record
+  // the occurrence for the summary.
+  if (column_index == 0 && !flag.unit_mismatch) {
+    double v1 = column_data.value1;
+    double v2 = column_data.value2;
+    if (std::isfinite(v1) && std::isfinite(v2) && std::abs(v1) > thresh.zero &&
+        std::abs(v2) > thresh.zero) {
+      const double NMI_METERS = 1852.0;
+      const double REL_TOL = 0.0075;  // 0.75% relative tolerance
+      double ratio = v1 / v2;
+      double inv_ratio = v2 / v1;
+      if (std::abs(ratio - NMI_METERS) / NMI_METERS < REL_TOL ||
+          std::abs(inv_ratio - NMI_METERS) / NMI_METERS < REL_TOL) {
+        flag.unit_mismatch = true;
+        flag.unit_mismatch_line = counter.line_number;
+        flag.unit_mismatch_ratio = ratio;
+        // Warning will be printed in summary
+      }
+    }
+  }
+
   // Handle decimal places initialization and updates
   // Initialize if this is the first line OR if the format has changed (vector
   // was cleared)
@@ -726,7 +757,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   double ithreshold = calculate_threshold(column_data.min_dp);
 
   // Process the difference using DifferenceAnalyzer
-  bool result = difference_analyzer_->process_difference(
+  bool result = difference_analyzer_.process_difference(
       column_data, column_index, ithreshold, counter, differ, flag);
 
   // Calculate unrounded and rounded differences for comparison
@@ -736,6 +767,15 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2,
                                                           column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
+
+  // Percent error relative to second file (file2) using raw difference.
+  double percent_error = 0.0;
+  double ref = std::abs(column_data.value2);
+  if (ref > thresh.zero) {
+    percent_error = 100.0 * diff_unrounded / ref;
+  } else {
+    percent_error = std::numeric_limits<double>::infinity();
+  }
 
   // For rigorous cross-platform validation, use unrounded differences for
   // thresholding but still display both for complete information
@@ -753,7 +793,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
       // NOTE: newline now emitted inside print_table() for each row. Do NOT add
       // another std::endl here or rows will be double-spaced.
       print_table(column_data, column_index, ithreshold, diff_rounded,
-                  diff_unrounded);
+                  diff_unrounded, percent_error);
     }
   } else {
     if (print.debug2) {
@@ -774,7 +814,8 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
 }
 
 void FileComparator::process_raw_values(const ColumnValues& column_data) {
-  difference_analyzer_->process_raw_values(column_data, counter, differ, flag);
+  // Call DifferenceAnalyzer directly (stored as a direct member).
+  difference_analyzer_.process_raw_values(column_data, counter, differ, flag);
 }
 
 void FileComparator::process_rounded_values(const ColumnValues& column_data,
@@ -782,7 +823,7 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
                                             double rounded_diff,
                                             int minimum_deci) {
   double ithreshold = calculate_threshold(column_data.min_dp);
-  difference_analyzer_->process_rounded_values(
+  difference_analyzer_.process_rounded_values(
       column_data, column_index, rounded_diff, minimum_deci, ithreshold,
       counter, differ, flag);
 }
@@ -792,7 +833,8 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
 // ========================================================================
 void FileComparator::print_table(const ColumnValues& column_data,
                                  size_t column_index, double line_threshold,
-                                 double diff_rounded, double diff_unrounded) {
+                                 double diff_rounded, double diff_unrounded,
+                                 double percent_error) {
   // If a critical difference has already been encountered OR we've hit the
   // maximum row print cap, stop printing further table rows. Continue
   // analyzing silently.
@@ -842,9 +884,10 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   // define column widths
   //                     line | col | range | file1 |
-  //                     file2 | thres |diff_rounded | diff_unrounded
-  std::vector<int> col_widths = {5,         5,         val_width, val_width,
-                                 val_width, val_width, val_width, val_width};
+  //                     file2 | thres |diff_rnd | diff_raw | %err
+  std::vector<int> col_widths = {5,         5,         val_width,
+                                 val_width, val_width, val_width,
+                                 val_width, val_width, 10};
 
   auto padLeft = [](const std::string& str, int width) {
     if (static_cast<int>(str.length()) >= width) return str;
@@ -869,15 +912,14 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << std::setw(col_widths[4] + 3) << "file2 |";
     std::cout << padLeft(" thres |", col_widths[5] + 3);
     std::cout << padLeft("diff_rnd |", col_widths[6] + 3);
-    std::cout << padLeft("diff_raw", col_widths[7] + 1) << std::endl;
+    std::cout << padLeft("diff_raw |", col_widths[7] + 3);
+    std::cout << padLeft("%err", col_widths[8] + 1) << std::endl;
 
     // Print horizontal line matching header width
     int total_width = 0;
     for (int w : col_widths) total_width += w;
     // Add spaces for extra padding in header columns
-    total_width +=
-        1 + 3 + 3 + 3 +
-        1;  // file1(+1), file2(+3), thres(+3), diff_rnd(+3), diff_raw(+1)
+    total_width += 1 + 3 + 3 + 3 + 3 + 1;
     std::cout << std::string(total_width, '-') << std::endl;
   }
   counter.diff_print++;
@@ -958,6 +1000,15 @@ void FileComparator::print_table(const ColumnValues& column_data,
   print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
   std::cout << format_number(diff_unrounded, column_data.max_dp, mxint, mxdec);
   std::cout << "\033[0m";
+  // percent error column
+  std::cout << " | ";
+  if (std::isfinite(percent_error)) {
+    std::ostringstream pss;
+    pss << std::fixed << std::setprecision(2) << percent_error << "%";
+    std::cout << std::setw(col_widths[8]) << pss.str();
+  } else {
+    std::cout << std::setw(col_widths[8]) << "INF";
+  }
   // Emit exactly one newline per printed diff row (centralized here).
   std::cout << std::endl;
 }
@@ -1012,7 +1063,7 @@ void FileComparator::print_hard_threshold_error(double rounded1,
   if (print.level < 0) {
     return;
   }
-  difference_analyzer_->print_hard_threshold_error(
+  difference_analyzer_.print_hard_threshold_error(
       rounded1, rounded2, diff_rounded, column_index, counter);
   flag.error_found = true;
 }
@@ -1192,7 +1243,7 @@ void FileComparator::print_diff_like_summary(
     const SummaryParams& params) const {
   // Handle file errors first - don't print any comparison results if files
   // couldn't be opened
-  if (flag.error_found) {
+  if (flag.file_access_error) {
     std::cout
         << "\033[1;31m   Cannot compare files due to file access errors\033[0m"
         << std::endl;
@@ -1213,6 +1264,26 @@ void FileComparator::print_diff_like_summary(
     return;
   }
 
+  // Print unit mismatch warning if detected (always show this important
+  // warning)
+  if (flag.unit_mismatch) {
+    const double NMI_METERS = 1852.0;
+    std::cout
+        << "\n\033[1;33m   WARNING: Column 1 values appear to be scaled by "
+        << flag.unit_mismatch_ratio << " (approx " << NMI_METERS << ")\n";
+    if (std::abs(flag.unit_mismatch_ratio - NMI_METERS) / NMI_METERS < 0.0075) {
+      std::cout
+          << "   File1 may be in meters and file2 in nautical miles.\033[0m"
+          << std::endl;
+    } else {
+      std::cout
+          << "   File2 may be in meters and file1 in nautical miles.\033[0m"
+          << std::endl;
+    }
+    std::cout << "   Detected at line " << flag.unit_mismatch_line << ".\033[0m"
+              << std::endl;
+  }
+
   // Early return for non-trivial differences at low print levels
   if (counter.diff_non_trivial > 0 && print.level < 1) {
     return;
@@ -1223,6 +1294,7 @@ void FileComparator::print_diff_like_summary(
   print_non_zero_differences_info(params);
   print_difference_counts(params);
   print_maximum_difference_analysis(params);
+
   printbar(1);
 }
 
@@ -1286,6 +1358,17 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                        std::round(std::log10(differ.max_non_trivial)) + 2),
                    differ.ndp_non_trivial)
             << "\033[0m" << std::endl;
+  // Print maximum percentage error if any non-trivial differences occurred.
+  if (differ.max_percent_error > 0.0) {
+    std::cout << "   Maximum percent error: ";
+    if (std::isfinite(differ.max_percent_error)) {
+      std::cout << std::fixed << std::setprecision(2)
+                << differ.max_percent_error << "%";
+    } else {
+      std::cout << "INF";
+    }
+    std::cout << std::endl;
+  }
   if (counter.diff_print < counter.diff_non_trivial) {
     if (print.level > 0) {
       std::cout << "   Printed differences     ( >" << thresh.print
@@ -1844,7 +1927,7 @@ void FileComparator::print_summary(const std::string& file1,
   print_arguments_and_files(file1, file2, argc, argv);
 
   // Early return for file access errors - don't print meaningless statistics
-  if (flag.error_found) {
+  if (flag.file_access_error) {
     std::cout << "SUMMARY:" << std::endl;
     std::cout << "\033[1;31m   Cannot perform comparison due to file access "
                  "errors\033[0m"
@@ -1888,8 +1971,14 @@ void FileComparator::print_settings(const std::string& file1,
   }
 
   std::cout << "   User-defined Thresholds " << std::endl;
-  std::cout << "      Significant: \033[1;36m" << thresh.significant
-            << "\033[0m (count)" << std::endl;
+  if (thresh.significant_is_percent) {
+    std::cout << "      Significant: \033[1;36m"
+              << (thresh.significant_percent * 100.0)
+              << "%\033[0m (percent of second file)" << std::endl;
+  } else {
+    std::cout << "      Significant: \033[1;36m" << thresh.significant
+              << "\033[0m (count)" << std::endl;
+  }
   std::cout << "      Critical   : \033[1;31m" << thresh.critical
             << "\033[0m (halt)" << std::endl;
   std::cout << "      Print      : " << thresh.print << " (print)" << std::endl;

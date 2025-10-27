@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 
 #include "uband_diff.h"  // For data structures
 
@@ -128,6 +129,28 @@ void DifferenceAnalyzer::process_rounded_values(
         differ.ndp_non_trivial = column_data.min_dp;
       }
 
+      // Track percentage error for this non-trivial difference. Use the
+      // unrounded (raw) difference for percent calculation to avoid
+      // artificially inflating the ratio by rounding. Use the second file as
+      // reference (column_data.value2). If reference is effectively zero,
+      // set percent to +infinity so that it is obvious in printed output and
+      // treat it as a sentinel (do not update max_percent_error with inf).
+      double raw_diff = std::abs(column_data.value1 - column_data.value2);
+      double ref = std::abs(column_data.value2);
+      double pct = 0.0;
+      if (ref > thresh.zero) {
+        pct = 100.0 * raw_diff / ref;
+        if (pct > differ.max_percent_error) {
+          differ.max_percent_error = pct;
+        }
+      } else {
+        // Reference effectively zero: set pct to a sentinel large value for
+        // printing. Do not store INF in max_percent_error since it's not
+        // meaningful numerically; instead store a very large number to
+        // indicate huge relative error when needed.
+        pct = std::numeric_limits<double>::infinity();
+      }
+
       // LEVEL 3: non_trivial = insignificant + significant
       // A non-trivial difference is considered INSIGNIFICANT if EITHER:
       //   (a) both TL values are above the ignore threshold (numerically
@@ -143,8 +166,23 @@ void DifferenceAnalyzer::process_rounded_values(
       // format-derived dp_threshold. This prevents the format precision from
       // inflating the effective significance cutoff when the intent is
       // "count everything meaningful".
-      bool exceeds_significance;
-      if (thresh.significant == 0.0) {
+      bool exceeds_significance = false;
+      if (thresh.significant_is_percent) {
+        // Percent-mode: compare rounded_diff relative to the reference value
+        // taken from the second file (column_data.value2). significant_percent
+        // is stored as a fraction (e.g. 0.01 for 1%). If the reference is
+        // effectively zero, any non-trivial difference counts as exceeding
+        // the percent threshold (since relative percent is undefined).
+        double ref = std::abs(column_data.value2);
+        if (ref <= thresh.zero) {
+          // Reference effectively zero -> treat any non-trivial difference as
+          // exceeding the percent cutoff.
+          exceeds_significance = (rounded_diff > thresh.zero);
+        } else {
+          double frac = rounded_diff / ref;  // fractional difference
+          exceeds_significance = (frac > thresh.significant_percent);
+        }
+      } else if (thresh.significant == 0.0) {
         // User wants maximum sensitivity: treat all non-trivial differences
         // (below ignore) as significant.
         exceeds_significance = true;
@@ -199,12 +237,31 @@ void DifferenceAnalyzer::process_rounded_values(
             // NON-CRITICAL
             // LEVEL 6: non_critical = error + non_error (user/user_thresh
             // split)
-            if (rounded_diff > thresh.significant) {
-              counter.diff_error++;
-              flags.has_error_diff = true;
+            // LEVEL 6: user-defined split. Honor percent-mode if enabled.
+            if (thresh.significant_is_percent) {
+              double ref = std::abs(column_data.value2);
+              bool percent_exceeds = false;
+              if (ref <= thresh.zero) {
+                percent_exceeds = (rounded_diff > thresh.zero);
+              } else {
+                percent_exceeds =
+                    ((rounded_diff / ref) > thresh.significant_percent);
+              }
+              if (percent_exceeds) {
+                counter.diff_error++;
+                flags.has_error_diff = true;
+              } else {
+                counter.diff_non_error++;
+                flags.has_non_error_diff = true;
+              }
             } else {
-              counter.diff_non_error++;
-              flags.has_non_error_diff = true;
+              if (rounded_diff > thresh.significant) {
+                counter.diff_error++;
+                flags.has_error_diff = true;
+              } else {
+                counter.diff_non_error++;
+                flags.has_non_error_diff = true;
+              }
             }
           }
         }
@@ -240,8 +297,13 @@ void DifferenceAnalyzer::print_hard_threshold_error(
     std::cout << " checked" << std::endl;
   }
 
-  std::cout << counter.diff_print << " with differences between "
-            << thresh.significant << " and " << thresh.critical << std::endl;
+  std::cout << counter.diff_print << " with differences between ";
+  if (thresh.significant_is_percent) {
+    std::cout << (thresh.significant_percent * 100.0) << "% and ";
+  } else {
+    std::cout << thresh.significant << " and ";
+  }
+  std::cout << thresh.critical << std::endl;
 
   std::cout << "   File1: " << std::setw(7) << rounded1 << std::endl;
   std::cout << "   File2: " << std::setw(7) << rounded2 << std::endl;
