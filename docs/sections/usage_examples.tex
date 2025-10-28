@@ -1,0 +1,135 @@
+\section{Usage Examples}
+\label{sec:examples}
+
+\subsection{Basic Usage}
+
+\subsubsection{Default Comparison (threshold = 0)}
+
+\begin{lstlisting}[language=bash]
+$ uband_diff file1.txt file2.txt
+\end{lstlisting}
+
+Reports all non-trivial differences (maximum sensitivity mode).
+
+\subsubsection{Absolute Threshold}
+
+\begin{lstlisting}[language=bash]
+$ uband_diff -t 0.01 file1.txt file2.txt
+\end{lstlisting}
+
+Ignores differences below 0.01 (after rounding to common precision).
+
+\subsubsection{Percent Threshold}
+
+\begin{lstlisting}[language=bash]
+$ uband_diff -t -2 file1.txt file2.txt
+\end{lstlisting}
+
+Ignores differences below 2\% (negative value activates percent mode).
+
+\subsection{Output Interpretation}
+
+\subsubsection{Successful Comparison}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 0 non-zero, 960 zero
+
+After rounding:
+  Trivial differences (formatting only): 0
+  Non-trivial differences: 0
+
+COMPARISON: Files are EQUIVALENT (0 non-trivial differences)
+\end{verbatim}
+
+\textbf{Interpretation:} Files are bitwise identical at printed precision.
+
+\subsubsection{Sub-LSB Differences}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 120 non-zero, 840 zero
+  Maximum non-zero difference: 0.05 (at 1 decimal places)
+
+After rounding:
+  Trivial differences (sub-LSB or rounded=0): 120
+  Non-trivial differences: 0
+
+COMPARISON: Files are EQUIVALENT (0 non-trivial differences)
+\end{verbatim}
+
+\textbf{Interpretation:} All differences are sub-LSB (formatting-induced).
+
+\subsubsection{Significant Differences}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 150 non-zero, 810 zero
+  Maximum non-zero difference: 1.25 (at 2 decimal places)
+
+After rounding:
+  Trivial differences: 50
+  Non-trivial differences: 100
+    Maximum non-trivial difference: 1.20 (at 2 decimal places)
+
+Significance classification (threshold = 0.10):
+  Insignificant differences: 30
+  Significant differences: 70
+    Maximum significant difference: 1.20 (2dp)
+    Maximum percent error: 5.6%
+  
+  Marginal TL differences [110, 138 dB]: 10
+  Non-marginal significant differences: 60
+    Critical differences (> 10.0): 0
+    Non-critical differences: 60
+
+COMPARISON: Files DIFFER (60 significant differences, 6.25% of total)
+\end{verbatim}
+
+\textbf{Interpretation:} 60 significant differences detected (6.25\% of 960 values). No critical failures. Files differ but within expected numerical variability.
+
+\subsection{Exit Codes}
+
+\begin{description}
+    \item[0] Files are equivalent (no significant differences)
+    \item[1] Files differ (significant differences found)
+    \item[2] File access error or structural mismatch
+    \item[3] Critical difference detected (hard failure)
+\end{description}
+
+\subsection{Integration with Automated Testing}
+
+\subsubsection{Makefile Integration}
+
+\begin{lstlisting}[language=make]
+test: test_regression
+	@uband_diff -t 0.01 reference.txt output.txt
+	@echo "Validation passed"
+
+.PHONY: test
+\end{lstlisting}
+
+\subsubsection{CI/CD Pipeline}
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+# run_validation.sh
+
+MODEL_OUTPUT="output/transmission_loss.txt"
+REFERENCE="data/reference/tl_baseline.txt"
+THRESHOLD=0.05
+
+if uband_diff -t ${THRESHOLD} ${REFERENCE} ${MODEL_OUTPUT}; then
+    echo "[PASS] Model validation PASSED"
+    exit 0
+else
+    echo "[FAIL] Model validation FAILED"
+    exit 1
+fi
+\end{lstlisting}

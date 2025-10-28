@@ -1,0 +1,62 @@
+\section{Introduction}
+\label{sec:introduction}
+
+\subsection{Motivation}
+
+Numerical file comparison is a fundamental requirement in scientific computing, computational physics, and software validation. Traditional text comparison tools (e.g., \texttt{diff}) perform bitwise comparison, which fails for numerical data where:
+
+\begin{itemize}
+    \item Values may be formatted with different precisions (e.g., \texttt{30.8} vs \texttt{30.85})
+    \item Floating-point arithmetic introduces platform-dependent rounding
+    \item Compiler optimizations produce numerically equivalent but not bitwise identical results
+    \item Cross-language implementations (Fortran, C++, Python) generate format variations
+\end{itemize}
+
+\subsection{Problem Statement}
+
+Given two numerical files, determine whether they are \emph{numerically equivalent} within:
+\begin{enumerate}
+    \item The precision at which values are printed
+    \item User-specified significance thresholds
+    \item Domain-specific operational constraints
+    \item Machine precision limitations
+\end{enumerate}
+
+\subsection{Application Domain}
+
+The \ubdiff{} utility was developed primarily for underwater acoustic propagation modeling, specifically for comparing transmission loss (TL) output files from acoustic models. However, its precision-aware comparison methodology is applicable to any domain requiring robust numerical validation.
+
+\textbf{Typical use cases include:}
+\begin{itemize}
+    \item Regression testing after code refactoring
+    \item Cross-platform validation (x86 vs ARM, Windows vs Linux)
+    \item Compiler optimization verification (GCC vs Clang, -O2 vs -O3)
+    \item Multi-language code validation (Fortran reference vs C++ port)
+    \item Scientific reproducibility verification
+\end{itemize}
+
+\subsection{Design Goals}
+
+\begin{enumerate}
+    \item \textbf{Precision Awareness:} Respect the printed precision of numerical values
+    \item \textbf{Cross-Platform Robustness:} Tolerate formatting differences that preserve numerical equivalence
+    \item \textbf{Domain Specificity:} Support physics-based thresholds for specialized applications
+    \item \textbf{Progressive Refinement:} Hierarchical classification from raw differences to domain significance
+    \item \textbf{Rigorous Accounting:} Maintain mathematical invariants across all discrimination levels
+    \item \textbf{Usability:} Provide clear, actionable output with minimal configuration
+\end{enumerate}
+
+\subsection{Document Organization}
+
+This report is organized as follows:
+
+\begin{description}
+    \item[Section~\ref{sec:design}] Design philosophy and architectural principles
+    \item[Section~\ref{sec:math}] Mathematical foundation and threshold derivations
+    \item[Section~\ref{sec:hierarchy}] Six-level discrimination hierarchy
+    \item[Section~\ref{sec:sublsb}] Sub-LSB detection theory and implementation
+    \item[Section~\ref{sec:implementation}] Code structure and key algorithms
+    \item[Section~\ref{sec:validation}] Test suite and validation methodology
+    \item[Section~\ref{sec:examples}] Usage examples and output interpretation
+    \item[Section~\ref{sec:conclusion}] Summary and future enhancements
+\end{description}

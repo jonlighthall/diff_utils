@@ -1,0 +1,81 @@
+\section{Appendix A: Threshold Reference}
+\label{app:thresholds}
+
+\subsection{Default Threshold Values}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Threshold} & \textbf{Default Value} & \textbf{Source} & \textbf{Purpose} \\ \midrule
+\texttt{zero} & $1.19 \times 10^{-7}$ & $2^{-23}$ & Machine epsilon (single precision) \\
+\texttt{significant} & 0.0 & User & Sensitivity threshold (0 = max sensitivity) \\
+\texttt{critical} & 10.0 & User/Domain & Hard failure threshold \\
+\texttt{marginal} & 110.0 dB & Domain & TL operational boundary \\
+\texttt{ignore} & 138.47 dB & Derived & TL numerical reliability limit \\ \bottomrule
+\end{tabular}
+\caption{Default threshold values and their derivations}
+\label{tab:thresholds}
+\end{table}
+
+\subsection{Threshold Derivation Details}
+
+\subsubsection{Zero Threshold ($\epsilon_{\text{single}}$)}
+
+\begin{align}
+    \epsilon_{\text{single}} &= 2^{-23} \\
+    &= \frac{1}{8388608} \\
+    &\approx 1.192 \times 10^{-7}
+\end{align}
+
+This is the ULP (Unit in the Last Place) for normalized single-precision floating-point numbers.
+
+\subsubsection{Ignore Threshold (TL Domain)}
+
+From acoustic pressure-to-TL relationship:
+
+\begin{align}
+    TL &= -20 \log_{10}\left(\frac{p}{p_{\text{ref}}}\right) \\
+    TL_{\text{ignore}} &= -20 \log_{10}(\epsilon_{\text{single}}) \\
+    &= -20 \times (-23) \log_{10}(2) \\
+    &= 460 \times 0.301029995664 \\
+    &\approx 138.47 \text{ dB}
+\end{align}
+
+\subsubsection{Marginal Threshold}
+
+Based on operational research (Schneider et al., OCEANS 2009):
+
+\begin{quote}
+``Transmission loss values exceeding 110 dB are weighted to zero in sonar equation calculations, as they represent signals below practical detection thresholds even under ideal conditions.''
+\end{quote}
+
+\subsection{Percent Mode Activation}
+
+When user specifies negative threshold value:
+
+\begin{lstlisting}[language=C++]
+if (user_threshold < 0) {
+    thresh.significant_is_percent = true;
+    thresh.significant_percent = abs(user_threshold) / 100.0;
+}
+\end{lstlisting}
+
+\textbf{Example:} \texttt{-t -5} $\to$ 5\% threshold
+
+\subsection{Recommended Thresholds by Use Case}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Use Case} & \textbf{Threshold} & \textbf{Rationale} \\ \midrule
+Regression testing & 0.0 & Detect any numerical change \\
+Cross-platform validation & 0.0 (with sub-LSB) & Tolerate format differences \\
+Model verification & 0.01--0.1 & Physics-based tolerance \\
+Quick smoke test & -1 (1\%) & Rapid pass/fail \\
+High-precision science & $10^{-10}$ & Near machine precision \\ \bottomrule
+\end{tabular}
+\caption{Recommended thresholds by application}
+\label{tab:recommended}
+\end{table}

@@ -1,0 +1,133 @@
+\section{Implementation}
+\label{sec:implementation}
+
+\subsection{Code Organization}
+
+The \ubdiff{} implementation is organized into the following components:
+
+\subsubsection{Key Source Files}
+
+\begin{description}
+    \item[\texttt{uband\_diff.h}] Threshold definitions, data structures (\texttt{Thresholds}, \texttt{CountStats}, \texttt{DiffStats}, \texttt{Flags})
+    \item[\texttt{difference\_analyzer.h/cpp}] Core discrimination logic
+    \item[\texttt{file\_comparator.h/cpp}] File parsing, orchestration, summary generation
+    \item[\texttt{file\_reader.h/cpp}] Line parsing, precision detection, range data detection
+    \item[\texttt{line\_parser.h/cpp}] Low-level numeric parsing
+    \item[\texttt{main/uband\_diff.cpp}] Command-line interface
+\end{description}
+
+\subsection{Data Structures}
+
+\subsubsection{Runtime Structures}
+
+\begin{lstlisting}[language=C++]
+struct ColumnValues {
+    double value1, value2;
+    int min_dp, max_dp;  // Decimal places
+    double range_min, range_max;
+};
+
+struct Thresholds {
+    double zero;           // Machine epsilon
+    double significant;    // User threshold
+    double critical;       // Hard failure threshold
+    double marginal;       // TL marginal band (110 dB)
+    double ignore;         // TL ignore threshold (~138 dB)
+    bool significant_is_percent;
+    double significant_percent;
+};
+
+struct CountStats {
+    size_t diff_non_zero;
+    size_t diff_trivial;
+    size_t diff_non_trivial;
+    size_t diff_insignificant;
+    size_t diff_significant;
+    size_t diff_marginal;
+    size_t diff_critical;
+    // ... more counters
+};
+
+struct DiffStats {
+    double max_non_zero;
+    double max_non_trivial;
+    double max_significant;
+    double max_percent_error;
+    int max_non_zero_dp;
+    int max_non_trivial_dp;
+};
+
+struct Flags {
+    bool has_critical_diff;
+    bool error_found;
+    bool column1_is_range_data;
+    // ... more flags
+};
+\end{lstlisting}
+
+\subsection{Analysis Flow}
+
+The comparison pipeline follows this sequence:
+
+\begin{enumerate}
+    \item \texttt{FileComparator::compare\_files()} orchestrates file reading
+    \item \texttt{FileComparator::process\_line()} parses each line
+    \item \texttt{FileComparator::process\_column()} extracts column values
+    \item \texttt{FileComparator::process\_difference()} delegates to analyzer
+    \item \texttt{DifferenceAnalyzer::process\_difference()} entry point
+    \item \texttt{DifferenceAnalyzer::process\_raw\_values()} implements Level 1
+    \item \texttt{DifferenceAnalyzer::process\_rounded\_values()} implements Levels 2--5
+\end{enumerate}
+
+\subsection{Key Algorithms}
+
+\subsubsection{Decimal Place Detection}
+
+\begin{lstlisting}[language=C++]
+int count_decimal_places(const string& str) {
+    size_t dot_pos = str.find('.');
+    if (dot_pos == string::npos) return 0;
+
+    size_t end_pos = str.find_first_not_of("0123456789", dot_pos + 1);
+    if (end_pos == string::npos) end_pos = str.length();
+
+    return static_cast<int>(end_pos - dot_pos - 1);
+}
+\end{lstlisting}
+
+\subsubsection{Range Data Detection}
+
+\begin{lstlisting}[language=C++]
+bool is_first_column_range_data() {
+    if (!is_first_column_monotonic()) return false;
+    if (!is_first_column_fixed_delta()) return false;
+
+    // Check starting value < 100 (typical for range)
+    if (first_column_values[0] >= 100.0) return false;
+
+    return true;
+}
+\end{lstlisting}
+
+\subsubsection{Rounding to Decimal Places}
+
+\begin{lstlisting}[language=C++]
+double round_to_decimals(double value, int dp) {
+    if (dp < 0 || dp > MAX_DECIMAL_PLACES) return value;
+
+    double multiplier = pow(10.0, dp);
+    return round(value * multiplier) / multiplier;
+}
+\end{lstlisting}
+
+\subsection{Summary Generation}
+
+Three levels of summary output:
+
+\begin{description}
+    \item[\texttt{print\_diff\_like\_summary()}] Level 1 summary (zero vs non-zero)
+    \item[\texttt{print\_rounded\_summary()}] Level 2 summary (trivial vs non-trivial)
+    \item[\texttt{print\_significant\_summary()}] Levels 3--5 (full discrimination)
+\end{description}
+
+Each summary maintains accounting invariants and highlights maximum differences with ANSI color codes (purple underline).

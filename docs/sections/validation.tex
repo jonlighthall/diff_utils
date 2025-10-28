@@ -1,0 +1,118 @@
+\section{Validation and Testing}
+\label{sec:validation}
+
+\subsection{Unit Test Suite}
+
+The implementation includes comprehensive unit tests covering all discrimination levels and edge cases:
+
+\subsubsection{Test Categories}
+
+\begin{enumerate}
+    \item \textbf{Semantic Invariants} (\texttt{test\_semantic\_invariants.cpp})
+    \begin{itemize}
+        \item Counter summation invariants at each level
+        \item Partition completeness verification
+        \item Mutual exclusivity of categories
+    \end{itemize}
+
+    \item \textbf{Sub-LSB Boundary} (\texttt{test\_sub\_lsb\_boundary.cpp})
+    \begin{itemize}
+        \item Exact half-LSB difference (30.8 vs 30.85)
+        \item Sub-LSB at multiple precision levels
+        \item Supra-LSB differences remain non-trivial
+        \item Mixed sub/supra-LSB cases
+        \item Cross-platform formatting equivalence
+        \item Sub-LSB with non-zero thresholds
+    \end{itemize}
+
+    \item \textbf{Percent Threshold} (\texttt{test\_percent\_threshold.cpp})
+    \begin{itemize}
+        \item Percent mode activation (negative threshold)
+        \item Reference value (value2) usage
+        \item Near-zero reference handling (INF sentinel)
+        \item Mixed percent/absolute thresholding
+    \end{itemize}
+
+    \item \textbf{Sensitive Threshold} (\texttt{test\_sensitive\_threshold.cpp})
+    \begin{itemize}
+        \item Zero threshold mode (maximum sensitivity)
+        \item All non-trivial classified as significant
+        \item Ignore threshold still applies
+    \end{itemize}
+
+    \item \textbf{TL-Specific} (\texttt{test\_trivial\_exclusion.cpp}, \texttt{test\_unit\_mismatch.cpp})
+    \begin{itemize}
+        \item Marginal band classification [110, 138] dB
+        \item Ignore threshold exclusion (>138 dB)
+        \item Range data bypass
+        \item Unit mismatch detection
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Pi Precision Test Suite}
+
+A domain-agnostic validation using mathematical constant $\pi$:
+
+\subsubsection{Test Methodology}
+
+\begin{enumerate}
+    \item Fortran program calculates $\pi$ using Machin's formula:
+    \begin{equation}
+        \frac{\pi}{4} = 4 \arctan\left(\frac{1}{5}\right) - \arctan\left(\frac{1}{239}\right)
+    \end{equation}
+
+    \item Output $\pi$ with increasing precision (0dp to 14dp):
+    \begin{align*}
+        0\text{dp:} & \quad 3 \\
+        1\text{dp:} & \quad 3.1 \\
+        2\text{dp:} & \quad 3.14 \\
+        & \vdots \\
+        14\text{dp:} & \quad 3.14159265358979
+    \end{align*}
+
+    \item Compare all precision pairs with \texttt{threshold=0}
+
+    \item Verify all pairs classified as equivalent (sub-LSB)
+\end{enumerate}
+
+\subsubsection{Test Results}
+
+\begin{itemize}
+    \item \checkmark{} Identical files recognized correctly
+    \item \checkmark{} Cross-precision (3.1 vs 3.14) recognized as equivalent
+    \item \checkmark{} All $\binom{15}{2} = 105$ pairwise comparisons pass
+    \item \checkmark{} High precision (17 decimal places) handled correctly
+\end{itemize}
+
+\subsection{Regression Testing}
+
+The \texttt{make test} target runs the complete test suite:
+
+\begin{lstlisting}[language=bash]
+$ make test
+Running unit tests...
+[==========] 43 tests passed
+  - Semantic invariants: 8 tests
+  - Sub-LSB boundary: 6 tests
+  - Percent threshold: 5 tests
+  - Sensitive threshold: 4 tests
+  - TL-specific: 12 tests
+  - File comparator: 8 tests
+
+All tests passed successfully!
+\end{lstlisting}
+
+\subsection{Test File Naming Convention}
+
+Test files follow structured naming:
+
+\begin{verbatim}
+test_<scenario>_<variant><file_number>.txt
+
+Examples:
+test_2percent_tl1.txt      # 2% threshold, transmission loss, file 1
+test_critical1.txt         # Critical difference case, file 1
+test_sub_lsb_edge1.txt     # Sub-LSB edge case, file 1
+\end{verbatim}
+
+This enables automated test discovery and classification.

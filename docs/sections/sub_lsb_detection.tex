@@ -1,0 +1,187 @@
+\section{Sub-LSB Detection}
+\label{sec:sublsb}
+
+\subsection{The Problem}
+
+When comparing numerical output from different sources (platforms, compilers, languages, or formatting configurations), a fundamental question arises:
+
+\begin{quote}
+\emph{Should values that differ by less than the minimum representable difference at the coarser precision be considered equivalent?}
+\end{quote}
+
+\subsection{Canonical Example}
+
+Consider comparing:
+\begin{itemize}
+    \item \textbf{File 1:} \texttt{30.8} (1 decimal place)
+    \item \textbf{File 2:} \texttt{30.85} (2 decimal places)
+    \item \textbf{Threshold:} 0.0 (maximum sensitivity)
+\end{itemize}
+
+\textbf{Analysis:}
+\begin{align*}
+    \text{Raw difference:} \quad & |\Delta v| = |30.8 - 30.85| = 0.05 \\
+    \LSB \text{ at 1dp:} \quad & 10^{-1} = 0.1 \\
+    \text{Half-LSB:} \quad & \text{big\_zero} = 0.05 \\
+    \text{Rounded values:} \quad & 30.8 \text{ vs } 30.9 \\
+    \text{Rounded difference:} \quad & 0.1
+\end{align*}
+
+\textbf{Question:} Should this be classified as:
+\begin{itemize}
+    \item A \textbf{failure} (difference of 0.1 after rounding to common precision)?
+    \item A \textbf{pass} (raw difference 0.05 is sub-LSB and indistinguishable)?
+\end{itemize}
+
+\subsection{Information-Theoretic Justification}
+
+The printed value ``\texttt{30.8}'' does \emph{not} represent a single number. It represents an \textbf{interval}:
+
+\begin{equation}
+    \texttt{30.8} \text{ (1dp)} \implies v \in [30.75, 30.85)
+\end{equation}
+
+The value 30.85 from File 2 falls \emph{exactly at the boundary} of what File 1 could represent. Therefore, they are \textbf{informationally equivalent} at File 1's precision.
+
+\subsection{Cross-Platform Robustness}
+
+Consider two platforms calculating the same physical quantity:
+
+\textbf{Platform A} (x86-64, GCC, -O2):
+\begin{lstlisting}[language=C]
+double result = complex_calculation();  // => 30.849999999...
+printf("%.1f\n", result);                // Output: 30.8
+\end{lstlisting}
+
+\textbf{Platform B} (ARM, Clang, -O3):
+\begin{lstlisting}[language=C]
+double result = complex_calculation();  // => 30.850000001...
+printf("%.2f\n", result);                // Output: 30.85
+\end{lstlisting}
+
+\textbf{Conclusion:} Same calculation, different output formatting $\implies$ should \emph{not} fail comparison!
+
+\subsection{Implementation: The Bug and The Fix}
+
+\subsubsection{Original (Buggy) Implementation}
+
+\begin{lstlisting}[language=C++]
+bool trivial_after_rounding = (rounded_diff <= big_zero);
+\end{lstlisting}
+
+\textbf{Why this fails:}
+\begin{align*}
+    \text{rounded\_diff} &= 0.1 \quad \text{(30.8 vs 30.9 at 1dp)} \\
+    \text{big\_zero} &= 0.05 \\
+    0.1 \leq 0.05 &\implies \texttt{FALSE} \quad \text{(incorrectly NON-TRIVIAL)}
+\end{align*}
+
+\subsubsection{Corrected Implementation}
+
+\begin{lstlisting}[language=C++]
+constexpr double FP_TOLERANCE = 1e-12;
+bool sub_lsb_diff = (raw_diff < big_zero) ||
+    (abs(raw_diff - big_zero) < FP_TOLERANCE * max(raw_diff, big_zero));
+bool trivial_after_rounding = (rounded_diff == 0.0 || sub_lsb_diff);
+\end{lstlisting}
+
+\textbf{Why this works:}
+\begin{enumerate}
+    \item First check: Are rounded values identical? (handles exact matches)
+    \item Second check: Is raw difference sub-LSB? (handles edge case)
+    \item Floating-point tolerance handles representation errors
+\end{enumerate}
+
+\subsection{Floating-Point Robustness}
+
+The \texttt{FP\_TOLERANCE} handles cases where:
+
+\begin{align*}
+    \text{raw\_diff} &= 0.05000000000000071054 \quad \text{(FP representation)} \\
+    \text{big\_zero} &= 0.05000000000000000278 \\
+    \text{Difference:} &\approx 7 \times 10^{-16} \quad \text{(FP error)}
+\end{align*}
+
+Without tolerance, \texttt{raw\_diff > big\_zero} would fail. With tolerance, correctly classified as equivalent.
+
+\subsection{Mathematical Formulation}
+
+\subsubsection{Definitions}
+
+\begin{align}
+    \LSB &= 10^{-p} \quad \text{(minimum step at precision } p \text{)} \\
+    \text{big\_zero} &= \frac{\LSB}{2} \\
+    \Delta v &= |v_1 - v_2| \quad \text{(raw difference)}
+\end{align}
+
+\subsubsection{Classification Logic}
+
+\begin{equation}
+    \text{Classification} = \begin{cases}
+        \textbf{EXACT} & \text{if } \Delta v = 0 \\
+        \textbf{TRIVIAL (sub-LSB)} & \text{if } \Delta v < \text{big\_zero} \text{ or } |\Delta v - \text{big\_zero}| < \epsilon_{FP} \cdot \max(\Delta v, \text{big\_zero}) \\
+        \textbf{TRIVIAL (rounded)} & \text{if } \text{round}(v_1, p) = \text{round}(v_2, p) \\
+        \textbf{NON-TRIVIAL} & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+where $\epsilon_{FP} = 10^{-12}$ is the floating-point comparison tolerance.
+
+\subsection{Implications and Benefits}
+
+\subsubsection{When threshold = 0.0 (Maximum Sensitivity)}
+
+\textbf{Before the fix:}
+\begin{itemize}
+    \item \texttt{30.8} vs \texttt{30.85} $\to$ \textbf{FAIL} (significant difference)
+    \item Cross-platform validation fails unnecessarily
+\end{itemize}
+
+\textbf{After the fix:}
+\begin{itemize}
+    \item \texttt{30.8} vs \texttt{30.85} $\to$ \textbf{PASS} (trivial/sub-LSB)
+    \item Cross-platform robust comparison
+    \item Only truly distinguishable differences fail
+\end{itemize}
+
+\subsubsection{Backward Compatibility}
+
+This fix \textbf{only affects edge cases} where:
+\begin{enumerate}
+    \item Values differ by exactly half-LSB or less
+    \item The difference becomes visible only after rounding to coarser precision
+\end{enumerate}
+
+For most comparisons, behavior is unchanged. The fix makes comparison:
+\begin{itemize}
+    \item \textbf{More robust}: Cross-platform formatting differences tolerated
+    \item \textbf{More rigorous}: Aligns with information theory
+    \item \textbf{More intuitive}: ``30.8'' and ``30.85'' are equivalent at 1dp
+\end{itemize}
+
+\subsection{Related Concepts}
+
+\subsubsection{ULP (Unit in the Last Place)}
+
+In floating-point arithmetic, ULP represents the spacing between consecutive representable values. The LSB concept for decimal printing is analogous to ULP for binary representation:
+
+\begin{align}
+    \text{Binary ULP:} \quad & \epsilon_{\text{machine}} = 2^{-m} \quad \text{($m$ = mantissa bits)} \\
+    \text{Decimal LSB:} \quad & \LSB = 10^{-p} \quad \text{($p$ = decimal places)}
+\end{align}
+
+\subsubsection{Epsilon Testing}
+
+Traditional floating-point comparison uses relative epsilon:
+
+\begin{equation}
+    |v_1 - v_2| < \epsilon \cdot \max(|v_1|, |v_2|)
+\end{equation}
+
+Sub-LSB detection uses \emph{absolute} epsilon based on printed precision:
+
+\begin{equation}
+    |v_1 - v_2| < \frac{10^{-p}}{2}
+\end{equation}
+
+This is precision-aware rather than magnitude-aware, making it suitable for formatted output comparison.

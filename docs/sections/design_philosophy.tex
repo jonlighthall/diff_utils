@@ -1,0 +1,64 @@
+\section{Design Philosophy}
+\label{sec:design}
+
+\subsection{Core Principles}
+
+The \ubdiff{} comparison algorithm is built on three fundamental principles:
+
+\subsubsection{Progressive Refinement}
+
+The algorithm implements a hierarchical classification pipeline where each level partitions one set into exactly two subsets, with one subset undergoing further subdivision at the next level. This creates a binary decision tree that progressively refines the classification from raw numeric comparison to domain-specific significance assessment.
+
+\textbf{Mathematical structure:}
+\begin{align*}
+    \text{Level } n: \quad S_n &= A_n \cup B_n \\
+    \text{Level } n+1: \quad B_n &= A_{n+1} \cup B_{n+1}
+\end{align*}
+
+This ensures that at each level, all elements remain accounted for, maintaining rigorous statistical invariants.
+
+\subsubsection{Precision Awareness}
+
+Differences are evaluated in the context of the \emph{printed precision} of numerical values. A value printed as \texttt{30.8} (1 decimal place) implicitly represents the interval $[30.75, 30.85)$, carrying an inherent uncertainty of $\pm 0.05$.
+
+\textbf{Key insight:} The minimum representable difference at precision $p$ decimal places is:
+\begin{equation}
+    \LSB = 10^{-p}
+\end{equation}
+
+Differences smaller than $\LSB/2$ are \emph{sub-LSB} and cannot be distinguished at the given precision.
+
+\subsubsection{Domain Specificity}
+
+For transmission loss (TL) acoustic data, the algorithm incorporates physics-based thresholds:
+
+\begin{itemize}
+    \item \textbf{Ignore threshold} ($\approx 138$ dB): Values exceeding this represent pressures below single-precision arithmetic limits
+    \item \textbf{Marginal threshold} (110 dB): Based on operational research, TL values above 110 dB are weighted to zero in propagation analysis \cite{doi:10.23919/OCEANS.2009.5422312}
+\end{itemize}
+
+These domain constraints are bypassed for range/distance data (column 0), which is automatically detected via monotonicity and fixed-delta criteria.
+
+\subsection{Architectural Design Pattern}
+
+\ubdiff{} implements a \textbf{pipeline architecture} with separation of concerns:
+
+\begin{description}
+    \item[FileReader] Parses files, extracts column values, detects precision
+    \item[DifferenceAnalyzer] Applies discrimination logic, tracks statistics
+    \item[FileComparator] Orchestrates comparison, generates summaries
+    \item[Main] Command-line interface, threshold configuration
+\end{description}
+
+This modular design enables independent testing of each component and facilitates future extensions.
+
+\subsection{Fail-Fast vs. Fail-Complete}
+
+The implementation uses a \textbf{hybrid strategy}:
+
+\begin{itemize}
+    \item \textbf{Fail-fast}: First critical difference triggers immediate error reporting
+    \item \textbf{Fail-complete}: Processing continues to gather complete statistics
+\end{itemize}
+
+This provides both rapid feedback (useful in automated testing) and comprehensive diagnostics (useful in debugging).

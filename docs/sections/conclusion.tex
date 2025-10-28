@@ -1,0 +1,110 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+\subsection{Summary of Contributions}
+
+This report has presented the design, implementation, and validation of \ubdiff{}, a precision-aware numerical file comparison utility. Key contributions include:
+
+\begin{enumerate}
+    \item \textbf{Six-level hierarchical discrimination algorithm} with rigorous accounting invariants
+
+    \item \textbf{Sub-LSB detection} enabling cross-platform robustness through information-theoretic precision awareness
+
+    \item \textbf{Domain-specific thresholds} derived from acoustic physics and single-precision arithmetic constraints
+
+    \item \textbf{Comprehensive test suite} including unit tests and mathematical validation via $\pi$ precision series
+
+    \item \textbf{Production-ready implementation} with clear output, configurable thresholds, and CI/CD integration support
+\end{enumerate}
+
+\subsection{Operational Benefits}
+
+\ubdiff{} provides several advantages over traditional comparison tools:
+
+\begin{itemize}
+    \item \textbf{Format tolerance}: Sub-LSB detection handles cross-precision comparisons (30.8 vs 30.85)
+
+    \item \textbf{Platform independence}: Tolerates compiler/architecture-induced formatting variations
+
+    \item \textbf{Meaningful classification}: Progressive refinement from raw differences to domain significance
+
+    \item \textbf{Actionable diagnostics}: Clear categorization helps identify root causes of discrepancies
+
+    \item \textbf{Flexible thresholding}: Supports absolute, percent, and sensitive (zero) threshold modes
+\end{itemize}
+
+\subsection{Lessons Learned}
+
+\subsubsection{Floating-Point Tolerance is Essential}
+
+The initial sub-LSB implementation failed edge cases due to floating-point representation errors. Adding \texttt{FP\_TOLERANCE = 1e-12} resolved cross-platform consistency issues.
+
+\subsubsection{Information Theory Guides Design}
+
+Recognizing that printed values represent \emph{intervals} rather than exact numbers led to the sub-LSB criterion, which is both mathematically rigorous and practically useful.
+
+\subsubsection{Progressive Refinement Maintains Clarity}
+
+The six-level hierarchy keeps each discrimination step simple and testable while building to complex domain-specific classification.
+
+\subsection{Future Enhancements}
+
+\subsubsection{Near-Term}
+
+\begin{itemize}
+    \item \textbf{Explicit sub-LSB counter}: Add Level 1.5 discrimination for detailed statistics
+
+    \item \textbf{User control flag}: Command-line option to enable/disable sub-LSB detection
+
+    \item \textbf{JSON output mode}: Machine-readable output for automated analysis
+
+    \item \textbf{Diff-style output}: Line-by-line comparison format option
+\end{itemize}
+
+\subsubsection{Long-Term}
+
+\begin{itemize}
+    \item \textbf{Extended precision support}: Quadruple precision (IEEE 754 binary128)
+
+    \item \textbf{Multi-file comparison}: Compare more than two files simultaneously
+
+    \item \textbf{Column-specific thresholds}: Different thresholds for range vs TL columns
+
+    \item \textbf{Statistical analysis}: Distribution of differences, outlier detection
+
+    \item \textbf{Visualization}: Graphical difference maps for large datasets
+\end{itemize}
+
+\subsection{Applicability Beyond Acoustics}
+
+While developed for underwater acoustic propagation, \ubdiff{}'s precision-aware methodology is applicable to any domain requiring numerical validation:
+
+\begin{itemize}
+    \item Computational fluid dynamics (CFD)
+    \item Climate modeling
+    \item Finite element analysis (FEA)
+    \item Molecular dynamics simulations
+    \item Financial modeling
+    \item Scientific data analysis
+\end{itemize}
+
+The domain-specific thresholds (marginal, ignore, critical) can be adapted to physics-based or operational constraints in any field.
+
+\subsection{Open Source Potential}
+
+The modular architecture and comprehensive test suite position \ubdiff{} as a candidate for open-source release. Potential benefits include:
+
+\begin{itemize}
+    \item Community contributions for domain-specific threshold libraries
+    \item Port to other languages (Python, Julia, Rust)
+    \item Integration with existing test frameworks (pytest, GoogleTest)
+    \item Standardization of precision-aware comparison methodology
+\end{itemize}
+
+\subsection{Final Remarks}
+
+Numerical comparison is a deceptively complex problem. Traditional tools treat numbers as strings, ignoring representational precision. \ubdiff{} demonstrates that incorporating information theory, floating-point arithmetic, and domain knowledge produces a more robust, meaningful, and practical solution.
+
+The sub-LSB detection innovation—recognizing that ``30.8'' and ``30.85'' are informationally equivalent—exemplifies the power of precision-aware design. This single insight enables cross-platform validation that would otherwise fail, directly addressing a critical pain point in multi-platform scientific computing.
+
+As computational science increasingly relies on cross-platform, multi-language, and distributed computing environments, precision-aware comparison tools will become essential infrastructure. \ubdiff{} provides a rigorous, tested, and production-ready implementation of this methodology.

@@ -1,0 +1,198 @@
+\section{Appendix B: Code Structure Reference}
+\label{app:code}
+
+\subsection{Directory Structure}
+
+\begin{verbatim}
+diff_utils/
+|--- src/
+|   |--- cpp/
+|   |   |--- include/
+|   |   |   |--- uband_diff.h           # Threshold/stat structures
+|   |   |   |--- difference_analyzer.h  # Core analyzer
+|   |   |   |--- file_comparator.h      # File orchestration
+|   |   |   |--- file_reader.h          # Parsing utilities
+|   |   |   |--- line_parser.h          # Low-level parsing
+|   |   |   `--- format_tracker.h       # Precision tracking
+|   |   |--- src/
+|   |   |   |--- difference_analyzer.cpp
+|   |   |   |--- file_comparator.cpp
+|   |   |   |--- file_reader.cpp
+|   |   |   |--- line_parser.cpp
+|   |   |   `--- format_tracker.cpp
+|   |   |--- main/
+|   |   |   `--- uband_diff.cpp         # CLI entry point
+|   |   `--- tests/
+|   |       |--- test_main.cpp
+|   |       |--- test_sub_lsb_boundary.cpp
+|   |       |--- test_percent_threshold.cpp
+|   |       |--- test_sensitive_threshold.cpp
+|   |       |--- test_semantic_invariants.cpp
+|   |       `--- ...
+|   `--- fortran/
+|       `--- pi_precision_test.f90      # Validation program
+|--- build/
+|   |--- bin/
+|   |   `--- uband_diff                 # Main executable
+|   |--- obj/                           # Object files
+|   |--- mod/                           # Module files
+|   `--- test/                          # Test outputs
+|--- data/
+|   `--- test_*.txt                     # Test input files
+|--- docs/
+|   |--- UBAND_DIFF_TECHNICAL_REPORT.tex
+|   |--- sections/
+|   |   |--- introduction.tex
+|   |   |--- design_philosophy.tex
+|   |   |--- mathematical_foundation.tex
+|   |   |--- discrimination_hierarchy.tex
+|   |   |--- sub_lsb_detection.tex
+|   |   |--- implementation.tex
+|   |   |--- validation.tex
+|   |   |--- usage_examples.tex
+|   |   |--- conclusion.tex
+|   |   |--- appendix_thresholds.tex
+|   |   `--- appendix_code_structure.tex
+|   |--- DISCRIMINATION_HIERARCHY.md
+|   |--- SUB_LSB_DETECTION.md
+|   `--- IMPLEMENTATION_SUMMARY.md
+`--- makefile
+\end{verbatim}
+
+\subsection{Key Function Reference}
+
+\subsubsection{DifferenceAnalyzer Class}
+
+\begin{lstlisting}[language=C++]
+class DifferenceAnalyzer {
+public:
+    void process_difference(const ColumnValues& vals);
+
+private:
+    void process_raw_values(const ColumnValues& vals);
+    void process_rounded_values(const ColumnValues& vals);
+
+    double round_to_decimals(double value, int dp);
+    bool is_sub_lsb_difference(double raw_diff, double big_zero);
+
+    Thresholds thresh;
+    CountStats counter;
+    DiffStats differ;
+    Flags flags;
+};
+\end{lstlisting}
+
+\subsubsection{FileComparator Class}
+
+\begin{lstlisting}[language=C++]
+class FileComparator {
+public:
+    bool compare_files();
+
+private:
+    bool process_line(const string& line1, const string& line2);
+    void process_column(size_t col, const string& str1, const string& str2);
+    void process_difference(const ColumnValues& vals);
+
+    void print_diff_like_summary();
+    void print_rounded_summary();
+    void print_significant_summary();
+
+    FileReader reader1, reader2;
+    DifferenceAnalyzer analyzer;
+};
+\end{lstlisting}
+
+\subsubsection{FileReader Class}
+
+\begin{lstlisting}[language=C++]
+class FileReader {
+public:
+    bool open(const string& filename);
+    bool read_line(string& line);
+
+    bool is_first_column_range_data();
+    bool is_first_column_monotonic();
+    bool is_first_column_fixed_delta();
+
+private:
+    ifstream file;
+    vector<double> first_column_values;
+    bool first_column_analyzed;
+};
+\end{lstlisting}
+
+\subsection{Build System}
+
+\subsubsection{Makefile Targets}
+
+\begin{description}
+    \item[\texttt{make all}] Build main executable and tests
+    \item[\texttt{make uband\_diff}] Build main executable only
+    \item[\texttt{make tests}] Build test suite
+    \item[\texttt{make test}] Run all unit tests
+    \item[\texttt{make clean}] Remove build artifacts
+    \item[\texttt{make help}] Display available targets
+\end{description}
+
+\subsubsection{Compiler Flags}
+
+\begin{lstlisting}[language=make]
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O2
+LDFLAGS = -lm
+\end{lstlisting}
+
+\subsection{Dependency Graph}
+
+\begin{verbatim}
+uband_diff (main)
+  `-- FileComparator
+      |-- FileReader
+      |   `-- LineParser
+      |       `-- FormatTracker
+      `-- DifferenceAnalyzer
+          `-- (Thresholds, CountStats, DiffStats, Flags)
+
+test_main
+  |-- test_sub_lsb_boundary
+  |-- test_percent_threshold
+  |-- test_sensitive_threshold
+  |-- test_semantic_invariants
+  `-- (all tests link against same components)
+\end{verbatim}
+
+\subsection{Testing Infrastructure}
+
+\subsubsection{Unit Test Framework}
+
+Uses lightweight custom framework (no external dependencies):
+
+\begin{lstlisting}[language=C++]
+#define ASSERT_TRUE(condition) \
+    if (!(condition)) { \
+        std::cerr << "FAILED: " << #condition << std::endl; \
+        return false; \
+    }
+
+#define ASSERT_EQ(actual, expected) \
+    if ((actual) != (expected)) { \
+        std::cerr << "FAILED: " << #actual << " != " << #expected \
+                  << " (" << (actual) << " != " << (expected) << ")" \
+                  << std::endl; \
+        return false; \
+    }
+\end{lstlisting}
+
+\subsubsection{Test Execution}
+
+\begin{lstlisting}[language=bash]
+$ make test
+g++ -std=c++17 -o build/bin/test_main tests/*.cpp src/*.cpp
+Running unit tests...
+[PASS] test_sub_lsb_exact_half
+[PASS] test_sub_lsb_multiple_precision
+[PASS] test_percent_threshold_activation
+...
+[==========] 43 tests passed, 0 failed
+\end{lstlisting}

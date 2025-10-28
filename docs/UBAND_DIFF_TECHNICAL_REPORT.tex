@@ -1,0 +1,80 @@
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\geometry{margin=1in}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={uband\_diff Technical Report},
+    pdfauthor={},
+}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    language=C++,
+    commentstyle=\color{green!60!black},
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    captionpos=b
+}
+
+% Custom commands
+\newcommand{\ubdiff}{\texttt{uband\_diff}}
+\newcommand{\LSB}{\mathrm{LSB}}
+\newcommand{\ULP}{\mathrm{ULP}}
+
+\title{
+    \textbf{Technical Report}\\
+    \large Precision-Aware Numerical File Comparison:\\
+    Theory and Implementation of \ubdiff{}
+}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This technical report presents the design, implementation, and validation of \ubdiff{}, a precision-aware numerical file comparison utility. The tool implements a six-level hierarchical discrimination algorithm that classifies numeric differences based on printed precision, machine epsilon, and domain-specific thresholds. Key innovations include sub-LSB (Least Significant Bit) detection for cross-platform robustness, transmission loss domain specialization for acoustic propagation analysis, and a progressive refinement architecture that maintains rigorous accounting invariants. The implementation has been validated through comprehensive unit testing and domain-specific test suites, demonstrating reliable operation across multiple precision levels and threshold configurations.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% Include sections
+\input{sections/introduction}
+\input{sections/design_philosophy}
+\input{sections/mathematical_foundation}
+\input{sections/discrimination_hierarchy}
+\input{sections/sub_lsb_detection}
+\input{sections/implementation}
+\input{sections/validation}
+\input{sections/usage_examples}
+\input{sections/conclusion}
+
+% Bibliography (if needed later)
+% \bibliographystyle{plain}
+% \bibliography{references}
+
+\appendix
+\input{sections/appendix_thresholds}
+\input{sections/appendix_code_structure}
+
+\end{document}

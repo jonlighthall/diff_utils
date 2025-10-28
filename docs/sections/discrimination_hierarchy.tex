@@ -1,0 +1,226 @@
+\section{Six-Level Discrimination Hierarchy}
+\label{sec:hierarchy}
+
+\subsection{Overview}
+
+The discrimination algorithm implements a six-level binary partition hierarchy. Each level applies specific criteria to progressively categorize differences from raw comparison through domain-specific significance assessment.
+
+\textbf{Hierarchical invariants at each level:}
+
+\begin{align*}
+    \text{Level 0:} \quad & \text{total} = \Sigma(\text{lines} \times \text{columns}) \\
+    \text{Level 1:} \quad & \text{total} = \text{zero} + \text{non-zero} \\
+    \text{Level 2:} \quad & \text{non-zero} = \text{trivial} + \text{non-trivial} \\
+    \text{Level 3:} \quad & \text{non-trivial} = \text{insignificant} + \text{significant} \\
+    \text{Level 4:} \quad & \text{significant} = \text{marginal} + \text{non-marginal} \\
+    \text{Level 5:} \quad & \text{non-marginal} = \text{critical} + \text{non-critical}
+\end{align*}
+
+\subsection{Level 0: Structure Validation}
+
+\textbf{Purpose:} Verify file structure compatibility and count total elements
+
+\textbf{Partition:}
+\begin{equation}
+    \text{total\_elements} = \text{countable\_elements} + \text{structural\_mismatches}
+\end{equation}
+
+\textbf{Implementation:} \texttt{FileComparator::compare\_files()}
+
+\textbf{Decision Logic:}
+\begin{lstlisting}[language=C++]
+total_elements = sum(lines_per_group * columns_per_group)
+\end{lstlisting}
+
+\textbf{Failure Behavior:} If element counts differ between files, comparison continues up to the structural divergence point but is marked as failed.
+
+\subsection{Level 1: Raw Difference Detection}
+
+\textbf{Purpose:} Distinguish identical elements from those with any measurable difference
+
+\textbf{Partition:}
+\begin{equation}
+    \text{total} = \text{zero\_diff} + \text{non\_zero\_diff}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{lstlisting}[language=C++]
+raw_diff = |value1 - value2|
+non_zero = (raw_diff > thresh.zero)  // thresh.zero = epsilon_single
+\end{lstlisting}
+
+\textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_raw\_values()}
+
+\textbf{Counters:} \texttt{counter.diff\_non\_zero}, \texttt{differ.max\_non\_zero}
+
+\textbf{Significance:} If non-zero count is zero, files are bitwise equivalent (within epsilon). This provides functionality similar to \texttt{diff} but with epsilon tolerance.
+
+\subsection{Level 2: Precision-Based Trivial Detection}
+
+\textbf{Purpose:} Separate format-driven differences from substantive numerical differences
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non\_zero} = \text{trivial} + \text{non\_trivial}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{lstlisting}[language=C++]
+LSB = pow(10.0, -min_dp)  // Least Significant Bit
+big_zero = LSB / 2.0       // Half-ULP criterion
+rounded_diff = round_to_decimals(raw_diff, min_dp)
+
+constexpr double FP_TOLERANCE = 1e-12;
+bool sub_lsb = (raw_diff < big_zero) ||
+    (abs(raw_diff - big_zero) < FP_TOLERANCE * max(raw_diff, big_zero));
+
+trivial = (rounded_diff == 0.0) || sub_lsb;
+\end{lstlisting}
+
+\textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_rounded\_values()}
+
+\textbf{Counters:} \texttt{counter.diff\_trivial}, \texttt{counter.diff\_non\_trivial}
+
+\textbf{Example:} Comparing \texttt{30.8} (1dp) vs \texttt{30.85} (2dp):
+\begin{align*}
+    \LSB &= 10^{-1} = 0.1 \\
+    \text{big\_zero} &= 0.05 \\
+    \text{raw\_diff} &= |30.8 - 30.85| = 0.05 \\
+    \text{Test:} \quad 0.05 &\leq 0.05 \quad \checkmark \\
+    \text{Classification:} \quad & \textbf{TRIVIAL} \text{ (sub-LSB difference)}
+\end{align*}
+
+\textbf{Percent Error Tracking:} For non-trivial differences:
+\begin{equation}
+    E_{\%} = \begin{cases}
+        100 \times \frac{\text{raw\_diff}}{|v_2|} & \text{if } |v_2| > \epsilon_{\text{single}} \\
+        \infty & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+\subsection{Level 3: Significance Assessment}
+
+\textbf{Purpose:} Among non-trivial differences, separate numerically meaningful from those dominated by machine precision
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non\_trivial} = \text{insignificant} + \text{significant}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{lstlisting}[language=C++]
+// Check domain threshold (skip for range data)
+both_above_ignore = (value1 > thresh.ignore) &&
+                   (value2 > thresh.ignore) &&
+                   !is_range_data;
+
+if (both_above_ignore) {
+    classification = INSIGNIFICANT;  // Beyond numerical reliability
+} else {
+    // Apply significance threshold
+    if (thresh.significant_is_percent) {
+        // Percent mode
+        ref = abs(value2);
+        if (ref <= thresh.zero) {
+            exceeds = (rounded_diff > thresh.zero);
+        } else {
+            exceeds = (rounded_diff / ref) > thresh.significant_percent;
+        }
+    } else if (thresh.significant == 0.0) {
+        // Sensitive mode: all non-trivial = significant
+        exceeds = true;
+    } else {
+        // Standard mode: absolute threshold
+        exceeds = (rounded_diff > thresh.significant);
+    }
+
+    classification = exceeds ? SIGNIFICANT : INSIGNIFICANT;
+}
+\end{lstlisting}
+
+\textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_rounded\_values()}
+
+\textbf{Counters:} \texttt{counter.diff\_insignificant}, \texttt{counter.diff\_significant}, \texttt{counter.diff\_high\_ignore}
+
+\textbf{Special Modes:}
+\begin{description}
+    \item[Percent Mode] Enabled when \texttt{thresh.significant < 0} (e.g., -10 for 10\%)
+    \item[Sensitive Mode] When \texttt{thresh.significant == 0.0}, all non-trivial below ignore are significant
+    \item[Range Data] Column 0 bypasses TL-specific thresholds if detected as monotonic range values
+\end{description}
+
+\subsection{Level 4: Marginal vs Non-Marginal}
+
+\textbf{Purpose:} Distinguish operationally marginal from truly non-marginal differences
+
+\textbf{Partition:}
+\begin{equation}
+    \text{significant} = \text{marginal} + \text{non\_marginal}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{lstlisting}[language=C++]
+if (!is_range_data &&
+    value1 > thresh.marginal && value1 < thresh.ignore &&
+    value2 > thresh.marginal && value2 < thresh.ignore) {
+    classification = MARGINAL;  // Both in [110, 138.47] dB band
+} else {
+    classification = NON_MARGINAL;
+}
+\end{lstlisting}
+
+\textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_rounded\_values()}
+
+\textbf{Counter:} \texttt{counter.diff\_marginal}
+
+\textbf{Domain Context:} For TL data, the marginal band [110, 138.47] dB represents numerically valid but operationally insignificant values.
+
+\subsection{Level 5: Critical vs Non-Critical}
+
+\textbf{Purpose:} Detect catastrophically large differences indicating potential model failure
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non\_marginal} = \text{critical} + \text{non\_critical}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{lstlisting}[language=C++]
+if (!is_range_data &&
+    rounded_diff > thresh.critical &&
+    value1 <= thresh.ignore && value2 <= thresh.ignore) {
+    classification = CRITICAL;
+    flags.has_critical_diff = true;
+    flags.error_found = true;
+} else {
+    classification = NON_CRITICAL;
+}
+\end{lstlisting}
+
+\textbf{Implementation:} Early check in \texttt{DifferenceAnalyzer::process\_difference()}
+
+\textbf{Counter:} \texttt{counter.diff\_critical}
+
+\textbf{Behavior:} Upon first critical difference, \texttt{print\_hard\_threshold\_error()} reports it. Processing continues for complete statistics, but exit code is set to failure.
+
+\subsection{Complete Hierarchy Diagram}
+
+\begin{figure}[h]
+\centering
+\small
+\begin{verbatim}
+TOTAL ELEMENTS (Level 0)
+|-- ZERO DIFF (Level 1)
+`-- NON-ZERO DIFF (Level 1)
+    |-- TRIVIAL (Level 2: sub-LSB or rounded=0)
+    `-- NON-TRIVIAL (Level 2)
+        |-- INSIGNIFICANT (Level 3)
+        `-- SIGNIFICANT (Level 3)
+            |-- MARGINAL (Level 4)
+            `-- NON-MARGINAL (Level 4)
+                |-- CRITICAL (Level 5)
+                `-- NON-CRITICAL (Level 5)
+\end{verbatim}
+\caption{Six-level discrimination hierarchy}
+\label{fig:hierarchy}
+\end{figure}

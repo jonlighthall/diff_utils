@@ -1,0 +1,98 @@
+\section{Mathematical Foundation}
+\label{sec:math}
+
+\subsection{Machine Precision Constants}
+
+\subsubsection{Single-Precision Epsilon}
+
+Single-precision floating-point numbers (IEEE 754 binary32) have 23 mantissa bits:
+
+\begin{equation}
+    \epsilon_{\text{single}} = 2^{-23} \approx 1.19 \times 10^{-7}
+\end{equation}
+
+This represents the smallest resolvable \emph{relative} difference for normalized single-precision values.
+
+\subsubsection{Double-Precision Epsilon}
+
+Double-precision floating-point numbers (IEEE 754 binary64) have 52 mantissa bits:
+
+\begin{equation}
+    \epsilon_{\text{double}} = 2^{-52} \approx 2.22 \times 10^{-16}
+\end{equation}
+
+\subsection{Domain-Specific Threshold Derivations}
+
+\subsubsection{Ignore Threshold}
+
+For transmission loss in underwater acoustics, the relationship between pressure and transmission loss is:
+
+\begin{equation}
+    TL = -20 \log_{10}\left(\frac{p}{p_{\text{ref}}}\right)
+\end{equation}
+
+The minimum representable pressure in single-precision arithmetic (relative to reference pressure) is $\epsilon_{\text{single}}$. The corresponding transmission loss is:
+
+\begin{align}
+    TL_{\text{ignore}} &= -20 \log_{10}(\epsilon_{\text{single}}) \\
+    &= -20 \log_{10}(2^{-23}) \\
+    &= -20 \times (-23) \log_{10}(2) \\
+    &= 460 \log_{10}(2) \\
+    &\approx 138.47 \text{ dB}
+\end{align}
+
+\textbf{Physical interpretation:} Transmission loss values above 138.47 dB represent acoustic pressures that cannot be reliably represented in single-precision arithmetic.
+
+\subsubsection{Marginal Threshold}
+
+Based on acoustic propagation research \cite{doi:10.23919/OCEANS.2009.5422312}, transmission loss values exceeding 110 dB are weighted to zero in practical sonar calculations. This threshold defines the boundary of operational significance.
+
+\begin{equation}
+    TL_{\text{marginal}} = 110 \text{ dB}
+\end{equation}
+
+\subsection{LSB and Sub-LSB Criteria}
+
+\subsubsection{Least Significant Bit}
+
+For a value printed with $p$ decimal places, the LSB is:
+
+\begin{equation}
+    \LSB = 10^{-p}
+\end{equation}
+
+This represents the minimum step size in the printed representation.
+
+\subsubsection{Half-LSB (big\_zero)}
+
+The rounding uncertainty for a value at precision $p$ is:
+
+\begin{equation}
+    \text{big\_zero} = \frac{\LSB}{2} = \frac{10^{-p}}{2}
+\end{equation}
+
+\textbf{Information-theoretic justification:} A value printed as $v$ with precision $p$ represents the interval:
+
+\begin{equation}
+    \left[v - \frac{\LSB}{2}, v + \frac{\LSB}{2}\right)
+\end{equation}
+
+\subsubsection{Sub-LSB Detection with Floating-Point Tolerance}
+
+To handle floating-point representation errors, the sub-LSB criterion includes a relative tolerance:
+
+\begin{equation}
+    \text{sub-LSB} \iff \left(|\Delta v| < \text{big\_zero}\right) \vee \left(||\Delta v| - \text{big\_zero}| < \epsilon_{FP} \cdot \max(|\Delta v|, \text{big\_zero})\right)
+\end{equation}
+
+where $\epsilon_{FP} = 10^{-12}$ is the floating-point comparison tolerance.
+
+\subsection{Percent Error Calculation}
+
+For non-trivial differences, percent error is computed using the second file as reference:
+
+\begin{equation}
+    E_{\%} = 100 \times \frac{|\Delta v|}{|v_2|}
+\end{equation}
+
+\textbf{Special case:} When $|v_2| \leq \epsilon_{\text{single}}$, the percent error is undefined and reported as $\infty$ (sentinel value).
