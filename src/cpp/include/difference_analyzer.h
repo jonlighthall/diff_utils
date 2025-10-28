@@ -42,12 +42,12 @@ class DifferenceAnalyzer {
   void process_raw_values(const ColumnValues& column_data, CountStats& counter,
                           DiffStats& differ, Flags& flags) const;
 
-  // Rounded value processing (with precision rounding)
-  void process_rounded_values(const ColumnValues& column_data,
-                              size_t column_index, double rounded_diff,
-                              int minimum_decimal_places, double threshold,
-                              CountStats& counter, DiffStats& differ,
-                              Flags& flags) const;
+  // Hierarchical discrimination (6-level processing)
+  // Renamed from process_rounded_values to reflect consistent raw_diff usage
+  void process_hierarchy(const ColumnValues& column_data, size_t column_index,
+                         double raw_diff, int minimum_decimal_places,
+                         double threshold, CountStats& counter,
+                         DiffStats& differ, Flags& flags) const;
 
   // Helper functions
   static double round_to_decimals(double value, int precision);

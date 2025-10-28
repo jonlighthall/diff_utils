@@ -26,28 +26,29 @@ bool DifferenceAnalyzer::process_difference(
              << " v2=" << column_data.value2 << " threshold=" << threshold
              << std::endl;
   debug_file.close();
-  // Calculate rounded values and process difference
-  double rounded1 = round_to_decimals(column_data.value1, column_data.min_dp);
-  double rounded2 = round_to_decimals(column_data.value2, column_data.min_dp);
-  // compare values (with rounding)
-  double diff_rounded = std::abs(rounded1 - rounded2);
 
-  process_rounded_values(column_data, column_index, diff_rounded,
-                         column_data.min_dp, threshold, counter, differ, flags);
+  // Calculate raw difference (used for Levels 2-6)
+  double raw_diff = std::abs(column_data.value1 - column_data.value2);
+
+  // Process through the 6-level hierarchy
+  // NOTE: We pass raw_diff, not rounded_diff, for consistency.
+  // Level 2 will calculate rounded values internally to determine triviality,
+  // but Levels 3-6 use the actual raw difference for magnitude comparisons.
+  process_hierarchy(column_data, column_index, raw_diff, column_data.min_dp,
+                    threshold, counter, differ, flags);
 
   counter.elem_number++;
 
-  // Check critical threshold - only annotate early if both values correspond
-  // to meaningful pressure values (TL <= ignore threshold). We DO NOT abort
-  // processing; instead we set flags and let the hierarchy logic count it.
+  // Early critical difference check (for fail-fast reporting)
+  // Use raw_diff consistently with the hierarchy logic
   // Skip TL threshold checks for column 0 if it's range data.
   bool skip_tl_check = (column_index == 0 && flags.column1_is_range_data);
-  if ((diff_rounded > thresh.critical) && (rounded1 <= thresh.ignore) &&
-      (rounded2 <= thresh.ignore) && !skip_tl_check) {
+  if ((raw_diff > thresh.critical) && (column_data.value1 <= thresh.ignore) &&
+      (column_data.value2 <= thresh.ignore) && !skip_tl_check) {
     if (!flags.has_critical_diff) {
       // First critical difference encountered: print a concise notification
-      print_hard_threshold_error(rounded1, rounded2, diff_rounded, column_index,
-                                 counter);
+      print_hard_threshold_error(column_data.value1, column_data.value2,
+                                 raw_diff, column_index, counter);
     }
     flags.has_critical_diff = true;
     flags.error_found = true;  // ensure program exits non-zero
@@ -75,13 +76,21 @@ void DifferenceAnalyzer::process_raw_values(const ColumnValues& column_data,
   }
 }
 
-void DifferenceAnalyzer::process_rounded_values(
-    const ColumnValues& column_data, size_t column_index, double rounded_diff,
-    int minimum_deci, double threshold, CountStats& counter, DiffStats& differ,
-    Flags& flags) const {
+void DifferenceAnalyzer::process_hierarchy(const ColumnValues& column_data,
+                                           size_t column_index, double raw_diff,
+                                           int minimum_deci, double threshold,
+                                           CountStats& counter,
+                                           DiffStats& differ,
+                                           Flags& flags) const {
   // 6-LEVEL HIERARCHY IMPLEMENTATION
   // Each level divides one group into two, with one group being further
   // subdivided
+  //
+  // IMPORTANT: After Level 2, we use raw_diff (not rounded_diff) for all
+  // magnitude comparisons. Level 2's job is to filter out differences that
+  // are indistinguishable at the printed precision. Once a difference is
+  // non-trivial, subsequent levels should compare against the actual
+  // magnitude, not the inflated rounded difference.
 
   // LEVEL 2: non_zero = trivial + non_trivial (based on printed precision)
   // A raw non-zero difference is TRIVIAL if, after rounding to the minimum
@@ -95,15 +104,20 @@ void DifferenceAnalyzer::process_rounded_values(
   //
   // Example: 30.8 (1dp) vs 30.85 (2dp)
   //   - LSB = 0.1 (minimum step at 1 decimal place)
-  //   - raw_diff = 0.05 < LSB/2 = 0.05
+  //   - raw_diff = 0.05 <= LSB/2 = 0.05
   //   - This is a sub-LSB difference, classified as TRIVIAL
-  //   - Even though rounded_diff = 0.1 after rounding both to 1dp
   //
-  // CRITICAL FIX: Check raw_diff, not rounded_diff, against big_zero
-  double raw_diff = std::abs(column_data.value1 - column_data.value2);
+  // We calculate rounded_diff only to check if values round to the same value,
+  // but use raw_diff for the sub-LSB test and all subsequent comparisons.
+
   double lsb = std::pow(10, -minimum_deci);    // one unit in last place
   double big_zero = lsb / 2.0;                 // half-ulp criterion
   bool raw_non_zero = raw_diff > thresh.zero;  // raw difference observed
+
+  // Calculate rounded values to check if they're identical
+  double rounded1 = round_to_decimals(column_data.value1, minimum_deci);
+  double rounded2 = round_to_decimals(column_data.value2, minimum_deci);
+  double rounded_diff = std::abs(rounded1 - rounded2);
 
   // FLOATING POINT ROBUSTNESS: Use epsilon tolerance for sub-LSB comparison
   // to handle cases like 30.8 vs 30.85 where floating point arithmetic may
@@ -125,19 +139,16 @@ void DifferenceAnalyzer::process_rounded_values(
       flags.has_non_trivial_diff = true;
       flags.files_have_same_values = false;
 
-      // track maximum non-trivial difference
-      if (rounded_diff > differ.max_non_trivial) {
-        differ.max_non_trivial = rounded_diff;
+      // Track maximum non-trivial difference using raw_diff (actual magnitude)
+      if (raw_diff > differ.max_non_trivial) {
+        differ.max_non_trivial = raw_diff;
         differ.ndp_non_trivial = column_data.min_dp;
       }
 
-      // Track percentage error for this non-trivial difference. Use the
-      // unrounded (raw) difference for percent calculation to avoid
-      // artificially inflating the ratio by rounding. Use the second file as
-      // reference (column_data.value2). If reference is effectively zero,
-      // set percent to +infinity so that it is obvious in printed output and
-      // treat it as a sentinel (do not update max_percent_error with inf).
-      double raw_diff = std::abs(column_data.value1 - column_data.value2);
+      // Track percentage error for this non-trivial difference using raw_diff.
+      // Use the second file as reference (column_data.value2).
+      // If reference is effectively zero, set percent to +infinity as a
+      // sentinel (do not update max_percent_error with inf).
       double ref = std::abs(column_data.value2);
       double pct = 0.0;
       if (ref > thresh.zero) {
@@ -148,32 +159,32 @@ void DifferenceAnalyzer::process_rounded_values(
       } else {
         // Reference effectively zero: set pct to a sentinel large value for
         // printing. Do not store INF in max_percent_error since it's not
-        // meaningful numerically; instead store a very large number to
-        // indicate huge relative error when needed.
+        // meaningful numerically.
         pct = std::numeric_limits<double>::infinity();
       }
 
       // LEVEL 3: non_trivial = insignificant + significant
       // A non-trivial difference is considered INSIGNIFICANT if EITHER:
       //   (a) both TL values are above the ignore threshold (numerically
-      //   meaningless) (b) the magnitude of the difference does NOT exceed the
-      //   (possibly
-      //       precision-inflated) significance threshold passed in (threshold)
+      //       meaningless), OR
+      //   (b) the raw magnitude of the difference does NOT exceed the
+      //       significance threshold
       // Otherwise it is SIGNIFICANT.
+      //
+      // NOTE: We now use raw_diff for threshold comparisons, not rounded_diff.
+      // This provides consistent, intuitive behavior: threshold=0.1 means
+      // actual difference of 0.1, not "rounds to 0.1 difference at precision p"
+      //
       // Skip TL ignore threshold check for column 0 if it's range data.
       bool skip_tl_check = (column_index == 0 && flags.column1_is_range_data);
       bool both_above_ignore =
           !skip_tl_check && (column_data.value1 > thresh.ignore &&
                              column_data.value2 > thresh.ignore);
-      // Determine significance exceed condition. When the user-specified
-      // significant threshold is zero, any non-trivial difference (not both
-      // above ignore) should be considered significant regardless of the
-      // format-derived dp_threshold. This prevents the format precision from
-      // inflating the effective significance cutoff when the intent is
-      // "count everything meaningful".
+
+      // Determine significance exceed condition
       bool exceeds_significance = false;
       if (thresh.significant_is_percent) {
-        // Percent-mode: compare rounded_diff relative to the reference value
+        // Percent-mode: compare raw_diff relative to the reference value
         // taken from the second file (column_data.value2). significant_percent
         // is stored as a fraction (e.g. 0.01 for 1%). If the reference is
         // effectively zero, any non-trivial difference counts as exceeding
@@ -182,9 +193,9 @@ void DifferenceAnalyzer::process_rounded_values(
         if (ref <= thresh.zero) {
           // Reference effectively zero -> treat any non-trivial difference as
           // exceeding the percent cutoff.
-          exceeds_significance = (rounded_diff > thresh.zero);
+          exceeds_significance = (raw_diff > thresh.zero);
         } else {
-          double frac = rounded_diff / ref;  // fractional difference
+          double frac = raw_diff / ref;  // fractional difference
           exceeds_significance = (frac > thresh.significant_percent);
         }
       } else if (thresh.significant == 0.0) {
@@ -192,18 +203,16 @@ void DifferenceAnalyzer::process_rounded_values(
         // (below ignore) as significant.
         exceeds_significance = true;
       } else {
-        // Standard behavior: strictly greater than the (possibly inflated)
-        // threshold. (Keep '>' not '>=' to preserve original semantics for
-        // non-zero thresholds.)
-        exceeds_significance = (rounded_diff > threshold);
+        // Standard behavior: compare raw_diff against threshold
+        // (Keep '>' not '>=' to preserve original semantics)
+        exceeds_significance = (raw_diff > threshold);
       }
 
       // DEBUG instrumentation (can be removed after validation)
       if (counter.line_number < 5 && column_index < 5) {
         std::ofstream dbg("/tmp/debug_significance.txt", std::ios::app);
         dbg << "LN " << counter.line_number << " COL " << column_index + 1
-            << " raw_diff=" << raw_diff << " rounded_diff=" << rounded_diff
-            << " threshold=" << threshold
+            << " raw_diff=" << raw_diff << " threshold=" << threshold
             << " both_above_ignore=" << both_above_ignore
             << " exceeds_significance=" << exceeds_significance << std::endl;
       }
@@ -234,7 +243,8 @@ void DifferenceAnalyzer::process_rounded_values(
           // NON-MARGINAL
           // LEVEL 5: non_marginal = critical + non_critical
           // Skip TL ignore threshold check for column 0 if it's range data.
-          if (!skip_tl_check && (rounded_diff > thresh.critical) &&
+          // Use raw_diff for critical threshold comparison
+          if (!skip_tl_check && (raw_diff > thresh.critical) &&
               (column_data.value1 <= thresh.ignore) &&
               (column_data.value2 <= thresh.ignore)) {
             // CRITICAL
@@ -243,17 +253,16 @@ void DifferenceAnalyzer::process_rounded_values(
             flags.error_found = true;  // ensure failure exit code
           } else {
             // NON-CRITICAL
-            // LEVEL 6: non_critical = error + non_error (user/user_thresh
-            // split)
-            // LEVEL 6: user-defined split. Honor percent-mode if enabled.
+            // LEVEL 6: non_critical = error + non_error (user threshold split)
+            // Honor percent-mode if enabled. Use raw_diff for all comparisons.
             if (thresh.significant_is_percent) {
               double ref = std::abs(column_data.value2);
               bool percent_exceeds = false;
               if (ref <= thresh.zero) {
-                percent_exceeds = (rounded_diff > thresh.zero);
+                percent_exceeds = (raw_diff > thresh.zero);
               } else {
                 percent_exceeds =
-                    ((rounded_diff / ref) > thresh.significant_percent);
+                    ((raw_diff / ref) > thresh.significant_percent);
               }
               if (percent_exceeds) {
                 counter.diff_error++;
@@ -263,7 +272,7 @@ void DifferenceAnalyzer::process_rounded_values(
                 flags.has_non_error_diff = true;
               }
             } else {
-              if (rounded_diff > thresh.significant) {
+              if (raw_diff > thresh.significant) {
                 counter.diff_error++;
                 flags.has_error_diff = true;
               } else {
@@ -273,9 +282,9 @@ void DifferenceAnalyzer::process_rounded_values(
             }
           }
         }
-        // Track maximum significant difference
-        if (rounded_diff > differ.max_significant) {
-          differ.max_significant = rounded_diff;
+        // Track maximum significant difference using raw_diff
+        if (raw_diff > differ.max_significant) {
+          differ.max_significant = raw_diff;
           differ.ndp_significant = column_data.min_dp;
         }
       }

@@ -826,10 +826,14 @@ void FileComparator::process_rounded_values(const ColumnValues& column_data,
                                             size_t column_index,
                                             double rounded_diff,
                                             int minimum_deci) {
+  // Calculate raw difference (actual magnitude, not precision-inflated)
+  double raw_diff = std::abs(column_data.value1 - column_data.value2);
   double ithreshold = calculate_threshold(column_data.min_dp);
-  difference_analyzer_.process_rounded_values(
-      column_data, column_index, rounded_diff, minimum_deci, ithreshold,
-      counter, differ, flag);
+
+  // Call the renamed hierarchical processing function with raw_diff
+  difference_analyzer_.process_hierarchy(column_data, column_index, raw_diff,
+                                         minimum_deci, ithreshold, counter,
+                                         differ, flag);
 }
 
 // ========================================================================
@@ -1179,7 +1183,7 @@ void FileComparator::print_maximum_difference_analysis(
                    static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
                    differ.ndp_non_zero)
             << "\033[0m" << std::endl;
-  
+
   // Print maximum percent error immediately after
   if (differ.max_percent_error > 0.0) {
     std::cout << "   Maximum percent error: ";
@@ -1191,7 +1195,7 @@ void FileComparator::print_maximum_difference_analysis(
     }
     std::cout << std::endl;
   }
-  
+
   std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
             << ") to significant thresh (" << thresh.significant << ")..."
             << std::endl;
@@ -1221,7 +1225,7 @@ void FileComparator::print_maximum_difference_analysis(
         // Print maximum rounded difference (underlined, purple)
         std::cout << "   \033[4;35mMaximum rounded difference: "
                   << differ.max_non_trivial << "\033[0m" << std::endl;
-        
+
         // Print maximum percent error immediately after
         if (differ.max_percent_error > 0.0) {
           std::cout << "   Maximum percent error: ";
@@ -1388,7 +1392,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                        std::round(std::log10(differ.max_non_trivial)) + 2),
                    differ.ndp_non_trivial)
             << "\033[0m" << std::endl;
-  
+
   // Print maximum percentage error immediately after
   if (differ.max_percent_error > 0.0) {
     std::cout << "   Maximum percent error: ";
@@ -1400,7 +1404,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
     }
     std::cout << std::endl;
   }
-  
+
   if (counter.diff_print < counter.diff_non_trivial) {
     if (print.level > 0) {
       std::cout << "   Printed differences     ( >" << thresh.print
@@ -1605,7 +1609,7 @@ void FileComparator::print_maximum_significant_difference_details() const {
                        std::round(std::log10(differ.max_significant)) + 2),
                    differ.ndp_significant)
             << "\033[0m" << std::endl;
-  
+
   // Print maximum percent error immediately after
   if (differ.max_percent_error > 0.0) {
     std::cout << "   Maximum percent error: ";
