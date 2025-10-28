@@ -473,6 +473,10 @@ bool FileComparator::compare_files(const std::string& file1,
     ColumnStructure struct1 = file_reader_->analyze_column_structure(file1);
     ColumnStructure struct2 = file_reader_->analyze_column_structure(file2);
 
+    // Check if column 1 is range data in both files
+    flag.column1_is_range_data = struct1.is_first_column_range_data &&
+                                 struct2.is_first_column_range_data;
+
     if (struct1.groups.size() != struct2.groups.size() ||
         (struct1.groups.size() > 0 && struct2.groups.size() > 0 &&
          struct1.groups.back().column_count !=
@@ -1168,14 +1172,26 @@ void FileComparator::print_maximum_difference_analysis(
     return;  // No significant maximum difference to analyze
   }
 
-  // Print maximum difference
-
+  // Print maximum difference (underlined, purple)
   std::cout << "   \033[4;35mMaximum raw difference: "
             << format_number(
                    differ.max_non_zero, differ.ndp_non_zero,
                    static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
                    differ.ndp_non_zero)
             << "\033[0m" << std::endl;
+  
+  // Print maximum percent error immediately after
+  if (differ.max_percent_error > 0.0) {
+    std::cout << "   Maximum percent error: ";
+    if (std::isfinite(differ.max_percent_error)) {
+      std::cout << std::fixed << std::setprecision(2)
+                << differ.max_percent_error << "%";
+    } else {
+      std::cout << "INF";
+    }
+    std::cout << std::endl;
+  }
+  
   std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
             << ") to significant thresh (" << thresh.significant << ")..."
             << std::endl;
@@ -1202,8 +1218,21 @@ void FileComparator::print_maximum_difference_analysis(
 
       printbar(1);
       if (differ.max_non_trivial <= thresh.significant) {
+        // Print maximum rounded difference (underlined, purple)
         std::cout << "   \033[4;35mMaximum rounded difference: "
                   << differ.max_non_trivial << "\033[0m" << std::endl;
+        
+        // Print maximum percent error immediately after
+        if (differ.max_percent_error > 0.0) {
+          std::cout << "   Maximum percent error: ";
+          if (std::isfinite(differ.max_percent_error)) {
+            std::cout << std::fixed << std::setprecision(2)
+                      << differ.max_percent_error << "%";
+          } else {
+            std::cout << "INF";
+          }
+          std::cout << std::endl;
+        }
 
         bool equal_to_threshold =
             fabs(differ.max_non_trivial - thresh.significant) < thresh.zero;
@@ -1351,6 +1380,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << std::endl;
   }
 
+  // Print maximum rounded difference (underlined, purple)
   std::cout << "   \033[4;35mMaximum rounded difference: "
             << format_number(
                    differ.max_non_trivial, differ.ndp_non_trivial,
@@ -1358,7 +1388,8 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
                        std::round(std::log10(differ.max_non_trivial)) + 2),
                    differ.ndp_non_trivial)
             << "\033[0m" << std::endl;
-  // Print maximum percentage error if any non-trivial differences occurred.
+  
+  // Print maximum percentage error immediately after
   if (differ.max_percent_error > 0.0) {
     std::cout << "   Maximum percent error: ";
     if (std::isfinite(differ.max_percent_error)) {
@@ -1369,6 +1400,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
     }
     std::cout << std::endl;
   }
+  
   if (counter.diff_print < counter.diff_non_trivial) {
     if (print.level > 0) {
       std::cout << "   Printed differences     ( >" << thresh.print
@@ -1565,6 +1597,7 @@ void FileComparator::print_maximum_significant_difference_analysis(
 }
 
 void FileComparator::print_maximum_significant_difference_details() const {
+  // Print maximum significant difference (underlined, purple)
   std::cout << "   \033[4;35mMaximum significant difference: "
             << format_number(
                    differ.max_significant, differ.ndp_significant,
@@ -1572,6 +1605,18 @@ void FileComparator::print_maximum_significant_difference_details() const {
                        std::round(std::log10(differ.max_significant)) + 2),
                    differ.ndp_significant)
             << "\033[0m" << std::endl;
+  
+  // Print maximum percent error immediately after
+  if (differ.max_percent_error > 0.0) {
+    std::cout << "   Maximum percent error: ";
+    if (std::isfinite(differ.max_percent_error)) {
+      std::cout << std::fixed << std::setprecision(2)
+                << differ.max_percent_error << "%";
+    } else {
+      std::cout << "INF";
+    }
+    std::cout << std::endl;
+  }
 
   if (differ.ndp_significant > differ.ndp_single_precision) {
     std::cout << "   \033[1;33mProbably OK: single precision exceeded"
