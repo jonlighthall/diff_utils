@@ -783,7 +783,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
     // Only add to accumulation data if this is a significant error
     bool is_significant = (diff_unrounded > thresh.significant);
 
-    if (is_significant && counter.line_number < 10) {
+    if (print.debug && is_significant && counter.line_number < 10) {
       std::cout << "[DEBUG] Line " << counter.line_number << ", col "
                 << column_index << ": is_significant=" << is_significant
                 << ", diff=" << diff_unrounded
@@ -798,12 +798,12 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
           column_data.value2,  // TL from test file
           is_significant       // significance flag (always true here)
       );
-      if (accumulation_data_.n_points <= 3) {
+      if (print.debug && accumulation_data_.n_points <= 3) {
         std::cout << "[DEBUG] Added point #" << accumulation_data_.n_points
                   << " at range=" << column_data.range << "\n";
       }
     }
-  } else if (column_index == 0 && counter.line_number < 3) {
+  } else if (print.debug && column_index == 0 && counter.line_number < 3) {
     std::cout << "[DEBUG] Line " << counter.line_number << ", col "
               << column_index << " - SKIPPED (column_index = 0)\n";
   }
@@ -1213,11 +1213,18 @@ void FileComparator::print_maximum_difference_analysis(
   }
 
   // Print maximum difference (underlined, purple)
+  // Use appropriate precision: at least the stored ndp, but ensure we show
+  // the actual magnitude (use max of ndp_non_zero and digits needed to show
+  // value)
+  int display_precision = std::max(
+      differ.ndp_non_zero,
+      static_cast<int>(-std::floor(std::log10(differ.max_non_zero)) + 2));
   std::cout << "   \033[4;35mMaximum raw difference: "
-            << format_number(
-                   differ.max_non_zero, differ.ndp_non_zero,
-                   static_cast<int>(std::round(log10(differ.max_non_zero)) + 2),
-                   differ.ndp_non_zero)
+            << format_number(differ.max_non_zero, display_precision,
+                             static_cast<int>(std::round(std::log10(std::max(
+                                                  differ.max_non_zero, 1.0))) +
+                                              2),
+                             display_precision)
             << "\033[0m" << std::endl;
 
   // Print maximum percent error immediately after
@@ -1232,16 +1239,20 @@ void FileComparator::print_maximum_difference_analysis(
     std::cout << std::endl;
   }
 
-  std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
-            << ") to significant thresh (" << thresh.significant << ")..."
-            << std::endl;
+  if (print.debug) {
+    std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
+              << ") to significant thresh (" << thresh.significant << ")..."
+              << std::endl;
+  }
 
   // Analyze maximum difference relative to significant threshold
   if (differ.max_non_zero > thresh.significant) {
     // Maximum difference exceeds threshold
-    std::cout
-        << "   DEBUG: max non-zero diff is greater than significant threshold"
-        << std::endl;
+    if (print.debug) {
+      std::cout
+          << "   DEBUG: max non-zero diff is greater than significant threshold"
+          << std::endl;
+    }
     std::string color =
         (counter.diff_significant > 0) ? "\033[1;31m" : "\033[1;33m";
     std::cout
@@ -1249,8 +1260,10 @@ void FileComparator::print_maximum_difference_analysis(
         << "   Max non-zero diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
 
-    std::cout << "   DEBUG: non-trivial diff count: "
-              << counter.diff_non_trivial << std::endl;
+    if (print.debug) {
+      std::cout << "   DEBUG: non-trivial diff count: "
+                << counter.diff_non_trivial << std::endl;
+    }
     // Handle special case when no non-trivial differences exist
     if (counter.diff_non_trivial == 0) {
       // This means all differences are trivial but the max non-zero diff
@@ -2039,12 +2052,13 @@ void FileComparator::print_summary(const std::string& file1,
   if (print.debug) print_consistency_checks();
 
   // Print error accumulation analysis if applicable
-  // Debug: Always show this to diagnose why analysis isn't running
-  std::cout << "\n[DEBUG] About to call print_accumulation_analysis():\n";
-  std::cout << "  accumulation_data_.n_points = " << accumulation_data_.n_points
-            << "\n";
-  std::cout << "  flag.has_significant_diff = " << flag.has_significant_diff
-            << "\n";
+  if (print.debug) {
+    std::cout << "\n[DEBUG] About to call print_accumulation_analysis():\n";
+    std::cout << "  accumulation_data_.n_points = "
+              << accumulation_data_.n_points << "\n";
+    std::cout << "  flag.has_significant_diff = " << flag.has_significant_diff
+              << "\n";
+  }
   print_accumulation_analysis();
 }
 
