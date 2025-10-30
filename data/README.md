@@ -15,6 +15,9 @@ This directory contains reference and test files used for validating the `uband_
 - Fixed column width with variable precision
 - Tests precision-aware trivial difference detection
 
+test and ref should pass
+test 2 should fail
+
 ---
 
 ### `bbpp.rc` — Range-Centered Data with Complex Formatting
@@ -27,6 +30,9 @@ This directory contains reference and test files used for validating the `uband_
 - Complex multi-column structure
 - Mixed precision formats
 - Historical test case for format handling robustness
+
+time by 4.83ns, will fail
+wildly different results
 
 ---
 
@@ -41,6 +47,9 @@ This directory contains reference and test files used for validating the `uband_
 - Variable decimal places across columns
 - Tests column-specific precision tracking
 
+time offset by 1.36ns, fill fail
+complex data
+
 ---
 
 ### `bbtl.nspe02` — Transmission Loss with NSPE Data
@@ -54,6 +63,25 @@ This directory contains reference and test files used for validating the `uband_
 - Multiple columns (range + depth points)
 - Tests ignore/marginal threshold logic
 
+all different, all fail
+very similar tl curves, but different results.
+test 1 and test 2 are very close and would pass a more sophisticated test
+
+---
+
+### `calcpduct.std0` — Header Line Handling
+
+**Files**: Files with `.std0` naming
+
+**Description**: Tests comparison utility `cpddiff` functionality with files containing header lines.
+
+**Characteristics**:
+- Contains header row
+- Tests header skip logic
+- Validates multi-column processing
+
+very close but fails regular "diff"
+
 ---
 
 ### `pe.std1.pe01` — Precision Edge Case
@@ -65,15 +93,49 @@ This directory contains reference and test files used for validating the `uband_
 - 9 extra decimal places with values 1-4 (trivial differences)
 - 39 real differences
 
+this is the canonical test
+34 lines appear different
+maximum difference is 0.1.
+the first line of ref file has added precision for testing
+real data
+
+
 **Characteristics**:
 - Total elements: 3883 (353 lines × 11 columns)
 - Non-zero differences: 48 (9 trivial + 39 non-trivial)
 - Tests LEVEL 2 trivial vs non-trivial discrimination
 
+level 0
+  file sturctures match, but with different formatting
+   353 lines ×
+    11 columns
+  3883 - Total elements:
+level 1
+  3835 exact matches
+    48 non-zero differences (3835 + 48 = 3883)
+level 2
+    39 non-trivial
+     9 trivial (39 + 9 = 48)
+level 3
+  29 insignificant differences (differences below meaningful range)
+  10 significant differences (in meaningful range) (29 + 10 = 48)
+level 4
+  marginal differnces 9 (in operationally insignificant range
+  1 non-marginal difference (in operational range) (9 + 1 = 10)
+level 5
+  no critical (>1dB) differences
+level 6
+  1 significant difference in operational range
+  0.025% of total
+level 7
+   uncorrelated differences
+
 **Expected behavior**:
 - 9 trivial differences detected and excluded from significance analysis
 - 39 non-trivial differences undergo further discrimination
 - Validates format precision awareness
+
+
 
 ---
 
@@ -87,6 +149,11 @@ This directory contains reference and test files used for validating the `uband_
 - Contains significant differences
 - Tests pass-with-warning logic (< 2% threshold)
 - Realistic operational comparison case
+
+divering - should fail all tests
+actually very close, again would pass a more sophisticaed test
+test 2 and ref are imperceptably close; actually they are identical, but fail regular diff!?
+
 
 ---
 
@@ -105,6 +172,11 @@ This directory contains reference and test files used for validating the `uband_
 - Tests structural mismatch handling
 - Exposes need for range data detection
 
+interesting case a few large differences
+ranges formatted differently
+should absolutely pass
+test of transient spikes
+
 **Command example**:
 ```bash
 ./bin/uband_diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 0.6
@@ -113,6 +185,10 @@ This directory contains reference and test files used for validating the `uband_
 **Expected behavior**: Should fail due to >2% significant differences (905/3554 = 25%)
 
 ---
+
+### case1
+
+unit scaling error
 
 ### `case1r` — Multi-Level Discrimination Validation
 
@@ -144,18 +220,7 @@ This directory contains reference and test files used for validating the `uband_
 
 ---
 
-### `calcpduct.std0` — Header Line Handling
 
-**Files**: Files with `.std0` naming
-
-**Description**: Tests comparison utility `cpddiff` functionality with files containing header lines.
-
-**Characteristics**:
-- Contains header row
-- Tests header skip logic
-- Validates multi-column processing
-
----
 
 ### `edge_case` — Zero Threshold Failure
 
