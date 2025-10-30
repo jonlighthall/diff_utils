@@ -527,6 +527,9 @@ bool FileComparator::compare_files(const std::string& file1,
   }
   flag.file_end_reached = true;
 
+  // Finalize TL metrics (calculate last 4% statistics)
+  tl_metrics.finalize();
+
   // Validate file lengths and return result
   if (!file_reader_->compare_file_lengths(file1, file2)) {
     return false;
@@ -777,6 +780,17 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // Accumulate RMSE statistics (use raw difference for all comparisons)
   rmse_stats.add_error(column_index, diff_unrounded);
 
+  // Accumulate weighted RMSE for data columns (column > 0)
+  // Use TL values for weighting
+  if (column_index > 0) {
+    rmse_stats.add_weighted_error(column_index, diff_unrounded,
+                                  column_data.value1, column_data.value2);
+    
+    // Track TL metrics data for M2, M3, and M_curve calculations
+    tl_metrics.add_point(column_data.range, column_data.value1, 
+                         column_data.value2, diff_unrounded);
+  }
+
   // Collect data for error accumulation analysis
   // Only collect for SIGNIFICANT errors (Level 3+) to focus on meaningful
   // differences Collect if we have at least 2 columns and this is not column 0
@@ -941,12 +955,21 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
+  // Calculate weighted diff for display (only for data columns, column_index > 0)
+  double weighted_diff = 0.0;
+  double tl_weight = 0.0;
+  if (column_index > 0) {
+    double avg_tl = (column_data.value1 + column_data.value2) / 2.0;
+    tl_weight = RMSEStats::calculate_tl_weight(avg_tl);
+    weighted_diff = tl_weight * diff_unrounded;
+  }
+
   // define column widths
   //                     line | col | range | file1 |
-  //                     file2 | thres |diff_rnd | diff_raw | %err
+  //                     file2 | thres |diff_rnd | diff_raw | wtd_diff | %err
   std::vector<int> col_widths = {5,         5,         val_width,
                                  val_width, val_width, val_width,
-                                 val_width, val_width, 10};
+                                 val_width, val_width, val_width, 10};
 
   auto padLeft = [](const std::string& str, int width) {
     if (static_cast<int>(str.length()) >= width) return str;
@@ -972,13 +995,14 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << padLeft(" thres |", col_widths[5] + 3);
     std::cout << padLeft("diff_rnd |", col_widths[6] + 3);
     std::cout << padLeft("diff_raw |", col_widths[7] + 2);
-    std::cout << padLeft("%err", col_widths[8] + 1) << std::endl;
+    std::cout << padLeft("wtd_diff |", col_widths[8] + 2);
+    std::cout << padLeft("%err", col_widths[9] + 1) << std::endl;
 
     // Print horizontal line matching header width
     int total_width = 0;
     for (int w : col_widths) total_width += w;
     // Add spaces for extra padding in header columns
-    total_width += 1 + 3 + 3 + 3 + 3 + 1;
+    total_width += 1 + 3 + 3 + 3 + 2 + 2 + 1;
     std::cout << std::string(total_width, '-') << std::endl;
   }
   counter.diff_print++;
@@ -1059,14 +1083,35 @@ void FileComparator::print_table(const ColumnValues& column_data,
   print_diff_color(column_data.value1, column_data.value2, diff_unrounded);
   std::cout << format_number(diff_unrounded, column_data.max_dp, mxint, mxdec);
   std::cout << "\033[0m";
+  
+  // weighted difference (only for data columns, column_index > 0)
+  std::cout << " | ";
+  if (column_index > 0) {
+    // Color based on weight: green for high weight (operational), dim for low weight (marginal)
+    if (tl_weight >= 0.8) {
+      std::cout << "\033[1;32m";  // Green - operational region (high weight)
+    } else if (tl_weight >= 0.3) {
+      std::cout << "\033[1;33m";  // Yellow - transition region
+    } else if (tl_weight > 0.0) {
+      std::cout << "\033[2;37m";  // Dim white - low weight
+    } else {
+      std::cout << "\033[2;90m";  // Dim gray - zero weight (marginal)
+    }
+    std::cout << format_number(weighted_diff, column_data.max_dp, mxint, mxdec);
+    std::cout << "\033[0m";
+  } else {
+    // Range column - no weighted diff
+    std::cout << std::setw(val_width) << "---";
+  }
+  
   // percent error column
   std::cout << " | ";
   if (std::isfinite(percent_error)) {
     std::ostringstream pss;
     pss << std::fixed << std::setprecision(2) << percent_error << "%";
-    std::cout << std::setw(col_widths[8]) << pss.str();
+    std::cout << std::setw(col_widths[9]) << pss.str();
   } else {
-    std::cout << std::setw(col_widths[8]) << "INF";
+    std::cout << std::setw(col_widths[9]) << "INF";
   }
   // Emit exactly one newline per printed diff row (centralized here).
   std::cout << std::endl;
@@ -1941,6 +1986,14 @@ void FileComparator::print_rmse_statistics() const {
     std::cout << "   Data only (excluding range): " << std::scientific
               << std::setprecision(4) << rmse_data << std::endl;
 
+    // Print weighted RMSE if we have weighted data (TL values)
+    if (rmse_stats.has_weighted_data()) {
+      double weighted_rmse_data = rmse_stats.get_weighted_rmse_data();
+      std::cout << "   Weighted RMSE (TL-weighted, data only): "
+                << std::scientific << std::setprecision(4) << weighted_rmse_data
+                << " [weight: 1.0 at TL≤60 dB, 0.0 at TL≥110 dB]" << std::endl;
+    }
+
     // If we have multiple data columns, print per-column RMSE
     size_t num_data_columns = rmse_stats.count_per_column.size();
     if (num_data_columns > 2) {  // Range + at least 2 TL columns
@@ -1967,7 +2020,15 @@ void FileComparator::print_rmse_statistics() const {
             // Data column (TL or other)
             std::cout << "      Column " << std::setw(2) << (col + 1)
                       << " (curve " << col << "): " << std::scientific
-                      << std::setprecision(4) << rmse_col << std::endl;
+                      << std::setprecision(4) << rmse_col;
+
+            // Add weighted RMSE for this column if available
+            double weighted_rmse_col = rmse_stats.get_weighted_rmse_column(col);
+            if (weighted_rmse_col > 0) {
+              std::cout << " (weighted: " << std::scientific
+                        << std::setprecision(4) << weighted_rmse_col << ")";
+            }
+            std::cout << std::endl;
           }
         }
       }
@@ -1976,6 +2037,73 @@ void FileComparator::print_rmse_statistics() const {
     // Single column file (e.g., pi data)
     std::cout << "   (Single column data)" << std::endl;
   }
+
+  std::cout << std::endl;
+}
+
+// Helper function to print TL curve comparison metrics
+void FileComparator::print_tl_metrics() const {
+  // Only print if we have TL data and weighted RMSE
+  if (print.level < 0 || !tl_metrics.has_data || !rmse_stats.has_weighted_data()) {
+    return;
+  }
+
+  std::cout << "TL Curve Comparison Metrics:" << std::endl;
+  
+  // Get M1 (weighted RMSE - already calculated)
+  double m1_diff = rmse_stats.get_weighted_rmse_data();
+  
+  // Calculate M2 (last 4% mean difference)
+  double m2_diff = tl_metrics.calculate_m2();
+  
+  // Calculate M3 (correlation coefficient)
+  double correlation = tl_metrics.calculate_correlation();
+  
+  // Calculate M_curve (average of M1, M2, M3 scores)
+  double m_curve = tl_metrics.calculate_m_curve(m1_diff);
+  
+  // Convert component differences to scores
+  double score1 = TLMetrics::score_from_diff(m1_diff);
+  double score2 = TLMetrics::score_from_diff(m2_diff);
+  double score3 = std::max(0.0, correlation * 100.0);
+  
+  std::cout << "   M1 (weighted TL diff):    " << std::scientific
+            << std::setprecision(4) << m1_diff << " dB  (score: " 
+            << std::fixed << std::setprecision(1) << score1 << "/100)" << std::endl;
+  
+  std::cout << "   M2 (last 4% TL diff):     " << std::scientific
+            << std::setprecision(4) << m2_diff << " dB  (score: " 
+            << std::fixed << std::setprecision(1) << score2 << "/100)" << std::endl;
+  
+  std::cout << "   M3 (TL correlation):      " << std::fixed
+            << std::setprecision(4) << correlation << "      (score: " 
+            << std::setprecision(1) << score3 << "/100)" << std::endl;
+  
+  std::cout << "   M_curve (avg of M1-M3):   " << std::setprecision(1) 
+            << m_curve << "/100";
+  
+  // Add interpretation
+  if (m_curve >= 90.0) {
+    std::cout << "  \033[1;32m(EXCELLENT agreement)\033[0m";
+  } else if (m_curve >= 80.0) {
+    std::cout << "  \033[1;32m(GOOD agreement)\033[0m";
+  } else if (m_curve >= 70.0) {
+    std::cout << "  \033[1;33m(FAIR agreement)\033[0m";
+  } else if (m_curve >= 60.0) {
+    std::cout << "  \033[1;33m(MARGINAL agreement)\033[0m";
+  } else {
+    std::cout << "  \033[1;31m(POOR agreement)\033[0m";
+  }
+  std::cout << std::endl;
+  
+  // Add details about data points
+  std::cout << "   Data points analyzed:     " << tl_metrics.tl1_values.size() 
+            << " (max range: " << std::fixed << std::setprecision(2) 
+            << tl_metrics.max_range;
+  if (tl_metrics.count_last_4pct > 0) {
+    std::cout << ", last 4%: " << tl_metrics.count_last_4pct << " points";
+  }
+  std::cout << ")" << std::endl;
 
   std::cout << std::endl;
 }
@@ -2166,6 +2294,7 @@ void FileComparator::print_summary(const std::string& file1,
   print_settings(params.file1, params.file2);
   print_statistics(params.file1);
   print_rmse_statistics();
+  print_tl_metrics();
   print_flag_status();
   print_counter_info();
 

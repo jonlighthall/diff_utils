@@ -46,3 +46,9 @@ build/test/
 
 # diff test files
 *.txt
+
+# images
+*.png
+*.jpg
+*.jpeg
+*.gif

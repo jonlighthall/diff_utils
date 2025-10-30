@@ -163,30 +163,106 @@ RMSE complements existing metrics:
 | Significant count | RMSE | Count shows frequency, RMSE shows magnitude |
 | TRANSIENT_SPIKES | RMSE | Pattern uses accumulation RMSE; statistics RMSE is global |
 
-## Future Enhancements
+## Weighted RMSE Implementation
 
-As noted in `task_list.md`, the next step is **weighted RMSE**:
+**Status**: ✅ **COMPLETED** October 30, 2025
 
-```matlab
-% Weighting function for TL values
-wTL_min = 60;
-wTL_max = 110;
-wTL_span = wTL_max - wTL_min;
+### Weighting Function
 
-weight = (wTL_max - TL) / wTL_span;
-weight = min(weight, 1);
-weight = max(weight, 0);
+Implements TL-based operational significance weighting:
+
+```cpp
+// Weighting parameters
+TL_MIN_WEIGHT = 60.0;   // Full weight (1.0) for TL ≤ 60 dB
+TL_MAX_WEIGHT = 110.0;  // Zero weight (0.0) for TL ≥ 110 dB
+
+// Calculate weight
+if (TL <= 60.0)        weight = 1.0;
+else if (TL >= 110.0)  weight = 0.0;
+else                   weight = (110.0 - TL) / 50.0;  // Linear
 ```
 
-This will:
-- Weight TL ≤ 60 dB at 1.0 (full weight - operational region)
-- Weight TL ≥ 110 dB at 0.0 (zero weight - marginal region)
-- Linear interpolation between (60-110 dB)
+**Rationale**:
+- **TL ≤ 60 dB**: Operational region (full weight = 1.0)
+- **60-110 dB**: Transition region (linear weight 1.0 → 0.0)
+- **TL ≥ 110 dB**: Marginal region (zero weight = 0.0)
 
-Implementation plan:
-1. Add `RMSEStats::add_weighted_error(column_index, error, tl_value)`
-2. Track weighted sum separately
-3. Print weighted RMSE alongside unweighted
+### Implementation Details
+
+**File**: `src/cpp/include/uband_diff.h`
+
+Added to `RMSEStats`:
+- `sum_weighted_squared_errors_data` - Global weighted sum
+- `sum_weights_data` - Total weight sum
+- `sum_weighted_squared_errors_per_column` - Per-column weighted sums
+- `sum_weights_per_column` - Per-column weight sums
+- `calculate_tl_weight(tl_value)` - Static weighting function
+- `add_weighted_error(col, error, tl_ref, tl_test)` - Accumulator
+- `get_weighted_rmse_data()` - Global weighted RMSE
+- `get_weighted_rmse_column(col)` - Per-column weighted RMSE
+
+**File**: `src/cpp/src/file_comparator.cpp`
+
+In `process_difference()`:
+```cpp
+// Accumulate weighted RMSE for data columns (column > 0)
+if (column_index > 0) {
+  rmse_stats.add_weighted_error(column_index, diff_unrounded,
+                                 column_data.value1, column_data.value2);
+}
+```
+
+Uses average TL from both files for weighting: `avg_tl = (tl_ref + tl_test) / 2.0`
+
+### Test Results
+
+#### Multi-Column Case (pe.std1.pe01)
+
+```
+RMSE (Root Mean Square Error):
+   All elements:     1.0461e-02
+   Data only (excluding range): 1.0971e-02
+   Weighted RMSE (TL-weighted, data only): 2.3026e-03 [weight: 1.0 at TL≤60 dB, 0.0 at TL≥110 dB]
+   Per-column RMSE:
+      Column  2 (curve 1): 1.9198e-02 (weighted: 1.5552e-03)
+      Column  3 (curve 2): 1.6865e-02 (weighted: 2.4584e-03)
+      Column  4 (curve 3): 1.5139e-02 (weighted: 3.3043e-03)
+      ...
+```
+
+**Analysis**:
+- Overall weighted RMSE: **4.76× lower** than unweighted (2.30e-03 vs 1.10e-02)
+- Curve 1: **12.3× reduction** → errors concentrated at high TL (marginal region)
+- Curves 3-4: **4-5× reduction** → errors more distributed
+
+#### Single-Column Case (pe.std3.pe01)
+
+```
+RMSE (Root Mean Square Error):
+   All elements:     1.2054e-01
+   Data only (excluding range): 1.7045e-01
+   Weighted RMSE (TL-weighted, data only): 1.0828e-01 [weight: 1.0 at TL≤60 dB, 0.0 at TL≥110 dB]
+```
+
+**Analysis**:
+- Weighted RMSE: **1.57× lower** than unweighted (1.08e-01 vs 1.70e-01)
+- Moderate reduction → errors span operational and marginal regions
+- Supports TRANSIENT_SPIKES classification (not just high-TL noise)
+
+### Interpretation Guide
+
+| Weighted/Unweighted Ratio | Interpretation |
+|---------------------------|----------------|
+| **> 10×** | Errors heavily concentrated at high TL (marginal region) |
+| **3-10×** | Errors more prevalent at high TL, but operational region affected |
+| **1.5-3×** | Errors distributed across TL range |
+| **< 1.5×** | Errors concentrated at low TL (operational region) - **concerning** |
+
+### Use Cases
+
+1. **Operational Assessment**: Low weighted RMSE → acceptable for deployment
+2. **Error Localization**: High ratio → errors in marginal region (less critical)
+3. **Model Validation**: Compare weighted vs unweighted to understand error distribution
 
 ---
 
@@ -194,4 +270,4 @@ Implementation plan:
 **Related**:
 - `DISCRIMINATION_HIERARCHY.md` - Error classification levels
 - `TRANSIENT_SPIKES_ENHANCEMENT.md` - Pattern-based pass/fail logic
-- `task_list.md` - Next: weighted RMSE implementation
+- `task_list.md` - Weighted RMSE completed

@@ -186,20 +186,46 @@ struct DiffStats {
 
 // RMSE (Root Mean Square Error) Statistics
 struct RMSEStats {
-  // Global RMSE (all elements)
+  // Unweighted RMSE - Global (all elements)
   double sum_squared_errors_all = 0.0;
   size_t count_all = 0;
 
-  // RMSE excluding range column (column 0)
+  // Unweighted RMSE - excluding range column (column 0)
   double sum_squared_errors_data = 0.0;
   size_t count_data = 0;
 
-  // Per-column RMSE (for multi-column TL data)
+  // Unweighted RMSE - Per-column (for multi-column TL data)
   std::map<size_t, double>
       sum_squared_errors_per_column;          // column index -> sum
   std::map<size_t, size_t> count_per_column;  // column index -> count
 
-  // Helper to add a squared error
+  // Weighted RMSE - Global (all data elements, excluding range)
+  double sum_weighted_squared_errors_data = 0.0;
+  double sum_weights_data = 0.0;
+
+  // Weighted RMSE - Per-column
+  std::map<size_t, double> sum_weighted_squared_errors_per_column;
+  std::map<size_t, double> sum_weights_per_column;
+
+  // TL weighting parameters (operational significance region)
+  static constexpr double TL_MIN_WEIGHT = 60.0;   // Full weight below this
+  static constexpr double TL_MAX_WEIGHT = 110.0;  // Zero weight above this
+  static constexpr double TL_WEIGHT_SPAN = TL_MAX_WEIGHT - TL_MIN_WEIGHT;
+
+  // Calculate TL-based weight for a value
+  // Returns 1.0 for TL <= 60 dB, 0.0 for TL >= 110 dB, linear between
+  static double calculate_tl_weight(double tl_value) {
+    if (tl_value <= TL_MIN_WEIGHT) {
+      return 1.0;
+    } else if (tl_value >= TL_MAX_WEIGHT) {
+      return 0.0;
+    } else {
+      // Linear interpolation: weight = (110 - TL) / 50
+      return (TL_MAX_WEIGHT - tl_value) / TL_WEIGHT_SPAN;
+    }
+  }
+
+  // Helper to add an unweighted squared error
   void add_error(size_t column_index, double error) {
     double sq_err = error * error;
 
@@ -218,19 +244,43 @@ struct RMSEStats {
     count_per_column[column_index]++;
   }
 
-  // Calculate RMSE for all elements
+  // Helper to add a weighted squared error (for TL data)
+  // tl_ref and tl_test are the TL values from both files
+  void add_weighted_error(size_t column_index, double error, double tl_ref,
+                          double tl_test) {
+    // Skip range column (column 0) for weighted RMSE
+    if (column_index == 0) {
+      return;
+    }
+
+    // Use average TL for weighting (could also use ref or test specifically)
+    double avg_tl = (tl_ref + tl_test) / 2.0;
+    double weight = calculate_tl_weight(avg_tl);
+
+    double weighted_sq_err = weight * error * error;
+
+    // Add to global weighted data
+    sum_weighted_squared_errors_data += weighted_sq_err;
+    sum_weights_data += weight;
+
+    // Add to per-column weighted
+    sum_weighted_squared_errors_per_column[column_index] += weighted_sq_err;
+    sum_weights_per_column[column_index] += weight;
+  }
+
+  // Calculate unweighted RMSE for all elements
   double get_rmse_all() const {
     return (count_all > 0) ? std::sqrt(sum_squared_errors_all / count_all)
                            : 0.0;
   }
 
-  // Calculate RMSE for data only (excluding range column)
+  // Calculate unweighted RMSE for data only (excluding range column)
   double get_rmse_data() const {
     return (count_data > 0) ? std::sqrt(sum_squared_errors_data / count_data)
                             : 0.0;
   }
 
-  // Calculate RMSE for a specific column
+  // Calculate unweighted RMSE for a specific column
   double get_rmse_column(size_t column_index) const {
     auto it_sum = sum_squared_errors_per_column.find(column_index);
     auto it_count = count_per_column.find(column_index);
@@ -239,6 +289,146 @@ struct RMSEStats {
       return std::sqrt(it_sum->second / it_count->second);
     }
     return 0.0;
+  }
+
+  // Calculate weighted RMSE for data only (excluding range column)
+  double get_weighted_rmse_data() const {
+    return (sum_weights_data > 0)
+               ? std::sqrt(sum_weighted_squared_errors_data / sum_weights_data)
+               : 0.0;
+  }
+
+  // Calculate weighted RMSE for a specific column
+  double get_weighted_rmse_column(size_t column_index) const {
+    auto it_sum = sum_weighted_squared_errors_per_column.find(column_index);
+    auto it_weight = sum_weights_per_column.find(column_index);
+    if (it_sum != sum_weighted_squared_errors_per_column.end() &&
+        it_weight != sum_weights_per_column.end() && it_weight->second > 0) {
+      return std::sqrt(it_sum->second / it_weight->second);
+    }
+    return 0.0;
+  }
+
+  // Check if we have weighted data
+  bool has_weighted_data() const { return sum_weights_data > 0; }
+};
+
+// TL Curve Comparison Metrics (based on Goodman et al.)
+// Tracks data needed for M2, M3, and M_curve calculations
+struct TLMetrics {
+  // For M2: Last 4% of range analysis
+  double sum_diff_last_4pct = 0.0;
+  size_t count_last_4pct = 0;
+  double max_range = 0.0;
+
+  // For M3: Correlation coefficient
+  std::vector<double> tl1_values;  // TL values from file 1
+  std::vector<double> tl2_values;  // TL values from file 2
+  std::vector<double> ranges;      // Range values for each point
+  std::vector<double> diffs;       // Absolute differences
+
+  // Track which column has TL data (usually column index > 0)
+  size_t tl_column_index = 0;
+  bool has_data = false;
+
+  // Add a data point for analysis
+  void add_point(double range, double tl1, double tl2, double diff_abs) {
+    has_data = true;
+
+    // Update max range
+    if (range > max_range) {
+      max_range = range;
+    }
+
+    // Store for later analysis
+    ranges.push_back(range);
+    tl1_values.push_back(tl1);
+    tl2_values.push_back(tl2);
+    diffs.push_back(diff_abs);
+  }
+
+  // Finalize - compute last 4% statistics after all data collected
+  void finalize() {
+    if (!has_data || ranges.empty()) return;
+
+    // Calculate last 4% threshold
+    double range_threshold = max_range * 0.96;
+
+    sum_diff_last_4pct = 0.0;
+    count_last_4pct = 0;
+
+    for (size_t i = 0; i < ranges.size(); ++i) {
+      if (ranges[i] >= range_threshold) {
+        sum_diff_last_4pct += diffs[i];
+        count_last_4pct++;
+      }
+    }
+  }
+
+  // Calculate M2: Mean difference in last 4% of range
+  double calculate_m2() const {
+    if (!has_data || count_last_4pct == 0) return 0.0;
+    return sum_diff_last_4pct / count_last_4pct;
+  }
+
+  // Calculate M3: Correlation coefficient
+  double calculate_correlation() const {
+    if (!has_data || tl1_values.size() < 2) return 0.0;
+
+    size_t n = tl1_values.size();
+    double mean1 = 0.0, mean2 = 0.0;
+
+    // Calculate means
+    for (size_t i = 0; i < n; ++i) {
+      mean1 += tl1_values[i];
+      mean2 += tl2_values[i];
+    }
+    mean1 /= n;
+    mean2 /= n;
+
+    // Calculate correlation
+    double numerator = 0.0;
+    double denom1 = 0.0;
+    double denom2 = 0.0;
+
+    for (size_t i = 0; i < n; ++i) {
+      double diff1 = tl1_values[i] - mean1;
+      double diff2 = tl2_values[i] - mean2;
+      numerator += diff1 * diff2;
+      denom1 += diff1 * diff1;
+      denom2 += diff2 * diff2;
+    }
+
+    if (denom1 < 1e-10 || denom2 < 1e-10) return 0.0;
+
+    return numerator / std::sqrt(denom1 * denom2);
+  }
+
+  // Score from difference (Figure 1 in Goodman paper)
+  static double score_from_diff(double diff) {
+    if (diff <= 3.0) {
+      // High score for differences 0-3 dB (90s range)
+      return 100.0 - (diff / 3.0) * 10.0;
+    } else if (diff < 20.0) {
+      // Linear decrease from ~90 to 0 for 3-20 dB
+      return std::max(0.0, 90.0 - ((diff - 3.0) / 17.0) * 90.0);
+    } else {
+      return 0.0;
+    }
+  }
+
+  // Calculate M_curve: average of M1, M2, M3 scores
+  // Note: M1 is the weighted RMSE (TL_diff_1), passed in
+  double calculate_m_curve(double m1_diff) const {
+    double m2_diff = calculate_m2();
+    double corr = calculate_correlation();
+
+    // Convert to scores (0-100)
+    double score1 = score_from_diff(m1_diff);
+    double score2 = score_from_diff(m2_diff);
+    double score3 = std::max(0.0, corr * 100.0);  // Correlation to 0-100
+
+    return (score1 + score2 + score3) / 3.0;
   }
 };
 
@@ -397,6 +587,7 @@ class FileComparator {
   DiffStats differ;
   CountStats counter;
   RMSEStats rmse_stats;
+  TLMetrics tl_metrics;  // TL curve comparison metrics (M2, M3, M_curve)
 
   // Error accumulation analysis data
   ErrorAccumulationData accumulation_data_;
@@ -473,6 +664,7 @@ class FileComparator {
   void print_flag_status() const;
   void print_counter_info() const;
   void print_rmse_statistics() const;  // RMSE statistics
+  void print_tl_metrics() const;       // TL curve comparison metrics
   void print_detailed_summary(const SummaryParams& params) const;
   void print_additional_diff_info(const SummaryParams& params) const;
   void print_critical_threshold_info() const;
