@@ -27,6 +27,7 @@
 #   --skip-newer        Skip files where outputs are newer than input
 #   --force             Override skip options and process all matched files
 #   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
+#   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
 #   --dry-run           Show what would be processed without running
 #   --debug             Show detailed file filtering information
 #   -h, --help          Show this help message
@@ -65,6 +66,7 @@ Options:
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
+  --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
   -h, --help          Show this help message
@@ -90,6 +92,7 @@ dry_run=false
 debug=false
 keep_bin=false
 cli_exe=""
+diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force uband_diff
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -133,6 +136,7 @@ while [[ $# -gt 0 ]]; do
         --skip-newer) skip_newer=true; shift;;
         --force) force=true; shift;;
         --keep-bin) keep_bin=true; shift;;
+        --diff-level) diff_level="$2"; shift 2;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
         -h|--help) usage; exit 0;;
@@ -153,6 +157,17 @@ else
 fi
 
 set -e
+
+# Validate diff_level
+if [[ ! "$diff_level" =~ ^[0-3]$ ]]; then
+    echo -e "\e[31mError: Invalid diff level '$diff_level'.\e[0m"
+    echo "Valid diff levels are:"
+    echo "  0 - Auto (default hierarchical behavior)"
+    echo "  1 - diff only (no fallback to tldiff or uband_diff)"
+    echo "  2 - max tldiff (stop at tldiff, don't try uband_diff)"
+    echo "  3 - force uband_diff (always run all three diff tools)"
+    exit 1
+fi
 
 # Set default directory if not provided
 directory="${directory:-std}"
@@ -424,6 +439,14 @@ if [[ "$mode" == "make" ]]; then
     echo "Will run ${PROG} and compare outputs to reference files"
     elif [[ "$mode" == "diff" ]]; then
     echo "Will compare existing output files to reference files (no ${PROG} execution)"
+fi
+# Show diff level if specified
+if [[ $diff_level -ne 0 && ("$mode" == "test" || "$mode" == "diff") ]]; then
+    case $diff_level in
+        1) echo "Diff level: 1 (diff only - no fallback)" ;;
+        2) echo "Diff level: 2 (max tldiff - stop at tldiff)" ;;
+        3) echo "Diff level: 3 (force uband_diff - always run all tools)" ;;
+    esac
 fi
 printf '%*s\n' "$line_len" '' | tr '  ' '='
 
@@ -887,7 +910,8 @@ for infile in "${infiles[@]}"; do
                             # TEST mode: Log comparison results
                             # Capture diff output to check which diff tool failed
                             diff_output_file=$(mktemp)
-                            if diff_files "$test" "$ref" >> "$LOG_FILE" 2>&1; then
+                            # Pass diff_level as 5th argument (after threshold1 and threshold2 which are empty/default)
+                            if diff_files "$test" "$ref" "" "" "$diff_level" >> "$LOG_FILE" 2>&1; then
                                 echo -e "\e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
                                 add_to_array_if_not_present "pass_files" "$infile"
@@ -930,7 +954,8 @@ for infile in "${infiles[@]}"; do
                             # DIFF mode: Show comparison results to terminal only
                             # Capture diff output to check which diff tool failed while also showing to screen
                             diff_output_file=$(mktemp)
-                            diff_files "$test" "$ref" 2>&1 | tee "$diff_output_file"
+                            # Pass diff_level as 5th argument (after threshold1 and threshold2 which are empty/default)
+                            diff_files "$test" "$ref" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
                             # Capture the exit code from diff_files (not from tee)
                             diff_exit_code=${PIPESTATUS[0]}
                             if [[ $diff_exit_code -eq 0 ]]; then
