@@ -46,6 +46,7 @@
 #include <string>
 #include <vector>
 
+#include "error_accumulation_analyzer.h"
 #include "precision_info.h"
 #include "uband_diff.h"
 
@@ -757,6 +758,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   debug_file << "FC::process_difference called: v1=" << column_data.value1
              << " v2=" << column_data.value2 << std::endl;
   debug_file.close();
+
   // Calculate threshold for this column
   double ithreshold = calculate_threshold(column_data.min_dp);
 
@@ -771,6 +773,40 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   double rounded2 = DifferenceAnalyzer::round_to_decimals(column_data.value2,
                                                           column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
+
+  // Collect data for error accumulation analysis
+  // Only collect for SIGNIFICANT errors (Level 3+) to focus on meaningful
+  // differences Collect if we have at least 2 columns and this is not column 0
+  // (the independent variable) Increased limit to 200 points to capture errors
+  // throughout entire file (not just first 100 lines)
+  if (column_index > 0 && accumulation_data_.n_points < 200) {
+    // Only add to accumulation data if this is a significant error
+    bool is_significant = (diff_unrounded > thresh.significant);
+
+    if (is_significant && counter.line_number < 10) {
+      std::cout << "[DEBUG] Line " << counter.line_number << ", col "
+                << column_index << ": is_significant=" << is_significant
+                << ", diff=" << diff_unrounded
+                << ", thresh=" << thresh.significant << "\n";
+    }
+
+    if (is_significant) {
+      accumulation_data_.add_point(
+          column_data.range,   // range value (first column)
+          diff_unrounded,      // raw error magnitude
+          column_data.value1,  // TL from reference file
+          column_data.value2,  // TL from test file
+          is_significant       // significance flag (always true here)
+      );
+      if (accumulation_data_.n_points <= 3) {
+        std::cout << "[DEBUG] Added point #" << accumulation_data_.n_points
+                  << " at range=" << column_data.range << "\n";
+      }
+    }
+  } else if (column_index == 0 && counter.line_number < 3) {
+    std::cout << "[DEBUG] Line " << counter.line_number << ", col "
+              << column_index << " - SKIPPED (column_index = 0)\n";
+  }
 
   // Percent error relative to second file (file2) using raw difference.
   double percent_error = 0.0;
@@ -2001,6 +2037,15 @@ void FileComparator::print_summary(const std::string& file1,
   print_additional_diff_info(params);
   print_critical_threshold_info();
   if (print.debug) print_consistency_checks();
+
+  // Print error accumulation analysis if applicable
+  // Debug: Always show this to diagnose why analysis isn't running
+  std::cout << "\n[DEBUG] About to call print_accumulation_analysis():\n";
+  std::cout << "  accumulation_data_.n_points = " << accumulation_data_.n_points
+            << "\n";
+  std::cout << "  flag.has_significant_diff = " << flag.has_significant_diff
+            << "\n";
+  print_accumulation_analysis();
 }
 
 void FileComparator::print_settings(const std::string& file1,
@@ -2191,4 +2236,131 @@ ColumnValues FileComparator::extract_column_values(const LineData& data1,
   int max_dp = std::max(dp1, dp2);
 
   return {val1, val2, rangeValue, dp1, dp2, min_dp, max_dp};
+}
+
+// ========================================================================
+// Error Accumulation Analysis
+// ========================================================================
+
+void FileComparator::print_accumulation_analysis() const {
+  // Only perform analysis if:
+  // 1. We have significant differences (Level 3+)
+  // 2. We have enough data points (at least 10 significant errors)
+  // 3. We're not in minimal print mode
+  //
+  // This ensures we only analyze when there are meaningful errors to
+  // investigate, not for trivial formatting differences or random noise
+
+  if (print.level >= 1) {
+    std::cout << "\nDEBUG: Accumulation analysis check:\n";
+    std::cout << "  has_significant_diff: " << flag.has_significant_diff
+              << "\n";
+    std::cout << "  accumulation_data_.n_points: "
+              << accumulation_data_.n_points << "\n";
+    std::cout << "  diff_significant: " << counter.diff_significant << "\n";
+    std::cout << "  print.level: " << print.level << "\n";
+  }
+
+  // Skip if no significant differences found
+  if (!flag.has_significant_diff) {
+    if (print.level >= 1) {
+      std::cout
+          << "Skipping accumulation analysis (no significant differences)\n";
+    }
+    return;
+  }
+
+  // Skip if insufficient significant error data points
+  if (accumulation_data_.n_points < 10 || print.level < 0) {
+    if (print.level >= 1 && accumulation_data_.n_points > 0) {
+      std::cout << "Skipping accumulation analysis (n_significant_points="
+                << accumulation_data_.n_points << " < 10)\n";
+    }
+    return;
+  }
+
+  ErrorAccumulationAnalyzer analyzer;
+  auto metrics = analyzer.analyze(accumulation_data_);
+
+  // Skip printing if insufficient data
+  if (metrics.pattern == AccumulationMetrics::ErrorPattern::INSUFFICIENT_DATA) {
+    return;
+  }
+
+  std::cout << "\n";
+  std::cout << "========================================\n";
+  std::cout << "ERROR ACCUMULATION ANALYSIS\n";
+  std::cout << "(Significant Errors Only - Level 3+)\n";
+  std::cout << "========================================\n";
+  std::cout << "Range: " << std::fixed << std::setprecision(2)
+            << accumulation_data_.range_min << " to "
+            << accumulation_data_.range_max << "\n";
+  std::cout << "Significant error data points: " << accumulation_data_.n_points
+            << " (out of " << counter.diff_significant
+            << " total significant)\n\n";
+
+  // Linear regression results
+  std::cout << "Linear Regression (error vs range):\n";
+  std::cout << "  Slope:       " << std::scientific << std::setprecision(4)
+            << metrics.slope << " (error per unit range)\n";
+  std::cout << "  Intercept:   " << metrics.intercept << "\n";
+  std::cout << "  R²:          " << std::fixed << std::setprecision(3)
+            << metrics.r_squared;
+  if (metrics.r_squared > 0.7) {
+    std::cout << " \033[1;33m(strong fit)\033[0m\n";
+  } else if (metrics.r_squared > 0.3) {
+    std::cout << " (moderate fit)\n";
+  } else {
+    std::cout << " (weak fit)\n";
+  }
+  std::cout << "  P-value:     " << std::scientific << metrics.p_value_slope;
+  if (metrics.p_value_slope < 0.05) {
+    std::cout << " \033[1;31m(SIGNIFICANT)\033[0m\n";
+  } else {
+    std::cout << " (not significant)\n";
+  }
+  std::cout << "  RMSE:        " << metrics.rmse << "\n\n";
+
+  // Autocorrelation analysis
+  std::cout << "Autocorrelation Analysis:\n";
+  std::cout << "  Lag-1 correlation: " << std::fixed << std::setprecision(3)
+            << metrics.autocorr_lag1 << "\n";
+  std::cout << "  Status: ";
+  if (metrics.is_correlated) {
+    std::cout << "\033[1;33mCORRELATED (systematic pattern)\033[0m\n";
+  } else {
+    std::cout << "\033[1;32mUNCORRELATED (random)\033[0m\n";
+  }
+  std::cout << "\n";
+
+  // Run test results
+  std::cout << "Run Test (randomness):\n";
+  std::cout << "  Observed runs:  " << metrics.n_runs << "\n";
+  std::cout << "  Expected runs:  " << metrics.expected_runs << "\n";
+  std::cout << "  Z-score:        " << std::setprecision(2)
+            << metrics.run_test_z_score << "\n";
+  std::cout << "  Status: ";
+  if (metrics.is_random) {
+    std::cout << "\033[1;32mRANDOM (passes test)\033[0m\n";
+  } else {
+    std::cout << "\033[1;33mNON-RANDOM (systematic trend)\033[0m\n";
+  }
+  std::cout << "\n";
+
+  // Classification
+  std::cout << "========================================\n";
+  std::cout << "CLASSIFICATION\n";
+  std::cout << "========================================\n";
+  std::cout << "Pattern: \033[1;36m"
+            << ErrorAccumulationAnalyzer::get_pattern_name(metrics.pattern)
+            << "\033[0m\n\n";
+  std::cout << "Interpretation:\n";
+  std::cout << metrics.interpretation << "\n\n";
+
+  // Recommendation
+  std::cout << "========================================\n";
+  std::cout << "RECOMMENDATION\n";
+  std::cout << "========================================\n";
+  std::cout << metrics.recommendation << "\n";
+  std::cout << "========================================\n\n";
 }

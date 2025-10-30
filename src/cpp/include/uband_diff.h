@@ -202,6 +202,46 @@ struct SummaryParams {
   int fmt_wid;        // Formatting width for output alignment
 };
 
+// Error Accumulation Analysis - Track errors as a function of range
+struct ErrorAccumulationData {
+  std::vector<double> ranges;          // Range values (typically column 1)
+  std::vector<double> errors;          // raw_diff values
+  std::vector<double> tl_values_ref;   // TL from reference file (column 2+)
+  std::vector<double> tl_values_test;  // TL from test file (column 2+)
+  std::vector<bool> is_significant;    // Significance flags
+
+  // Metadata
+  size_t n_points = 0;
+  double range_min = std::numeric_limits<double>::max();
+  double range_max = std::numeric_limits<double>::lowest();
+
+  // Add a data point
+  void add_point(double range, double error, double tl_ref, double tl_test,
+                 bool significant) {
+    ranges.push_back(range);
+    errors.push_back(error);
+    tl_values_ref.push_back(tl_ref);
+    tl_values_test.push_back(tl_test);
+    is_significant.push_back(significant);
+    n_points++;
+
+    if (range < range_min) range_min = range;
+    if (range > range_max) range_max = range;
+  }
+
+  // Clear all data
+  void clear() {
+    ranges.clear();
+    errors.clear();
+    tl_values_ref.clear();
+    tl_values_test.clear();
+    is_significant.clear();
+    n_points = 0;
+    range_min = std::numeric_limits<double>::max();
+    range_max = std::numeric_limits<double>::lowest();
+  }
+};
+
 // PrintLevel definition moved to print_level.h
 
 // Forward declarations for utility functions
@@ -296,6 +336,9 @@ class FileComparator {
   DiffStats differ;
   CountStats counter;
 
+  // Error accumulation analysis data
+  ErrorAccumulationData accumulation_data_;
+
   // ========================================================================
   // Line/Column Processing
   // ========================================================================
@@ -352,6 +395,7 @@ class FileComparator {
   void print_diff_like_summary(const SummaryParams& params) const;
   void print_rounded_summary(const SummaryParams& params) const;
   void print_significant_summary(const SummaryParams& params) const;
+  void print_accumulation_analysis() const;  // Error accumulation analysis
 
   // ========================================================================
   // Summary Helper Functions (for cognitive complexity reduction)
