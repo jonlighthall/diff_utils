@@ -1926,47 +1926,48 @@ void FileComparator::print_rmse_statistics() const {
   if (print.level < 0 || rmse_stats.count_all == 0) {
     return;
   }
-  
+
   std::cout << "RMSE (Root Mean Square Error):" << std::endl;
-  
+
   // Print overall RMSE
   double rmse_all = rmse_stats.get_rmse_all();
-  std::cout << "   All elements:     " << std::scientific << std::setprecision(4) 
-            << rmse_all << std::endl;
-  
+  std::cout << "   All elements:     " << std::scientific
+            << std::setprecision(4) << rmse_all << std::endl;
+
   // Print RMSE for data only (excluding range column) if multi-column
-  if (rmse_stats.count_data > 0 && rmse_stats.count_data < rmse_stats.count_all) {
+  if (rmse_stats.count_data > 0 &&
+      rmse_stats.count_data < rmse_stats.count_all) {
     double rmse_data = rmse_stats.get_rmse_data();
-    std::cout << "   Data only (excluding range): " << std::scientific 
+    std::cout << "   Data only (excluding range): " << std::scientific
               << std::setprecision(4) << rmse_data << std::endl;
-    
+
     // If we have multiple data columns, print per-column RMSE
     size_t num_data_columns = rmse_stats.count_per_column.size();
     if (num_data_columns > 2) {  // Range + at least 2 TL columns
       std::cout << "   Per-column RMSE:" << std::endl;
-      
+
       // Get number of columns from the largest column index
       size_t max_col = 0;
       for (const auto& pair : rmse_stats.count_per_column) {
         if (pair.first > max_col) max_col = pair.first;
       }
-      
+
       // Print RMSE for each column
       for (size_t col = 0; col <= max_col; ++col) {
         auto it = rmse_stats.count_per_column.find(col);
         if (it != rmse_stats.count_per_column.end() && it->second > 0) {
           double rmse_col = rmse_stats.get_rmse_column(col);
-          
+
           if (col == 0) {
             // Range column
-            std::cout << "      Column " << std::setw(2) << (col + 1) 
-                     << " (range):   " << std::scientific << std::setprecision(4) 
-                     << rmse_col << std::endl;
+            std::cout << "      Column " << std::setw(2) << (col + 1)
+                      << " (range):   " << std::scientific
+                      << std::setprecision(4) << rmse_col << std::endl;
           } else {
             // Data column (TL or other)
-            std::cout << "      Column " << std::setw(2) << (col + 1) 
-                     << " (curve " << col << "): " << std::scientific 
-                     << std::setprecision(4) << rmse_col << std::endl;
+            std::cout << "      Column " << std::setw(2) << (col + 1)
+                      << " (curve " << col << "): " << std::scientific
+                      << std::setprecision(4) << rmse_col << std::endl;
           }
         }
       }
@@ -1975,7 +1976,7 @@ void FileComparator::print_rmse_statistics() const {
     // Single column file (e.g., pi data)
     std::cout << "   (Single column data)" << std::endl;
   }
-  
+
   std::cout << std::endl;
 }
 
