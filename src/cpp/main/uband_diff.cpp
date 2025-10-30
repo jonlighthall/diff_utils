@@ -20,9 +20,15 @@
 
 #include "uband_diff.h"
 
+#include <libgen.h>
+#include <limits.h>
+#include <unistd.h>
+
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 // Forward declarations
@@ -38,6 +44,7 @@ struct ProgramArgs {
   // threshold on the command line (e.g. -1 -> 1%).
   bool count_level_is_percent = false;
   double count_percent = 0.0;  // fractional (0.01 == 1%)
+  bool plot_enabled = false;   // If true, call Python plotting script
 };
 
 bool show_help_if_requested(int argc, char* argv[]);
@@ -47,6 +54,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args);
 bool parse_threshold_argument(const char* arg, double& value,
                               const std::string& name);
 bool parse_debug_level_argument(const char* arg, int& value);
+void call_plot_script(const std::string& file1, const std::string& file2,
+                      double threshold, int debug_level);
 
 bool show_help_if_requested(int argc, char* argv[]) {
   if (argc >= 2 &&
@@ -56,7 +65,7 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "USAGE:" << std::endl;
     std::cout << "  " << argv[0]
               << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level]"
+                 "[debug_level] [--plot]"
               << std::endl;
     std::cout << "\nARGUMENTS:" << std::endl;
     std::cout << "  file1           First input file to compare" << std::endl;
@@ -79,10 +88,19 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "                  (default: 1.0, must be ≥ 0)" << std::endl;
     std::cout << "  debug_level     Debug output level" << std::endl;
     std::cout << "                  (default: 0, typically 0-3)" << std::endl;
+    std::cout << "\nOPTIONS:" << std::endl;
+    std::cout
+        << "  --plot          Generate comparison plot using Python script"
+        << std::endl;
+    std::cout
+        << "                  (calls plot_pe_comparison.py with threshold)"
+        << std::endl;
     std::cout << "\nEXAMPLES:" << std::endl;
     std::cout << "  " << argv[0] << " data1.txt data2.txt" << std::endl;
     std::cout << "  " << argv[0] << " file1.dat file2.dat 0.01" << std::endl;
     std::cout << "  " << argv[0] << " test1.txt test2.txt 0.05 1.0 0.1 2"
+              << std::endl;
+    std::cout << "  " << argv[0] << " ref.txt test.txt 0.4 10.0 1.0 0 --plot"
               << std::endl;
     std::cout << "\nFEATURES:" << std::endl;
     std::cout << "  - Precision-aware numerical comparison" << std::endl;
@@ -90,6 +108,7 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "  - Configurable difference thresholds" << std::endl;
     std::cout << "  - Detailed difference reporting" << std::endl;
     std::cout << "  - Automatic column structure analysis" << std::endl;
+    std::cout << "  - Optional visualization via Python plotting" << std::endl;
     return true;
   }
   return false;
@@ -101,19 +120,19 @@ bool validate_argument_count(int argc, char* argv[]) {
               << std::endl;
     std::cout << "   Usage: " << argv[0]
               << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level]"
+                 "[debug_level] [--plot]"
               << std::endl;
     std::cout << "   Use '" << argv[0]
               << " --help' for detailed usage information." << std::endl;
     return false;
   }
 
-  if (argc > 8) {
+  if (argc > 9) {
     std::cerr << "\033[1;31mERROR:\033[0m Too many arguments provided."
               << std::endl;
     std::cerr << "Usage: " << argv[0]
               << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level]"
+                 "[debug_level] [--plot]"
               << std::endl;
     std::cerr << "Use '" << argv[0]
               << " --help' for detailed usage information." << std::endl;
@@ -234,8 +253,21 @@ bool parse_debug_level_argument(const char* arg, int& value) {
 }
 
 bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
-  // Parse threshold arguments
+  // Check for --plot flag anywhere in arguments
+  for (int i = 3; i < argc; i++) {
+    if (std::string(argv[i]) == "--plot") {
+      args.plot_enabled = true;
+      break;
+    }
+  }
+
+  // Parse threshold arguments (skip --plot if encountered)
   if (argc >= 4) {
+    // Skip if it's the --plot flag
+    if (std::string(argv[3]) == "--plot") {
+      return true;
+    }
+
     try {
       double parsed = std::stod(argv[3]);
       if (parsed < 0.0) {
@@ -266,6 +298,11 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   }
 
   if (argc >= 5) {
+    // Skip if it's the --plot flag
+    if (std::string(argv[4]) == "--plot") {
+      return true;
+    }
+
     if (!parse_threshold_argument(argv[4], args.stop_level, "High threshold")) {
       return false;
     }
@@ -280,15 +317,95 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
     }
   }
 
-  if (argc >= 6 &&
-      !parse_threshold_argument(argv[5], args.print_level, "Print threshold")) {
-    return false;
+  if (argc >= 6) {
+    // Skip if it's the --plot flag
+    if (std::string(argv[5]) == "--plot") {
+      return true;
+    }
+
+    if (!parse_threshold_argument(argv[5], args.print_level,
+                                  "Print threshold")) {
+      return false;
+    }
   }
 
-  if (argc >= 7 && !parse_debug_level_argument(argv[6], args.debug_level)) {
-    return false;
+  if (argc >= 7) {
+    // Skip if it's the --plot flag
+    if (std::string(argv[6]) == "--plot") {
+      return true;
+    }
+
+    if (!parse_debug_level_argument(argv[6], args.debug_level)) {
+      return false;
+    }
   }
   return true;
+}
+
+void call_plot_script(const std::string& file1, const std::string& file2,
+                      double threshold, int debug_level) {
+  // Find the directory containing the uband_diff executable
+  char exe_path[PATH_MAX];
+  ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+
+  std::string script_path;
+  if (len != -1) {
+    exe_path[len] = '\0';
+    // Get directory of executable and resolve any symlinks
+    char resolved_path[PATH_MAX];
+    if (realpath(exe_path, resolved_path) != nullptr) {
+      char* exe_dir = dirname(resolved_path);
+      // Construct path to script: ../../scripts/plot_pe_comparison.py
+      // (from build/bin to scripts/)
+      script_path =
+          std::string(exe_dir) + "/../../scripts/plot_pe_comparison.py";
+    } else {
+      // Fallback if realpath fails
+      char* exe_dir = dirname(exe_path);
+      script_path =
+          std::string(exe_dir) + "/../../scripts/plot_pe_comparison.py";
+    }
+  } else {
+    // Fallback to relative path if readlink fails
+    script_path = "scripts/plot_pe_comparison.py";
+  }
+
+  std::ostringstream command;
+  command << "python3 \"" << script_path << "\" ";
+  command << "\"" << file1 << "\" \"" << file2 << "\" ";
+  command << std::scientific << threshold;
+
+  if (debug_level > 1) {
+    // In high debug mode, show output (don't background)
+    std::cout
+        << "\n\033[1;36mCalling plotting script (foreground debug mode):\033[0m"
+        << std::endl;
+    std::cout << "   Script path: " << script_path << std::endl;
+    std::cout << "   " << command.str() << std::endl;
+  } else {
+    // Run in background - redirect output and run as background process
+    command << " > /dev/null 2>&1 &";
+
+    if (debug_level > 0) {
+      std::cout << "\n\033[1;36mCalling plotting script (background):\033[0m"
+                << std::endl;
+      std::cout << "   Script path: " << script_path << std::endl;
+      std::cout << "   " << command.str() << std::endl;
+    } else if (debug_level >= 0) {
+      std::cout << "\n\033[1;36mLaunching plot in background...\033[0m"
+                << std::endl;
+    }
+  }
+
+  int ret = std::system(command.str().c_str());
+
+  if (ret != 0 && debug_level > 0) {
+    std::cerr << "\033[1;33mWARNING:\033[0m Plot script launch returned "
+                 "non-zero exit code: "
+              << ret << std::endl;
+    std::cerr << "         This may be normal for background processes."
+              << std::endl;
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -333,6 +450,12 @@ int main(int argc, char* argv[]) {
                             args.count_percent);
   bool result = comparator.compare_files(args.file1, args.file2);
   comparator.print_summary(args.file1, args.file2, argc, argv);
+
+  // Call plotting script if requested
+  if (args.plot_enabled) {
+    call_plot_script(args.file1, args.file2, args.count_level,
+                     args.debug_level);
+  }
 
   // Check for errors and return appropriate exit code
   if (comparator.getFlag().error_found) {
