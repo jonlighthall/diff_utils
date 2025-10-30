@@ -26,7 +26,7 @@ def read_pe_data(filename):
     return range_values, tl_curves
 
 
-def plot_pe_comparison(ref_file, test_file, output_file=None):
+def plot_pe_comparison(ref_file, test_file, diff_threshold=1e-10, output_file=None):
     """
     Plot comparison of reference and test PE data.
 
@@ -35,6 +35,7 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
     Args:
         ref_file: Path to reference file
         test_file: Path to test file
+        diff_threshold: Threshold for marking differences (default: 1e-10)
         output_file: Optional path to save figure (default: show interactive)
     """
     # Read data
@@ -47,6 +48,7 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
     print(f"  Test:      {test_file}")
     print(f"  Range points: {len(range_ref)}")
     print(f"  TL curves:    {n_curves}")
+    print(f"  Diff threshold: {diff_threshold} dB")
 
     # Determine grid layout (aim for roughly square, prefer more columns)
     n_cols = int(np.ceil(np.sqrt(n_curves)))
@@ -66,6 +68,9 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
     # Flatten axes array for easier iteration
     axes = axes.flatten() if n_curves > 1 else [axes]
 
+    # Track total differences across all curves
+    total_diff_points = 0
+
     # Plot each curve in its own subplot
     for i in range(n_curves):
         ax = axes[i]
@@ -78,10 +83,80 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
         # Plot test (dotted line) - easier to see when curves overlap
         ax.plot(range_test, tl_test[:, i], "r:", linewidth=2.0, label="Test", alpha=0.8)
 
+        # Calculate differences (interpolate if needed)
+        if len(range_ref) == len(range_test) and np.allclose(range_ref, range_test):
+            # Same grid - direct comparison
+            differences = np.abs(tl_ref[:, i] - tl_test[:, i])
+            diff_ranges = range_ref
+            diff_tls = tl_ref[:, i]  # Use reference TL values
+        else:
+            # Different grids - interpolate test to reference grid
+            tl_test_interp = np.interp(range_ref, range_test, tl_test[:, i])
+            differences = np.abs(tl_ref[:, i] - tl_test_interp)
+            diff_ranges = range_ref
+            diff_tls = tl_ref[:, i]
+
+        # Find points with non-zero differences (threshold for numerical precision)
+        diff_mask = differences > diff_threshold
+
+        if np.any(diff_mask):
+            # Get range and TL values where differences occur
+            diff_range_vals = diff_ranges[diff_mask]
+            diff_tl_vals = diff_tls[diff_mask]
+            n_diffs = len(diff_range_vals)
+
+            # Add tick marks on range axis (bottom of plot)
+            ylim = ax.get_ylim()
+            y_bottom = max(ylim)  # Remember y-axis is inverted
+            marker_height = (max(ylim) - min(ylim)) * 0.02  # 2% of range
+
+            # Plot small vertical lines at bottom for each difference location
+            for j, rng in enumerate(diff_range_vals):
+                ax.plot(
+                    [rng, rng],
+                    [y_bottom, y_bottom - marker_height],
+                    "r-",
+                    linewidth=1.5,
+                    alpha=0.7,
+                    zorder=10,
+                    label="Diff marker" if j == 0 else "",  # Only label first marker
+                )
+
+            # Add tick marks on TL axis (left side of plot)
+            xlim = ax.get_xlim()
+            x_left = min(xlim)
+            marker_width = (max(xlim) - min(xlim)) * 0.015  # 1.5% of range
+
+            # Plot small horizontal lines at left for each difference location
+            for tl in diff_tl_vals:
+                ax.plot(
+                    [x_left, x_left + marker_width],
+                    [tl, tl],
+                    "r-",
+                    linewidth=1.5,
+                    alpha=0.7,
+                    zorder=10,
+                )
+
+            # Add count of differences to title
+            ax.set_title(
+                f"Curve {i+1} ({n_diffs} diffs)",
+                fontsize=10,
+                fontweight="bold",
+            )
+            total_diff_points += n_diffs
+            
+            # Print diff statistics for this curve
+            print(f"  Curve {i+1}: {n_diffs} differences detected")
+        else:
+            # No differences
+            ax.set_title(f"Curve {i+1} (exact)", fontsize=10, fontweight="bold")
+            print(f"  Curve {i+1}: Exact match")
+
         # Formatting
         ax.set_xlabel("Range (km)", fontsize=9)
         ax.set_ylabel("TL (dB)", fontsize=9)
-        ax.set_title(f"Curve {i+1}", fontsize=10, fontweight="bold")
+        # Title was already set above based on diff count
         ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5)
         ax.legend(loc="best", fontsize=8)
 
@@ -94,6 +169,10 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
     # Hide unused subplots
     for i in range(n_curves, len(axes)):
         axes[i].set_visible(False)
+
+    # Print summary
+    print()
+    print(f"Total difference points across all curves: {total_diff_points}")
 
     # Adjust layout to prevent overlap
     plt.tight_layout(rect=[0, 0.03, 1, 0.97])
@@ -110,28 +189,46 @@ def plot_pe_comparison(ref_file, test_file, output_file=None):
 def main():
     """Main entry point with command-line argument handling."""
     if len(sys.argv) < 3:
-        print("Usage: plot_pe_comparison.py <ref_file> <test_file> [output_file]")
+        print("Usage: plot_pe_comparison.py <ref_file> <test_file> [diff_threshold] [output_file]")
         print()
         print("Arguments:")
-        print("  ref_file    : Reference data file")
-        print("  test_file   : Test data file")
-        print(
-            "  output_file : (Optional) Output figure filename (e.g., comparison.png)"
-        )
+        print("  ref_file       : Reference data file")
+        print("  test_file      : Test data file")
+        print("  diff_threshold : (Optional) Threshold for marking differences (default: 1e-10)")
+        print("                   Common values: 0.01, 0.1, 0.4 (significant threshold)")
+        print("  output_file    : (Optional) Output figure filename (e.g., comparison.png)")
         print()
         print("Examples:")
-        print("  # Interactive display:")
+        print("  # Interactive display with default threshold:")
         print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt")
         print()
-        print("  # Save to file:")
-        print(
-            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt pe_comparison.png"
-        )
+        print("  # Mark differences > 0.1 dB:")
+        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.1")
+        print()
+        print("  # Mark differences > 0.4 dB and save to file:")
+        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.4 comparison.png")
+        print()
+        print("  # Save with default threshold:")
+        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 1e-10 comparison.png")
         sys.exit(1)
 
     ref_file = sys.argv[1]
     test_file = sys.argv[2]
-    output_file = sys.argv[3] if len(sys.argv) > 3 else None
+    
+    # Parse optional arguments
+    diff_threshold = 1e-10  # default
+    output_file = None
+    
+    if len(sys.argv) >= 4:
+        # Try to parse third argument as threshold
+        try:
+            diff_threshold = float(sys.argv[3])
+            # If there's a 4th argument, it's the output file
+            if len(sys.argv) >= 5:
+                output_file = sys.argv[4]
+        except ValueError:
+            # Third argument is not a number, treat it as output file
+            output_file = sys.argv[3]
 
     # Check files exist
     if not Path(ref_file).exists():
@@ -141,7 +238,7 @@ def main():
         print(f"Error: Test file not found: {test_file}")
         sys.exit(1)
 
-    plot_pe_comparison(ref_file, test_file, output_file)
+    plot_pe_comparison(ref_file, test_file, diff_threshold, output_file)
 
 
 if __name__ == "__main__":
