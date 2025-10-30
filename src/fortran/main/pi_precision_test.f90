@@ -51,14 +51,13 @@ else
    output_filename = trim(output_filename)
 end if
 
-! Program identifier
-write(*,*) 'Using program id: pi-precision-test'
+! Program identifier (standardized)
+write(*,*) 'Using program id: pi_gen_fortran'
 
-! Build output filenames (use continuation to avoid long source lines)
-asc_name = trim(output_filename) // &
-   '-pi-precision-test-ascending.txt'
-desc_name = trim(output_filename) // &
-   '-pi-precision-test-descending.txt'
+! Build output filenames (standardized): pi_fortran_asc.txt / pi_fortran_desc.txt
+! Use fixed standardized filenames so scripts can find them reliably
+asc_name = 'pi_fortran_asc.txt'
+desc_name = 'pi_fortran_desc.txt'
 
 ! Generate ascending precision file (0 to max decimal places)
 call write_precision_file(asc_name, pi_calculated, 0, &
@@ -110,22 +109,25 @@ character(len=*), intent(in) :: filename
 real(kind=8), intent(in) :: value
 integer, intent(in) :: start_dp, end_dp, step
 character(len=20) :: format_string
-integer :: unit_num, i
+integer :: unit_num, i, line_no
 
 unit_num = 10
 
 open(unit=unit_num, file=filename, status='replace', &
    action='write')
 
- ! Loop over decimal places
+ ! Loop over decimal places and include index as first column
+line_no = 1
 do i = start_dp, end_dp, step
    if (i == 0) then
-      write(unit_num, '(i0)') int(value)
+      ! index and integer value
+      write(unit_num, '(i0,2x,i0)') line_no, int(value)
    else
-      write(format_string, '(a,i0,a,i0,a)') &
-         '(f', i+2, '.', i, ')'
-      write(unit_num, format_string) value
+      ! build format like '(i0,2x,f<w>.<d>)' where w=i+2 and d=i
+      write(format_string, '(a,i0,a,i0,a)') '(i0,2x,f', i+2, '.', i, ')'
+      write(unit_num, format_string) line_no, value
    end if
+   line_no = line_no + 1
 end do
 
 close(unit_num)

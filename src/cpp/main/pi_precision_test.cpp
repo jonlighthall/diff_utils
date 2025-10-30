@@ -32,22 +32,27 @@ void write_precision_file(const std::string& filename, double value,
     return;
   }
 
-  // Loop over decimal places
+  // Loop over decimal places and include an index column (mimics range/time)
+  int line_no = 1;
   if (step > 0) {
     for (int i = start_dp; i <= end_dp; i += step) {
+      outfile << line_no << "  ";
       if (i == 0) {
         outfile << static_cast<int>(value) << std::endl;
       } else {
         outfile << std::fixed << std::setprecision(i) << value << std::endl;
       }
+      ++line_no;
     }
   } else {
     for (int i = start_dp; i >= end_dp; i += step) {
+      outfile << line_no << "  ";
       if (i == 0) {
         outfile << static_cast<int>(value) << std::endl;
       } else {
         outfile << std::fixed << std::setprecision(i) << value << std::endl;
       }
+      ++line_no;
     }
   }
 
@@ -80,14 +85,17 @@ int main(int argc, char* argv[]) {
     base_no_ext = base_no_ext.substr(0, base_no_ext.size() - 4);
   }
 
-  // Program identifier used in output filenames
-  const std::string prog = "pi-precision-test";
+  // Program identifier used in output filenames (standardized)
+  const std::string prog = "pi_gen_cpp";
 
-  // Generate ascending / descending precision files with clear program and
-  // order in the name
-  const std::string asc_name = base_no_ext + "-" + prog + "-ascending.txt";
-  const std::string desc_name = base_no_ext + "-" + prog + "-descending.txt";
+  // Generate ascending / descending precision files with standardized names
+  // Use explicit language tag so executables across languages don't clobber
+  // each other's output: pi_<language>_asc.txt / pi_<language>_desc.txt
+  // Use standard fixed filenames so scripts can rely on consistent names
+  const std::string asc_name = "pi_cpp_asc.txt";
+  const std::string desc_name = "pi_cpp_desc.txt";
 
+  // Include an index column (mimics a range/time column): "index value"
   write_precision_file(asc_name, pi, 0, max_decimal_places, 1);
   write_precision_file(desc_name, pi, max_decimal_places, 0, -1);
 
