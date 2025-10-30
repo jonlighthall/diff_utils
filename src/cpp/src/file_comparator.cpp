@@ -821,11 +821,20 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // thresholding but still display both for complete information
   double diff_for_threshold = diff_unrounded;
 
+  // Special case: if print threshold is exactly 0, use thresh.zero (machine epsilon)
+  // This makes print_thresh=0 behave like 'diff' - showing all non-zero differences
+  double effective_print_thresh = (thresh.print == 0.0) ? thresh.zero : thresh.print;
+  
+  // When print_thresh==0, we want diff-like behavior (print everything non-zero),
+  // Check raw diff instead of rounded diff to avoid suppression
+  bool print_all_nonzero = (thresh.print == 0.0);
+  bool diff_is_zero = print_all_nonzero ? (diff_unrounded <= thresh.zero) : (diff_rounded == 0.0);
+
   // Print differences if above print threshold and not a trivial (rounded zero)
-  // diff Suppress rows where rounding makes the diff zero unless debug output
-  // is requested.
-  if (diff_for_threshold > thresh.print) {
-    if (diff_rounded == 0.0 && !print.debug && !print.debug2 && !print.debug3) {
+  // diff. Suppress rows where rounding makes the diff zero unless debug output
+  // is requested or print_thresh==0 (diff-like mode).
+  if (diff_for_threshold > effective_print_thresh) {
+    if (diff_is_zero && !print.debug && !print.debug2 && !print.debug3) {
       // Still count it internally but do not emit a row.
       // We intentionally do NOT increment diff_print here since nothing was
       // printed.
