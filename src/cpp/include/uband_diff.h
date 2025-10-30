@@ -9,13 +9,16 @@
 
 #include <cmath>
 #include <fstream>
+#include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "difference_analyzer.h"
+#include "error_accumulation_analyzer.h"
 #include "file_reader.h"
 #include "format_tracker.h"
 #include "line_parser.h"
@@ -181,6 +184,64 @@ struct DiffStats {
       7;  // number of decimal places for single precision
 };
 
+// RMSE (Root Mean Square Error) Statistics
+struct RMSEStats {
+  // Global RMSE (all elements)
+  double sum_squared_errors_all = 0.0;
+  size_t count_all = 0;
+
+  // RMSE excluding range column (column 0)
+  double sum_squared_errors_data = 0.0;
+  size_t count_data = 0;
+
+  // Per-column RMSE (for multi-column TL data)
+  std::map<size_t, double>
+      sum_squared_errors_per_column;          // column index -> sum
+  std::map<size_t, size_t> count_per_column;  // column index -> count
+
+  // Helper to add a squared error
+  void add_error(size_t column_index, double error) {
+    double sq_err = error * error;
+
+    // Add to global
+    sum_squared_errors_all += sq_err;
+    count_all++;
+
+    // Add to data (excluding column 0 - range)
+    if (column_index > 0) {
+      sum_squared_errors_data += sq_err;
+      count_data++;
+    }
+
+    // Add to per-column
+    sum_squared_errors_per_column[column_index] += sq_err;
+    count_per_column[column_index]++;
+  }
+
+  // Calculate RMSE for all elements
+  double get_rmse_all() const {
+    return (count_all > 0) ? std::sqrt(sum_squared_errors_all / count_all)
+                           : 0.0;
+  }
+
+  // Calculate RMSE for data only (excluding range column)
+  double get_rmse_data() const {
+    return (count_data > 0) ? std::sqrt(sum_squared_errors_data / count_data)
+                            : 0.0;
+  }
+
+  // Calculate RMSE for a specific column
+  double get_rmse_column(size_t column_index) const {
+    auto it_sum = sum_squared_errors_per_column.find(column_index);
+    auto it_count = count_per_column.find(column_index);
+    if (it_sum != sum_squared_errors_per_column.end() &&
+        it_count != count_per_column.end() && it_count->second > 0) {
+      return std::sqrt(it_sum->second / it_count->second);
+    }
+    return 0.0;
+  }
+};
+
 struct LineData {
   std::vector<double> values;
   std::vector<int> decimal_places;
@@ -335,9 +396,12 @@ class FileComparator {
 
   DiffStats differ;
   CountStats counter;
+  RMSEStats rmse_stats;
 
   // Error accumulation analysis data
   ErrorAccumulationData accumulation_data_;
+  // Cached accumulation metrics (computed before pass/fail decision)
+  mutable std::optional<AccumulationMetrics> accumulation_metrics_;
 
   // ========================================================================
   // Line/Column Processing
@@ -408,6 +472,7 @@ class FileComparator {
   void print_statistics(const std::string& file1) const;
   void print_flag_status() const;
   void print_counter_info() const;
+  void print_rmse_statistics() const;  // RMSE statistics
   void print_detailed_summary(const SummaryParams& params) const;
   void print_additional_diff_info(const SummaryParams& params) const;
   void print_critical_threshold_info() const;

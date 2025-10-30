@@ -774,6 +774,9 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
                                                           column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
 
+  // Accumulate RMSE statistics (use raw difference for all comparisons)
+  rmse_stats.add_error(column_index, diff_unrounded);
+
   // Collect data for error accumulation analysis
   // Only collect for SIGNIFICANT errors (Level 3+) to focus on meaningful
   // differences Collect if we have at least 2 columns and this is not column 0
@@ -1619,24 +1622,72 @@ void FileComparator::print_significant_percentage() const {
       100.0 * static_cast<double>(non_marginal_non_critical_significant) /
       static_cast<double>(counter.elem_number);
 
+  // Run accumulation analysis to get error pattern (if enough data and not
+  // already computed)
+  bool has_transient_spikes = false;
+  if (!accumulation_metrics_.has_value() && accumulation_data_.n_points >= 5) {
+    ErrorAccumulationAnalyzer analyzer;
+    accumulation_metrics_ = analyzer.analyze(accumulation_data_);
+    has_transient_spikes =
+        (accumulation_metrics_->pattern ==
+         AccumulationMetrics::ErrorPattern::TRANSIENT_SPIKES);
+  } else if (accumulation_metrics_.has_value()) {
+    // Use cached result
+    has_transient_spikes =
+        (accumulation_metrics_->pattern ==
+         AccumulationMetrics::ErrorPattern::TRANSIENT_SPIKES);
+  }
+
   // Check the 2% failure threshold for non-marginal, non-critical, significant
-  // differences
+  // differences, with special handling for TRANSIENT_SPIKES pattern
   constexpr double failure_threshold_percent = 2.0;
+  constexpr double transient_spikes_relaxed_threshold =
+      10.0;  // More lenient for isolated spikes
+
   if (critical_percent > failure_threshold_percent) {
-    std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
-                 "differences ("
-              << non_marginal_non_critical_significant << ", " << std::fixed
-              << std::setprecision(2) << critical_percent << "%) exceed "
-              << failure_threshold_percent << "% threshold\033[0m" << std::endl;
-    flag.files_are_close_enough = false;
-    // Do not mark error_found here; reserve for true criticals or structural
-    // errors
+    // Check if TRANSIENT_SPIKES pattern justifies a pass with caveat
+    if (has_transient_spikes &&
+        critical_percent <= transient_spikes_relaxed_threshold) {
+      std::cout
+          << "   \033[1;33mPASS (with caveat): Non-marginal, non-critical "
+             "significant "
+             "differences ("
+          << non_marginal_non_critical_significant << ", " << std::fixed
+          << std::setprecision(2) << critical_percent << "%) exceed "
+          << failure_threshold_percent << "% threshold,\n"
+          << "   but TRANSIENT_SPIKES pattern detected (isolated outliers, "
+          << "not systematic error)\033[0m" << std::endl;
+      flag.files_are_close_enough = true;
+    } else {
+      std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
+                   "differences ("
+                << non_marginal_non_critical_significant << ", " << std::fixed
+                << std::setprecision(2) << critical_percent << "%) exceed "
+                << failure_threshold_percent << "% threshold\033[0m"
+                << std::endl;
+      flag.files_are_close_enough = false;
+      // Do not mark error_found here; reserve for true criticals or structural
+      // errors
+    }
   } else if (critical_percent > 0) {
-    std::cout << "   \033[1;33mPASS: Non-marginal, non-critical significant "
-                 "differences ("
-              << non_marginal_non_critical_significant << ", " << std::fixed
-              << std::setprecision(2) << critical_percent << "%) within "
-              << failure_threshold_percent << "% tolerance\033[0m" << std::endl;
+    // Add pattern-aware messaging even for passing cases
+    if (has_transient_spikes) {
+      std::cout << "   \033[1;32mPASS: Non-marginal, non-critical significant "
+                   "differences ("
+                << non_marginal_non_critical_significant << ", " << std::fixed
+                << std::setprecision(2) << critical_percent << "%) within "
+                << failure_threshold_percent << "% tolerance\n"
+                << "   (TRANSIENT_SPIKES pattern: isolated outliers, not "
+                   "systematic)\033[0m"
+                << std::endl;
+    } else {
+      std::cout << "   \033[1;33mPASS: Non-marginal, non-critical significant "
+                   "differences ("
+                << non_marginal_non_critical_significant << ", " << std::fixed
+                << std::setprecision(2) << critical_percent << "%) within "
+                << failure_threshold_percent << "% tolerance\033[0m"
+                << std::endl;
+    }
     flag.files_are_close_enough = true;
   } else {
     std::cout << "   \033[1;32mPASS: No non-marginal, non-critical significant "
@@ -1870,6 +1921,64 @@ void FileComparator::print_statistics(const std::string& file1) const {
   }
 }
 
+// Helper function to print RMSE statistics
+void FileComparator::print_rmse_statistics() const {
+  if (print.level < 0 || rmse_stats.count_all == 0) {
+    return;
+  }
+  
+  std::cout << "RMSE (Root Mean Square Error):" << std::endl;
+  
+  // Print overall RMSE
+  double rmse_all = rmse_stats.get_rmse_all();
+  std::cout << "   All elements:     " << std::scientific << std::setprecision(4) 
+            << rmse_all << std::endl;
+  
+  // Print RMSE for data only (excluding range column) if multi-column
+  if (rmse_stats.count_data > 0 && rmse_stats.count_data < rmse_stats.count_all) {
+    double rmse_data = rmse_stats.get_rmse_data();
+    std::cout << "   Data only (excluding range): " << std::scientific 
+              << std::setprecision(4) << rmse_data << std::endl;
+    
+    // If we have multiple data columns, print per-column RMSE
+    size_t num_data_columns = rmse_stats.count_per_column.size();
+    if (num_data_columns > 2) {  // Range + at least 2 TL columns
+      std::cout << "   Per-column RMSE:" << std::endl;
+      
+      // Get number of columns from the largest column index
+      size_t max_col = 0;
+      for (const auto& pair : rmse_stats.count_per_column) {
+        if (pair.first > max_col) max_col = pair.first;
+      }
+      
+      // Print RMSE for each column
+      for (size_t col = 0; col <= max_col; ++col) {
+        auto it = rmse_stats.count_per_column.find(col);
+        if (it != rmse_stats.count_per_column.end() && it->second > 0) {
+          double rmse_col = rmse_stats.get_rmse_column(col);
+          
+          if (col == 0) {
+            // Range column
+            std::cout << "      Column " << std::setw(2) << (col + 1) 
+                     << " (range):   " << std::scientific << std::setprecision(4) 
+                     << rmse_col << std::endl;
+          } else {
+            // Data column (TL or other)
+            std::cout << "      Column " << std::setw(2) << (col + 1) 
+                     << " (curve " << col << "): " << std::scientific 
+                     << std::setprecision(4) << rmse_col << std::endl;
+          }
+        }
+      }
+    }
+  } else if (rmse_stats.count_data == 0) {
+    // Single column file (e.g., pi data)
+    std::cout << "   (Single column data)" << std::endl;
+  }
+  
+  std::cout << std::endl;
+}
+
 // Helper function to print flag status
 void FileComparator::print_flag_status() const {
   if (print.level < 1) {
@@ -2055,6 +2164,7 @@ void FileComparator::print_summary(const std::string& file1,
   SummaryParams params{file1, file2, fmt_wid};
   print_settings(params.file1, params.file2);
   print_statistics(params.file1);
+  print_rmse_statistics();
   print_flag_status();
   print_counter_info();
 
@@ -2311,8 +2421,14 @@ void FileComparator::print_accumulation_analysis() const {
     return;
   }
 
-  ErrorAccumulationAnalyzer analyzer;
-  auto metrics = analyzer.analyze(accumulation_data_);
+  // Use cached metrics if available, otherwise compute them
+  AccumulationMetrics metrics;
+  if (accumulation_metrics_.has_value()) {
+    metrics = *accumulation_metrics_;
+  } else {
+    ErrorAccumulationAnalyzer analyzer;
+    metrics = analyzer.analyze(accumulation_data_);
+  }
 
   // Skip printing if insufficient data
   if (metrics.pattern == AccumulationMetrics::ErrorPattern::INSUFFICIENT_DATA) {
