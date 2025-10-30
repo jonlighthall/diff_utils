@@ -21,15 +21,17 @@ def write_precision_file(filename, value, start_dp, end_dp, step):
         end_dp: ending decimal places
         step: increment (+1 for ascending, -1 for descending)
     """
-    with open(filename, 'w') as f:
-        # Loop over decimal places
+    with open(filename, "w") as f:
+        # Loop over decimal places with index column
+        line_no = 1
         current = start_dp
         while (step > 0 and current <= end_dp) or (step < 0 and current >= end_dp):
             if current == 0:
-                f.write(f"{int(value)}\n")
+                f.write(f"{line_no}  {int(value)}\n")
             else:
                 # Python format uses banker's rounding (round half to even)
-                f.write(f"{value:.{current}f}\n")
+                f.write(f"{line_no}  {value:.{current}f}\n")
+            line_no += 1
             current += step
 
 
@@ -49,19 +51,20 @@ def main():
     base_filename = sys.argv[1] if len(sys.argv) > 1 else "pi_output.txt"
 
     # Normalize base filename by stripping trailing .txt
-    base_no_ext = base_filename[:-4] if base_filename.endswith('.txt') else base_filename
+    base_no_ext = (
+        base_filename[:-4] if base_filename.endswith(".txt") else base_filename
+    )
 
-    prog = 'pi-precision-test'
-    asc_name = f"{base_no_ext}-{prog}-ascending.txt"
-    desc_name = f"{base_no_ext}-{prog}-descending.txt"
+    # Standardized program identifier and filenames
+    prog = "pi_gen_python"
+    asc_name = "pi_python_asc.txt"
+    desc_name = "pi_python_desc.txt"
 
     # Generate ascending precision file
-    write_precision_file(asc_name, pi,
-                        0, max_decimal_places, 1)
+    write_precision_file(asc_name, pi, 0, max_decimal_places, 1)
 
     # Generate descending precision file
-    write_precision_file(desc_name, pi,
-                        max_decimal_places, 0, -1)
+    write_precision_file(desc_name, pi, max_decimal_places, 0, -1)
 
     # Print summary to console
     print("Pi Precision Test Program (Python)")
