@@ -821,14 +821,17 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // thresholding but still display both for complete information
   double diff_for_threshold = diff_unrounded;
 
-  // Special case: if print threshold is exactly 0, use thresh.zero (machine epsilon)
-  // This makes print_thresh=0 behave like 'diff' - showing all non-zero differences
-  double effective_print_thresh = (thresh.print == 0.0) ? thresh.zero : thresh.print;
-  
-  // When print_thresh==0, we want diff-like behavior (print everything non-zero),
-  // Check raw diff instead of rounded diff to avoid suppression
+  // Special case: if print threshold is exactly 0, use thresh.zero (machine
+  // epsilon) This makes print_thresh=0 behave like 'diff' - showing all
+  // non-zero differences
+  double effective_print_thresh =
+      (thresh.print == 0.0) ? thresh.zero : thresh.print;
+
+  // When print_thresh==0, we want diff-like behavior (print everything
+  // non-zero), Check raw diff instead of rounded diff to avoid suppression
   bool print_all_nonzero = (thresh.print == 0.0);
-  bool diff_is_zero = print_all_nonzero ? (diff_unrounded <= thresh.zero) : (diff_rounded == 0.0);
+  bool diff_is_zero = print_all_nonzero ? (diff_unrounded <= thresh.zero)
+                                        : (diff_rounded == 0.0);
 
   // Print differences if above print threshold and not a trivial (rounded zero)
   // diff. Suppress rows where rounding makes the diff zero unless debug output
@@ -965,7 +968,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << std::setw(col_widths[4] + 3) << "file2 |";
     std::cout << padLeft(" thres |", col_widths[5] + 3);
     std::cout << padLeft("diff_rnd |", col_widths[6] + 3);
-    std::cout << padLeft("diff_raw |", col_widths[7] + 3);
+    std::cout << padLeft("diff_raw |", col_widths[7] + 2);
     std::cout << padLeft("%err", col_widths[8] + 1) << std::endl;
 
     // Print horizontal line matching header width
@@ -1079,6 +1082,12 @@ std::string FileComparator::format_number(double value, int prec,
 
   oss << std::fixed << std::setprecision(iprec) << value;
   std::string numStr = oss.str();
+
+  // When precision is 0, std::fixed doesn't include the decimal point
+  // Add it manually for proper alignment (e.g., "3" -> "3.")
+  if (iprec == 0 && numStr.find('.') == std::string::npos) {
+    numStr += '.';
+  }
 
   // Find position of decimal point
   size_t dotPos = numStr.find('.');
