@@ -145,7 +145,7 @@ def plot_pe_comparison(ref_file, test_file, diff_threshold=1e-10, output_file=No
                 fontweight="bold",
             )
             total_diff_points += n_diffs
-            
+
             # Print diff statistics for this curve
             print(f"  Curve {i+1}: {n_diffs} differences detected")
         else:
@@ -189,36 +189,50 @@ def plot_pe_comparison(ref_file, test_file, diff_threshold=1e-10, output_file=No
 def main():
     """Main entry point with command-line argument handling."""
     if len(sys.argv) < 3:
-        print("Usage: plot_pe_comparison.py <ref_file> <test_file> [diff_threshold] [output_file]")
+        print(
+            "Usage: plot_pe_comparison.py <ref_file> <test_file> [diff_threshold] [output_file]"
+        )
         print()
         print("Arguments:")
         print("  ref_file       : Reference data file")
         print("  test_file      : Test data file")
-        print("  diff_threshold : (Optional) Threshold for marking differences (default: 1e-10)")
-        print("                   Common values: 0.01, 0.1, 0.4 (significant threshold)")
-        print("  output_file    : (Optional) Output figure filename (e.g., comparison.png)")
+        print(
+            "  diff_threshold : (Optional) Threshold for marking differences (default: 1e-10)"
+        )
+        print(
+            "                   Common values: 0.01, 0.1, 0.4 (significant threshold)"
+        )
+        print(
+            "  output_file    : (Optional) Output figure filename (e.g., comparison.png)"
+        )
         print()
         print("Examples:")
         print("  # Interactive display with default threshold:")
         print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt")
         print()
         print("  # Mark differences > 0.1 dB:")
-        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.1")
+        print(
+            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.1"
+        )
         print()
         print("  # Mark differences > 0.4 dB and save to file:")
-        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.4 comparison.png")
+        print(
+            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.4 comparison.png"
+        )
         print()
         print("  # Save with default threshold:")
-        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 1e-10 comparison.png")
+        print(
+            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 1e-10 comparison.png"
+        )
         sys.exit(1)
 
     ref_file = sys.argv[1]
     test_file = sys.argv[2]
-    
+
     # Parse optional arguments
     diff_threshold = 1e-10  # default
     output_file = None
-    
+
     if len(sys.argv) >= 4:
         # Try to parse third argument as threshold
         try:
