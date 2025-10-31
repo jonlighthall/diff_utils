@@ -67,6 +67,7 @@ Options:
   --force             Override skip options and process all matched files
   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
+  --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
   -h, --help          Show this help message
@@ -93,6 +94,7 @@ debug=false
 keep_bin=false
 cli_exe=""
 diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force uband_diff
+no_make=false
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -139,6 +141,7 @@ while [[ $# -gt 0 ]]; do
         --diff-level) diff_level="$2"; shift 2;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
+        --no-make) no_make=true; shift;;
         -h|--help) usage; exit 0;;
         *) echo "Unknown option: $1" >&2; usage; exit 1;;
     esac
@@ -265,6 +268,16 @@ detect_program() {
 }
 PROG_OUTPUT_COLOR="\x1B[38;5;71m" # Light green color for PROG output
 PROG_OUTPUT_COLOR="\x1B[0m" # Reset color for PROG output
+
+# Run 'make' unless --no-make flag is set (for make and test modes)
+if [[ "$no_make" = false && ("$mode" == "make" || "$mode" == "test") ]]; then
+    echo "Running 'make' to ensure executables are up to date..."
+    if ! make; then
+        echo -e "\e[31mError: 'make' command failed. Exiting.\e[0m"
+        exit 1
+    fi
+    echo "'make' completed successfully."
+fi
 
 # Detect the appropriate executable (skip for diff and copy modes)
 if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then

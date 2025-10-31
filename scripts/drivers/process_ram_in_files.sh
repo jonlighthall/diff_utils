@@ -51,6 +51,7 @@ Options:
   --skip-existing     Skip files where outputs already exist
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
+  --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
   -h, --help          Show this help message
@@ -75,6 +76,7 @@ force=false
 dry_run=false
 debug=false
 cli_exe=""
+no_make=false
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -119,6 +121,7 @@ while [[ $# -gt 0 ]]; do
         --force) force=true; shift;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
+        --no-make) no_make=true; shift;;
         -h|--help) usage; exit 0;;
         *) echo "Unknown option: $1" >&2; usage; exit 1;;
     esac
@@ -188,6 +191,17 @@ find_project_root() {
 # Find the project root directory
 PROJECT_ROOT="$(find_project_root)"
 
+# Run make before executing program (for make/test modes) unless --no-make flag is set
+if [[ "$mode" == "make" || "$mode" == "test" ]] && ! $no_make; then
+    echo "Building executable with 'make'..."
+    if ! make; then
+        echo -e "\e[31mError: 'make' command failed. Cannot proceed with $mode mode.\e[0m" >&2
+        exit 1
+    fi
+    echo -e "\e[32mBuild successful.\e[0m"
+    echo ""
+fi
+
 # Set the program executable
 # Priority: command line --exe > RAM_EXE environment variable > default
 if [[ -n "$cli_exe" ]]; then
@@ -206,8 +220,8 @@ if [[ "$mode" != "diff" && "$mode" != "copy" ]]; then
 
     # Check if the program exists, and build it if not
     if [[ ! -f "$PROG" ]]; then
-        echo "Program $PROG not found. Attempting to build it..."
-        make
+        echo -e "\e[31mError: Program $PROG not found even after running make.\e[0m" >&2
+        exit 1
     fi
 
     # Verify the program is now executable
