@@ -26,7 +26,7 @@ def read_pe_data(filename):
     return range_values, tl_curves
 
 
-def plot_pe_comparison(ref_file, test_file, diff_threshold=1e-10, output_file=None):
+def plot_tl_comparison(ref_file, test_file, diff_threshold=1e-10, output_file=None):
     """
     Plot comparison of reference and test PE data.
 
@@ -190,7 +190,7 @@ def main():
     """Main entry point with command-line argument handling."""
     if len(sys.argv) < 3:
         print(
-            "Usage: plot_pe_comparison.py <ref_file> <test_file> [diff_threshold] [output_file]"
+            "Usage: plot_tl_comparison.py <ref_file> <test_file> [diff_threshold] [output_file]"
         )
         print()
         print("Arguments:")
@@ -208,21 +208,21 @@ def main():
         print()
         print("Examples:")
         print("  # Interactive display with default threshold:")
-        print("  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt")
+        print("  ./plot_tl_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt")
         print()
         print("  # Mark differences > 0.1 dB:")
         print(
-            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.1"
+            "  ./plot_tl_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.1"
         )
         print()
         print("  # Mark differences > 0.4 dB and save to file:")
         print(
-            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.4 comparison.png"
+            "  ./plot_tl_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 0.4 comparison.png"
         )
         print()
         print("  # Save with default threshold:")
         print(
-            "  ./plot_pe_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 1e-10 comparison.png"
+            "  ./plot_tl_comparison.py pe.std1.pe01.ref.txt pe.std1.pe01.test.txt 1e-10 comparison.png"
         )
         sys.exit(1)
 
@@ -252,7 +252,7 @@ def main():
         print(f"Error: Test file not found: {test_file}")
         sys.exit(1)
 
-    plot_pe_comparison(ref_file, test_file, diff_threshold, output_file)
+    plot_tl_comparison(ref_file, test_file, diff_threshold, output_file)
 
 
 if __name__ == "__main__":

@@ -93,7 +93,7 @@ bool show_help_if_requested(int argc, char* argv[]) {
         << "  --plot          Generate comparison plot using Python script"
         << std::endl;
     std::cout
-        << "                  (calls plot_pe_comparison.py with threshold)"
+        << "                  (calls plot_tl_comparison.py with threshold)"
         << std::endl;
     std::cout << "\nEXAMPLES:" << std::endl;
     std::cout << "  " << argv[0] << " data1.txt data2.txt" << std::endl;
@@ -355,19 +355,19 @@ void call_plot_script(const std::string& file1, const std::string& file2,
     char resolved_path[PATH_MAX];
     if (realpath(exe_path, resolved_path) != nullptr) {
       char* exe_dir = dirname(resolved_path);
-      // Construct path to script: ../../scripts/plot_pe_comparison.py
+      // Construct path to script: ../../scripts/plot_tl_comparison.py
       // (from build/bin to scripts/)
       script_path =
-          std::string(exe_dir) + "/../../scripts/plot_pe_comparison.py";
+          std::string(exe_dir) + "/../../scripts/plot_tl_comparison.py";
     } else {
       // Fallback if realpath fails
       char* exe_dir = dirname(exe_path);
       script_path =
-          std::string(exe_dir) + "/../../scripts/plot_pe_comparison.py";
+          std::string(exe_dir) + "/../../scripts/plot_tl_comparison.py";
     }
   } else {
     // Fallback to relative path if readlink fails
-    script_path = "scripts/plot_pe_comparison.py";
+    script_path = "scripts/plot_tl_comparison.py";
   }
 
   std::ostringstream command;
