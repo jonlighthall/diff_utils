@@ -220,8 +220,8 @@ else
     echo "Copy/Diff mode: Skipping $PROG program detection and execution"
 fi
 
-# Create array of files to process, sorted by size
-mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -exec ls -lSr {} + | awk '{print $9}')
+# Create array of files to process, sorted numerically by filename
+mapfile -t infiles < <(find "$directory" -maxdepth 1 -type f -name '*.in' -print0 | xargs -0 ls -1 | sort -V)
 
 if [[ ${#infiles[@]} -eq 0 ]]; then
     echo
