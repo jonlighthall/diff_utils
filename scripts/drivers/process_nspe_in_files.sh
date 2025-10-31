@@ -1002,7 +1002,10 @@ for infile in "${infiles[@]}"; do
                     fi
                     # After renaming/diffing, delete files with same base name except .in and selected reference
                     basename_noext="$(basename "$infile" .in)"
-                    for f in "$directory/$basename_noext"*; do
+                    # Only remove files matching <basename>.<ext> or <basename>_<suffix>
+                    shopt -s nullglob
+                    files_to_clean=("$directory/${basename_noext}."* "$directory/${basename_noext}_"*)
+                    for f in "${files_to_clean[@]}"; do
                         # Skip .in, selected reference, and test file
                         if [[ "$f" == "$infile" || "$f" == "$ref" || "$f" == "$test" ]]; then
                             continue
@@ -1015,6 +1018,12 @@ for infile in "${infiles[@]}"; do
                         if [[ "$f" == "$LOG_FILE" ]] && [[ "$test" == *case7* || "$test" == *case6* ]]; then
                             continue
                         fi
+                        # Never delete .in or .tl files
+                        case "$f" in
+                            *.in|*.tl)
+                                continue
+                                ;;
+                        esac
                         # Only delete files
                         if [[ -f "$f" ]]; then
                             rm "$f"
@@ -1023,6 +1032,7 @@ for infile in "${infiles[@]}"; do
                             fi
                         fi
                     done
+                    shopt -u nullglob
                     found_files=true
                     break
                 fi  # End of the "if [[ -f "$test" && -s "$test" ]]; then" block

@@ -711,11 +711,21 @@ for infile in "${infiles[@]}"; do
     fi
 
     # Clean up extra files
-    for f in "$directory/$basename_noext"*; do
-        # Skip .in, reference, output, and log
-        if [[ "$f" == "$infile" || "$f" == "$ref" || "$f" == "$test" || "$f" == "$LOG_FILE" ]]; then
+    # Only remove files that are of the form: <basename>.<ext> or <basename>_<suffix>
+    # This avoids matching other case names such as case10 when processing case1
+    shopt -s nullglob
+    files_to_clean=("$directory/${basename_noext}."* "$directory/${basename_noext}_"*)
+    for f in "${files_to_clean[@]}"; do
+        # Skip input, reference, output, and log
+        if [[ "$f" == "$infile" || "$f" == "$ref" || "$f" == "$test" || "$f" == "$LOG_FILE" || "$f" == "$directory/${basename_noext}.in" ]]; then
             continue
         fi
+        # Never delete .in or .tl files as a safety rule
+        case "$f" in
+            *.in|*.tl)
+                continue
+                ;;
+        esac
         # Only delete files
         if [[ -f "$f" ]]; then
             rm "$f"
@@ -724,6 +734,7 @@ for infile in "${infiles[@]}"; do
             fi
         fi
     done
+    shopt -u nullglob
 
     # Clean up ram.in from parent directory if it exists
     if [[ -f "$parent_dir/ram.in" ]]; then
