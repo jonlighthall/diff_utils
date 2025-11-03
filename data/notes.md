@@ -4,38 +4,9 @@ This document contains historical development notes, bug fixes, and algorithmic 
 
 ## Historical Bug Fixes and Issues
 
-### bbpp.rc Output Formatting
-**Status**: Fixed  
-**Issue**: Complex output formatting caused parsing failures  
-**Resolution**: Improved format handling robustness in file parser
-
-### bbpp.ts Decimal Place Handling
-**Issue**: Time series comparison couldn't properly handle varying decimal places across columns  
-**Resolution**: Implemented column-specific decimal place tracking (`min_dp`, `max_dp` per column)
-
-### bbtl.nspe02 Message and Percentage Display
-**Issues**:
-- Bad error message formatting
-- Percentage not displayed when expected
-**Resolution**: Updated message formatting and ensured percent error calculation for all non-trivial differences
-
 ### edge_case Zero Threshold
-**Issue**: Comparison failed to trigger error when threshold set to zero  
+**Issue**: Comparison failed to trigger error when threshold set to zero
 **Resolution**: Implemented sensitive mode logic where `significant == 0.0` treats all non-trivial differences as significant
-
-### nspe.std3 Range Precision and Monotonic Detection
-**Complex issue**: Range column had step size 0.0122 but printed precision was insufficient to capture it at every step (e.g., values printed with fewer decimal places). This caused monotonic increasing test to fail because consecutive values appeared identical.
-
-**Root cause**: Monotonic increasing test was too strict—it should allow for unchanged values (monotonically non-decreasing).
-
-**Resolution**: Updated range detection to be more forgiving of precision-limited format while maintaining fixed-delta detection
-
-**Command that exposed issue**:
-```bash
-make && ./bin/uband-diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 0.6
-```
-
-**Expected behavior**: With 905 significant differences out of 3554 total (25%), should fail the 2% threshold
 
 ## Algorithmic Design Decisions
 
@@ -84,7 +55,7 @@ Absolute thresholds fail to capture this scale dependence. Percentage thresholds
 ### Reference Value Selection for Percent Mode
 **Decision**: Use `value2` (second file, typically reference) as denominator for percent error calculation
 
-**Rationale**: 
+**Rationale**:
 - Asymmetric but consistent
 - Second file typically represents "ground truth" or expected output
 - Avoids ambiguity in reference selection
@@ -158,7 +129,7 @@ Absolute thresholds fail to capture this scale dependence. Percentage thresholds
 ## Machine Precision and Domain Knowledge Integration
 
 ### Ignore Threshold Derivation (138.47 dB)
-**Physical basis**: 
+**Physical basis**:
 ```
 TL = -20 × log₁₀(p / p_ref)
 ```

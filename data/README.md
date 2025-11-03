@@ -15,6 +15,7 @@ This directory contains reference and test files used for validating the `uband_
 - Fixed column width with variable precision
 - Tests precision-aware trivial difference detection
 
+why is the "range" different between 1 and 3?
 test and ref should pass
 test 2 should fail
 
@@ -34,6 +35,15 @@ test 2 should fail
 time by 4.83ns, will fail
 wildly different results
 
+
+#### History - Output Formatting
+**Status**: Fixed
+**Issue**: Complex output formatting caused parsing failures
+**Resolution**: Improved format handling robustness in file parser
+
+   STATUS: breaks
+   FIX: crazy output formatting
+
 ---
 
 ### `bbpp.ts` — Time Series Data
@@ -49,6 +59,12 @@ wildly different results
 
 time offset by 1.36ns, fill fail
 complex data
+
+#### History - Decimal Place Handling
+   test for tsdiff functionality
+   FIX: can't handle number of decimal places
+**Issue**: Time series comparison couldn't properly handle varying decimal places across columns
+**Resolution**: Implemented column-specific decimal place tracking (`min_dp`, `max_dp` per column)
 
 ---
 
@@ -67,6 +83,14 @@ all different, all fail
 very similar tl curves, but different results.
 test 1 and test 2 are very close and would pass a more sophisticated test
 
+#### History - Message and Percentage Display
+   FIX: bad message
+   FIX: no percentage, but probably is printed
+**Issues**:
+- Bad error message formatting
+- Percentage not displayed when expected
+**Resolution**: Updated message formatting and ensured percent error calculation for all non-trivial differences
+
 ---
 
 ### `calcpduct.std0` — Header Line Handling
@@ -81,6 +105,10 @@ test 1 and test 2 are very close and would pass a more sophisticated test
 - Validates multi-column processing
 
 very close but fails regular "diff"
+
+history
+   test cpddiff
+   has header line
 
 ---
 
@@ -135,8 +163,50 @@ level 7
 - 39 non-trivial differences undergo further discrimination
 - Validates format precision awareness
 
+history
 
+$ ./bin/uband-diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
 
+with a threshold of zero, there are 39 differences (correctly tallied). there are 12 differences where the corresponding values are above the ignore threshold of 138.47; these are trivial and should be ignored. there are 24 differences where the corresponding values exceed the marginal threshold. these should be counted, but not cause a error or failure in the difference (by themselves). there are 3 differences where the values are less than the marginal threshold and should therefore be counted as significant differences.
+
+I think there are supposed to be 39-12=27 significant differences, not 13, so I don't know where that number is coming from. It looks like the non-zero differences are being double counted (39x2=78)
+
+    the number of elements is obvious, that should be the total number of elements compared. in this case the file has 353 lines with 11 columns per line (1 range with 10 data columns), so the total number of elements is 3883
+
+ In this case all of the 39 non-zero differences are non-trivial.
+
+ By my count, there are 12 "insignificant" differences where the magnitude of both vales exceeds the ignore threshold of ~138 (corresponding to pressure values less than the single precision epsilon of ~1.19E-7), which means there should be 27 significant differences (those differences that can't be written off as being due to machine precision and correspond to differences greater than the user threshold (first argument after file names)).
+
+ In this example, of the 27 significant differences, I count 24 differences that have both values in the marginal range.
+
+ The marginal/non-marginal count should be 24 and 3, which adds up to the significant difference tally of 27.
+
+ in this case there are 3 non-marginal significant errors.
+
+e.g. 353 lines * 11 columns = 3883 elements
+ In this case 3 out of the 3883 differences correspond to 0.0773%.
+ e.g. 353 lines * 11 columns = 3883 elements
+          e.g. 3883 = 3844 + 39 = 353 * 11
+                   e.g. 39 = 0 + 39 (no trivial differences)
+                            e.g. 39 = 12 + 27
+         e.g. 27 = 24 3
+   e.g. 3 = 0 + 3
+    e.g. 3 = 3 + 0
+
+    there are 39 real differences in the file plus the 9 trivial and 1 non-trival differences I introduced
+         therefore, there are 48 non-zero differences int his file
+         e.g. 3883 = 3835 + 48
+         Here, the 9 trivial differences I added are identified
+         e.g. 48 = 9 + 39 (no trivial differences)
+         In this example, there are 9 non-trivial differences that I introduced manually on line 1.
+                  e.g. 39 = 12 + 27
+
+In this example there are 27 significant differences
+         e.g. 27 = 24 3
+
+         there are 3 non-marginal differences in this example
+                 e.g. 3 = 0 + 3
+                       e.g. 3 = 3 + 0
 ---
 
 ### `pe.std2.pe02` — "Close Enough" Scenario
@@ -154,7 +224,14 @@ divering - should fail all tests
 actually very close, again would pass a more sophisticaed test
 test 2 and ref are imperceptably close; actually they are identical, but fail regular diff!?
 
+history
+file (case 2)
+   odd case
+   starts out the same
 
+nspe.std2.
+   another great example
+   this should "fail" but should pass with the 2% rule
 ---
 
 ### `pe.std3.pe01` — Structure Mismatch and Range Precision
@@ -183,6 +260,21 @@ test of transient spikes
 ```
 
 **Expected behavior**: Should fail due to >2% significant differences (905/3554 = 25%)
+
+history
+   considering the ouptut of ./bin/uband-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
+
+   this is a realistic example of data being compared.
+   in this example, the two files should "fail" a simple diff
+
+#### Range Precision and Monotonic Detection
+**Complex issue**: Range column had step size 0.0122 but printed precision was insufficient to capture it at every step (e.g., values printed with fewer decimal places). This caused monotonic increasing test to fail because consecutive values appeared identical.
+
+**Root cause**: Monotonic increasing test was too strict—it should allow for unchanged values (monotonically non-decreasing).
+
+**Resolution**: Updated range detection to be more forgiving of precision-limited format while maintaining fixed-delta detection
+
+
 
 ---
 

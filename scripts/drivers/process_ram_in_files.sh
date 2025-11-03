@@ -849,6 +849,14 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
                 done
             fi
             echo ""
+        else
+            # No diff failures at any level - all files are identical
+            if [[ ${#pass_files[@]} -gt 0 ]]; then
+                echo "Diff Details:"
+                echo "-------------"
+                echo -e "\e[1;32m*** All files are IDENTICAL - would pass simple 'diff' ***\e[0m"
+                echo ""
+            fi
         fi
 
         echo "Diff Results:"
