@@ -5,9 +5,9 @@
 # EXPLANATION SECTION
 #
 # This script processes .in files in a directory using the specified executable.
-# Note: Input files are copied to nspe.in before execution (for compatibility with
-# executables that only read the default input name). Output files are then renamed
-# to match the original input file basename.
+# Note: Input files are copied to a temporary file (default: nspe.in) before execution
+# (for compatibility with executables that only read a specific input name).
+# Output files are then renamed to match the original input file basename.
 #
 # Input options (first argument):
 #   make - Runs the executable only (no file operations)
@@ -60,6 +60,7 @@ Modes:
 
 Options:
   --exe <path>        Specify executable path (default: auto-detected)
+  --input-name <name> Specify input filename to copy .in files to (default: nspe.in)
   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
   --skip-existing     Skip files where outputs already exist
@@ -79,6 +80,7 @@ Examples:
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
   $0 test std --stop-on-error --pattern 'case*'
+  $0 test std --input-name pf_flyer.in --pattern 'case*'
 
 Environment variables:
   NSPE_EXE            Alternative way to specify executable path
@@ -97,6 +99,7 @@ keep_bin=false
 cli_exe=""
 diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force uband_diff
 no_make=false
+input_filename="nspe.in"  # Default input filename
 stop_on_error=false
 
 # Handle help first
@@ -135,6 +138,7 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --exe) cli_exe="$2"; shift 2;;
+        --input-name) input_filename="$2"; shift 2;;
         --pattern) patterns+=("$2"); shift 2;;
         --exclude) excludes+=("$2"); shift 2;;
         --skip-existing) skip_existing=true; shift;;
@@ -337,11 +341,11 @@ if [[ ${#infiles[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Exclude nspe.in from processing (it's a temporary file created by the script)
+# Exclude the temporary input filename from processing (it's created by the script)
 filtered=()
 for f in "${infiles[@]}"; do
     b=$(basename "$f")
-    if [[ "$b" != "nspe.in" ]]; then
+    if [[ "$b" != "$input_filename" ]]; then
         filtered+=("$f")
     fi
 done
@@ -349,7 +353,7 @@ infiles=("${filtered[@]}")
 
 if [[ ${#infiles[@]} -eq 0 ]]; then
     echo
-    echo -e "\e[31mNo input files (*.in) found in directory: $directory (after excluding nspe.in)\e[0m"
+    echo -e "\e[31mNo input files (*.in) found in directory: $directory (after excluding $input_filename)\e[0m"
     exit 1
 fi
 
@@ -604,9 +608,9 @@ for infile in "${infiles[@]}"; do
                     done
                 fi
 
-                # Copy input file to nspe.in in the same directory
-            cp "$infile" "$directory/nspe.in"
-            echo "   Copied $infile to $directory/nspe.in"
+                # Copy input file to specified input filename in the same directory
+            cp "$infile" "$directory/$input_filename"
+            echo "   Copied $infile to $directory/$input_filename"
 
             # Get absolute path to executable for running from different directory
             if [[ "$PROG" = /* ]]; then
@@ -617,17 +621,17 @@ for infile in "${infiles[@]}"; do
                 prog_path="$(readlink -f "$PROG")"
             fi
 
-            echo -n "   Running: $PROG nspe.in... "
+            echo -n "   Running: $PROG $input_filename... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
             if [[ "$mode" == "test" ]]; then
-                # Change to directory before running to ensure nspe.in is found
-                (cd "$directory" && { time "$prog_path" nspe.in; }) >> "$LOG_FILE" 2>&1
+                # Change to directory before running to ensure input file is found
+                (cd "$directory" && { time "$prog_path" "$input_filename"; }) >> "$LOG_FILE" 2>&1
                 RETVAL=$?
             else
                 echo
-                # Change to directory before running to ensure nspe.in is found
-                (cd "$directory" && "$prog_path" nspe.in)
+                # Change to directory before running to ensure input file is found
+                (cd "$directory" && "$prog_path" "$input_filename")
                 RETVAL=$?
                 echo -n "   "
             fi
@@ -808,10 +812,10 @@ for infile in "${infiles[@]}"; do
                     fi
                 fi
 
-                # Clean up nspe.in and other temporary files after successful execution
+                # Clean up temporary input file and other temporary files after successful execution
                 temp_files_cleaned=0
-                # Clean up specific known temporary files
-                for temp_file in nspe.in nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
+                # Clean up specific known temporary files (using variable for input filename)
+                for temp_file in "$input_filename" nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
                     if [[ -f "$directory/$temp_file" ]]; then
                         rm "$directory/$temp_file"
                         if [[ "$mode" != "test" ]]; then
@@ -830,8 +834,8 @@ for infile in "${infiles[@]}"; do
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
                 exec_fail_files+=("$infile")
 
-                # Clean up nspe.in and other temporary files after failed execution
-                for temp_file in nspe.in nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
+                # Clean up temporary input file and other temporary files after failed execution
+                for temp_file in "$input_filename" nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
                     if [[ -f "$directory/$temp_file" ]]; then
                         rm "$directory/$temp_file"
                     fi

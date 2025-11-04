@@ -477,7 +477,7 @@ for infile in "${infiles[@]}"; do
             echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
             echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
             exec_fail_files+=("$infile")
-            
+
             # Stop processing if --stop-on-error flag is set
             if $stop_on_error; then
                 echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
@@ -743,7 +743,7 @@ for infile in "${infiles[@]}"; do
                 add_to_array_if_not_present "skipped_files" "$infile"
             else
                 fail_files+=("$infile")
-                
+
                 # Stop processing if --stop-on-error flag is set
                 if $stop_on_error; then
                     echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
