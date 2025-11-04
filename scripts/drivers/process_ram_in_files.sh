@@ -46,11 +46,13 @@ Modes:
 
 Options:
   --exe <path>        Specify executable path (default: bin/ram1.5.exe)
+  --input-name <name> Specify input filename to copy .in files to (default: ram.in)
   --pattern <glob>    Include files matching glob pattern (can be used multiple times)
   --exclude <glob>    Exclude files matching glob pattern (can be used multiple times)
   --skip-existing     Skip files where outputs already exist
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
+  --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
@@ -61,6 +63,8 @@ Examples:
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
+  $0 test std --input-name pf_flyer.in --pattern 'case*'
+  $0 test std --stop-on-error --pattern 'case*'
 
 Environment variables:
   RAM_EXE             Alternative way to specify RAM executable path
@@ -77,6 +81,8 @@ dry_run=false
 debug=false
 cli_exe=""
 no_make=false
+input_filename="ram.in"  # Default input filename
+stop_on_error=false
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -114,11 +120,13 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --exe) cli_exe="$2"; shift 2;;
+        --input-name) input_filename="$2"; shift 2;;
         --pattern) patterns+=("$2"); shift 2;;
         --exclude) excludes+=("$2"); shift 2;;
         --skip-existing) skip_existing=true; shift;;
         --skip-newer) skip_newer=true; shift;;
         --force) force=true; shift;;
+        --stop-on-error) stop_on_error=true; shift;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
         --no-make) no_make=true; shift;;
@@ -414,8 +422,8 @@ for infile in "${infiles[@]}"; do
         if [[ -n "$skip_execution" && "$mode" == "test" ]]; then
             echo "  [SKIP EXECUTION] $infile ($skip_execution) - will compare existing output"
         else
-            # Copy infile to ram.in in parent directory
-        cp "$infile" "$parent_dir/ram.in"
+            # Copy infile to specified input filename in parent directory
+        cp "$infile" "$parent_dir/$input_filename"
 
         # Check for existing output files and warn user
         existing_files=()
@@ -469,6 +477,12 @@ for infile in "${infiles[@]}"; do
             echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
             echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
             exec_fail_files+=("$infile")
+            
+            # Stop processing if --stop-on-error flag is set
+            if $stop_on_error; then
+                echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
+                break
+            fi
         fi
 
         # After running the executable, move the output files to the target directory
@@ -729,6 +743,12 @@ for infile in "${infiles[@]}"; do
                 add_to_array_if_not_present "skipped_files" "$infile"
             else
                 fail_files+=("$infile")
+                
+                # Stop processing if --stop-on-error flag is set
+                if $stop_on_error; then
+                    echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
+                    break
+                fi
             fi
         fi
     fi
@@ -759,11 +779,11 @@ for infile in "${infiles[@]}"; do
     done
     shopt -u nullglob
 
-    # Clean up ram.in from parent directory if it exists
-    if [[ -f "$parent_dir/ram.in" ]]; then
-        rm "$parent_dir/ram.in"
+    # Clean up input file from parent directory if it exists
+    if [[ -f "$parent_dir/$input_filename" ]]; then
+        rm "$parent_dir/$input_filename"
         if [[ "$mode" != "test" ]]; then
-            echo "   Deleted $parent_dir/ram.in"
+            echo "   Deleted $parent_dir/$input_filename"
         fi
     fi
     printf '\n%*s\n' "$line_len" '' | tr ' ' '='

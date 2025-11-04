@@ -67,6 +67,7 @@ Options:
   --force             Override skip options and process all matched files
   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
+  --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
   --debug             Show detailed file filtering information
@@ -77,6 +78,7 @@ Examples:
   $0 test std --pattern 'case*' --exclude 'case_old*'
   $0 make . --skip-existing --debug
   $0 diff std --pattern 'test1*' --pattern 'test2*'
+  $0 test std --stop-on-error --pattern 'case*'
 
 Environment variables:
   NSPE_EXE            Alternative way to specify executable path
@@ -95,6 +97,7 @@ keep_bin=false
 cli_exe=""
 diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force uband_diff
 no_make=false
+stop_on_error=false
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -139,6 +142,7 @@ while [[ $# -gt 0 ]]; do
         --force) force=true; shift;;
         --keep-bin) keep_bin=true; shift;;
         --diff-level) diff_level="$2"; shift 2;;
+        --stop-on-error) stop_on_error=true; shift;;
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
         --no-make) no_make=true; shift;;
@@ -838,6 +842,12 @@ for infile in "${infiles[@]}"; do
                         rm "$temp_file"
                     fi
                 done
+
+                # Stop processing if --stop-on-error flag is set
+                if $stop_on_error; then
+                    echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
+                    break
+                fi
 
                 #echo "   Aborting..."; break
                 echo "   Continuing..."; continue
