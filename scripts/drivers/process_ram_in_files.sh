@@ -366,7 +366,7 @@ for infile in "${infiles[@]}"; do
     echo "Processing: $infile"
     LOG_FILE="$directory/$(basename "$infile" .in).log"
     basename_noext="$(basename "$infile" .in)"
-    parent_dir="$PROJECT_ROOT"
+    parent_dir="$PWD"  # Use current working directory for input/output files
 
     # Check if we should skip EXECUTION for make/test modes, or skip entirely for copy/make modes
     # In test mode with --skip-existing: skip execution but still do diff
@@ -424,6 +424,7 @@ for infile in "${infiles[@]}"; do
         else
             # Copy infile to specified input filename in parent directory
         cp "$infile" "$parent_dir/$input_filename"
+        echo "   Copied $infile to $parent_dir/$input_filename"
 
         # Check for existing output files and warn user
         existing_files=()
