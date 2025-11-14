@@ -869,6 +869,7 @@ for infile in "${infiles[@]}"; do
 
         # Find the first available file pair by priority: 03, 02, 01
         found_files=false
+        checked_outputs=()  # Track outputs that exist but have no reference
         for suffix in 03 02 01; do
             test="$directory/$(basename "$infile" .in)_${suffix}.asc"
             case $suffix in
@@ -915,18 +916,10 @@ for infile in "${infiles[@]}"; do
 
                         # Check if reference file exists
                         if [[ ! -f "$ref" ]]; then
-                            echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist"
-                            if [[ "$mode" == "test" ]]; then
-                                echo -e "\e[33m[[MISSING REFERENCE]]\e[0m\n   Reference file '$ref' does not exist" >> "$LOG_FILE"
-                                echo "   Output was generated successfully but cannot be validated without reference" >> "$LOG_FILE"
-                            fi
-                            # Don't mark as failed - output was generated, just can't validate it
-                            # This is a skip, not a failure
-                            echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
-                            missing_reference_files+=("$ref")
-                            add_to_array_if_not_present "skipped_files" "$infile"
-                            found_files=true  # Mark as processed to avoid "no files found" message
-                            break  # Exit the suffix loop since we handled this case
+                            # Reference missing for this suffix - track it and try next suffix
+                            # This handles cases where _02.asc exists but no .rtl, but _01.asc + .tl might work
+                            checked_outputs+=("$test:$ref")  # Track this output:ref pair
+                            continue  # Try next suffix in the loop
                         fi
 
                         # Check if reference file is empty
@@ -1100,26 +1093,59 @@ for infile in "${infiles[@]}"; do
             fi  # End of the main suffix condition
         done
 
+        # After checking all suffixes, if we found outputs but no matching references, report it
+        if [[ "$found_files" == false && ${#checked_outputs[@]} -gt 0 ]]; then
+            # We found output files but none had matching references
+            echo -e "   \e[33m[[MISSING REFERENCE]]\e[0m"
+            echo "   Output file(s) generated successfully but no matching reference files found"
+            for pair in "${checked_outputs[@]}"; do
+                output_file="${pair%%:*}"
+                ref_file="${pair##*:}"
+                echo "   - $(basename "$output_file") exists, but $(basename "$ref_file") does not"
+                missing_reference_files+=("$ref_file")
+            done
+            echo -e "   \e[33mHint: Run 'copy' mode first to generate reference files\e[0m"
+            add_to_array_if_not_present "skipped_files" "$infile"
+            found_files=true  # Mark as handled so we don't show "no files found" message
+        fi
+
         # If no files were found, check what exists and report appropriately
         if [[ "$found_files" == false ]]; then
-            # Check if output files exist (they may have been generated but no reference to compare)
-            output_exists=false
-            missing_ref_file=""
-            for suffix in 02 03 01; do  # Check in priority order
+            # Check ALL suffixes to see if any valid output exists (even if not the priority one)
+            # This handles cases where _02.asc is empty but _01.asc exists with a .tl reference
+            any_output_exists=false
+            any_ref_exists=false
+            all_outputs_empty=true
+            missing_ref_for_output=""
+
+            for suffix in 01 02 03; do
                 test_asc="$directory/$(basename "$infile" .in)_${suffix}.asc"
-                if [[ -f "$test_asc" && -s "$test_asc" ]]; then
-                    output_exists=true
-                    case $suffix in
-                        01) missing_ref_file="$directory/$(basename "$infile" .in).tl" ;;
-                        02) missing_ref_file="$directory/$(basename "$infile" .in).rtl" ;;
-                        03) missing_ref_file="$directory/$(basename "$infile" .in).ftl" ;;
-                    esac
-                    break
+                case $suffix in
+                    01) ref_file="$directory/$(basename "$infile" .in).tl" ;;
+                    02) ref_file="$directory/$(basename "$infile" .in).rtl" ;;
+                    03) ref_file="$directory/$(basename "$infile" .in).ftl" ;;
+                esac
+
+                # Check if this output exists
+                if [[ -f "$test_asc" ]]; then
+                    any_output_exists=true
+                    if [[ -s "$test_asc" ]]; then
+                        all_outputs_empty=false
+                        # If this output is not empty and its reference is missing, note it
+                        if [[ ! -f "$ref_file" && -z "$missing_ref_for_output" ]]; then
+                            missing_ref_for_output="$ref_file"
+                        fi
+                    fi
+                fi
+
+                # Check if this reference exists
+                if [[ -f "$ref_file" ]]; then
+                    any_ref_exists=true
                 fi
             done
 
             if [[ "$mode" == "copy" ]]; then
-                if $output_exists; then
+                if $any_output_exists && ! $all_outputs_empty; then
                     echo -e "   \e[33m[[INFO]]\e[0m Output files exist but were not copied (no reference check in copy mode)"
                 else
                     echo -e "   \e[33m[[MISSING]]\e[0m No output files (_01.asc, _02.asc, _03.asc) found to copy"
@@ -1127,34 +1153,33 @@ for infile in "${infiles[@]}"; do
                 fi
                 add_to_array_if_not_present "skipped_files" "$infile"
             elif [[ "$mode" == "test" ]]; then
-                if $output_exists; then
-                    # Output exists but no reference - skip (can't validate)
-                    echo -e "   \e[33m[[MISSING REFERENCE]]\e[0m"
-                    echo "   Output file(s) generated successfully"
-                    echo "   Reference file '$missing_ref_file' does not exist for comparison"
-                    echo -e "   \e[33mHint: Run 'copy' mode to establish reference files first\e[0m"
-                    missing_reference_files+=("$missing_ref_file")
-                    add_to_array_if_not_present "skipped_files" "$infile"
+                if $any_output_exists && ! $all_outputs_empty; then
+                    # At least one non-empty output exists
+                    if [[ -n "$missing_ref_for_output" ]]; then
+                        # Output exists but its reference is missing - skip (can't validate)
+                        echo -e "   \e[33m[[MISSING REFERENCE]]\e[0m"
+                        echo "   Output file(s) generated successfully"
+                        echo "   Reference file '$missing_ref_for_output' does not exist for comparison"
+                        echo -e "   \e[33mHint: Run 'copy' mode to establish reference files first\e[0m"
+                        missing_reference_files+=("$missing_ref_for_output")
+                        add_to_array_if_not_present "skipped_files" "$infile"
+                    else
+                        # This shouldn't happen - output exists but loop didn't process it
+                        # Likely all outputs are empty or references are empty
+                        echo -e "   \e[33m[[SKIPPED]]\e[0m Output files exist but could not be compared"
+                        echo -e "   \e[33mHint: Check if output or reference files are empty\e[0m"
+                        add_to_array_if_not_present "skipped_files" "$infile"
+                    fi
                 else
-                    # No output at all - check if reference exists to determine error vs skip
-                    ref_exists=false
-                    for suffix in 01 02 03; do
-                        case $suffix in
-                            01) check_ref="$directory/$(basename "$infile" .in).tl" ;;
-                            02) check_ref="$directory/$(basename "$infile" .in).rtl" ;;
-                            03) check_ref="$directory/$(basename "$infile" .in).ftl" ;;
-                        esac
-                        if [[ -f "$check_ref" ]]; then
-                            ref_exists=true
-                            break
+                    # No valid output at all - check if reference exists to determine error vs skip
+                    if $any_ref_exists; then
+                        # Reference exists but no valid output - REAL ERROR (executable failed)
+                        echo -e "   \e[31m[[ERROR]]\e[0m No valid output files found, but reference files exist"
+                        if $any_output_exists; then
+                            echo -e "   \e[31m(Output files exist but are all empty)\e[0m"
                         fi
-                    done
-
-                    if $ref_exists; then
-                        # Reference exists but no output - REAL ERROR (executable failed)
-                        echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist"
                         echo -e "   \e[31mThis indicates the executable failed to generate expected output\e[0m"
-                        echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist" >> "$LOG_FILE"
+                        echo -e "   \e[31m[[ERROR]]\e[0m No valid output files found, but reference files exist" >> "$LOG_FILE"
                         add_to_array_if_not_present "fail_files" "$infile"
                     else
                         # No reference and no output - just skip (can't validate anyway)
