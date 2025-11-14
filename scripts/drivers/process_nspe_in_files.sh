@@ -918,6 +918,7 @@ for infile in "${infiles[@]}"; do
                         if [[ ! -f "$ref" ]]; then
                             # Reference missing for this suffix - track it and try next suffix
                             # This handles cases where _02.asc exists but no .rtl, but _01.asc + .tl might work
+                            echo -e "   \e[36m[[INFO]]\e[0m $(basename "$test") exists but $(basename "$ref") not found, checking other suffixes..."
                             checked_outputs+=("$test:$ref")  # Track this output:ref pair
                             continue  # Try next suffix in the loop
                         fi
