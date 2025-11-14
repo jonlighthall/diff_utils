@@ -791,29 +791,7 @@ for infile in "${infiles[@]}"; do
                 if [[ "$keep_bin" == false ]]; then
                     echo "   Cleaning up extra output files (only keeping files with references)..."
 
-                    # Determine which reference files exist
-                    has_tl=false
-                    has_rtl=false
-                    has_ftl=false
-                    [[ -f "$directory/${basename_noext}.tl" ]] && has_tl=true
-                    [[ -f "$directory/${basename_noext}.rtl" ]] && has_rtl=true
-                    [[ -f "$directory/${basename_noext}.ftl" ]] && has_ftl=true
-
-                    # Remove .asc files that don't have corresponding references
-                    if [[ "$has_tl" == false && -f "$directory/${basename_noext}_01.asc" ]]; then
-                        rm "$directory/${basename_noext}_01.asc"
-                        echo "   Removed ${basename_noext}_01.asc (no .tl reference)"
-                    fi
-                    if [[ "$has_rtl" == false && -f "$directory/${basename_noext}_02.asc" ]]; then
-                        rm "$directory/${basename_noext}_02.asc"
-                        echo "   Removed ${basename_noext}_02.asc (no .rtl reference)"
-                    fi
-                    if [[ "$has_ftl" == false && -f "$directory/${basename_noext}_03.asc" ]]; then
-                        rm "$directory/${basename_noext}_03.asc"
-                        echo "   Removed ${basename_noext}_03.asc (no .ftl reference)"
-                    fi
-
-                    # Remove binary files and other extra outputs
+                    # Remove binary files and other extra outputs (keep .asc files as they are valuable output)
                     for binfile in "$directory/${basename_noext}"_*.bin "$directory/${basename_noext}"_*.dat "$directory/${basename_noext}".003 "$directory/${basename_noext}".prs "$directory/${basename_noext}".pulse "$directory/${basename_noext}"_angles.asc; do
                         if [[ -f "$binfile" ]]; then
                             # Check if file is binary or ASCII
@@ -1122,39 +1100,69 @@ for infile in "${infiles[@]}"; do
             fi  # End of the main suffix condition
         done
 
-        # If no files were found, report it
+        # If no files were found, check what exists and report appropriately
         if [[ "$found_files" == false ]]; then
-            if [[ "$mode" == "copy" ]]; then
-                echo -e "   \e[33m[[MISSING]]\e[0m No output files (_01.asc, _02.asc, _03.asc) found to copy"
-                echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
-                skipped_files+=("$infile")
-            elif [[ "$mode" == "test" ]]; then
-                # Check if any reference files exist - if yes, this is a real error
-                ref_exists=false
-                for suffix in 01 02 03; do
+            # Check if output files exist (they may have been generated but no reference to compare)
+            output_exists=false
+            missing_ref_file=""
+            for suffix in 02 03 01; do  # Check in priority order
+                test_asc="$directory/$(basename "$infile" .in)_${suffix}.asc"
+                if [[ -f "$test_asc" && -s "$test_asc" ]]; then
+                    output_exists=true
                     case $suffix in
-                        01) check_ref="$directory/$(basename "$infile" .in).tl" ;;
-                        02) check_ref="$directory/$(basename "$infile" .in).rtl" ;;
-                        03) check_ref="$directory/$(basename "$infile" .in).ftl" ;;
+                        01) missing_ref_file="$directory/$(basename "$infile" .in).tl" ;;
+                        02) missing_ref_file="$directory/$(basename "$infile" .in).rtl" ;;
+                        03) missing_ref_file="$directory/$(basename "$infile" .in).ftl" ;;
                     esac
-                    if [[ -f "$check_ref" ]]; then
-                        ref_exists=true
-                        break
-                    fi
-                done
-                
-                if $ref_exists; then
-                    # Reference exists but no output - this is a REAL ERROR (executable failed to produce output)
-                    echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist"
-                    echo -e "   \e[31mThis indicates the executable failed to generate expected output\e[0m"
-                    echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist" >> "$LOG_FILE"
-                    add_to_array_if_not_present "fail_files" "$infile"
+                    break
+                fi
+            done
+
+            if [[ "$mode" == "copy" ]]; then
+                if $output_exists; then
+                    echo -e "   \e[33m[[INFO]]\e[0m Output files exist but were not copied (no reference check in copy mode)"
                 else
-                    # No reference and no output - just skip (can't validate anyway)
-                    echo -e "   \e[33m[[SKIPPED]]\e[0m No output or reference files found"
+                    echo -e "   \e[33m[[MISSING]]\e[0m No output files (_01.asc, _02.asc, _03.asc) found to copy"
+                    echo -e "   \e[33mHint: Run 'make' mode first to generate output files\e[0m"
+                fi
+                add_to_array_if_not_present "skipped_files" "$infile"
+            elif [[ "$mode" == "test" ]]; then
+                if $output_exists; then
+                    # Output exists but no reference - skip (can't validate)
+                    echo -e "   \e[33m[[MISSING REFERENCE]]\e[0m"
+                    echo "   Output file(s) generated successfully"
+                    echo "   Reference file '$missing_ref_file' does not exist for comparison"
                     echo -e "   \e[33mHint: Run 'copy' mode to establish reference files first\e[0m"
-                    echo -e "   \e[33m[[SKIPPED]]\e[0m No output or reference files found" >> "$LOG_FILE"
+                    missing_reference_files+=("$missing_ref_file")
                     add_to_array_if_not_present "skipped_files" "$infile"
+                else
+                    # No output at all - check if reference exists to determine error vs skip
+                    ref_exists=false
+                    for suffix in 01 02 03; do
+                        case $suffix in
+                            01) check_ref="$directory/$(basename "$infile" .in).tl" ;;
+                            02) check_ref="$directory/$(basename "$infile" .in).rtl" ;;
+                            03) check_ref="$directory/$(basename "$infile" .in).ftl" ;;
+                        esac
+                        if [[ -f "$check_ref" ]]; then
+                            ref_exists=true
+                            break
+                        fi
+                    done
+
+                    if $ref_exists; then
+                        # Reference exists but no output - REAL ERROR (executable failed)
+                        echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist"
+                        echo -e "   \e[31mThis indicates the executable failed to generate expected output\e[0m"
+                        echo -e "   \e[31m[[ERROR]]\e[0m No output files found, but reference files exist" >> "$LOG_FILE"
+                        add_to_array_if_not_present "fail_files" "$infile"
+                    else
+                        # No reference and no output - just skip (can't validate anyway)
+                        echo -e "   \e[33m[[SKIPPED]]\e[0m No output or reference files found"
+                        echo -e "   \e[33mHint: Run 'copy' mode to establish reference files first\e[0m"
+                        echo -e "   \e[33m[[SKIPPED]]\e[0m No output or reference files found" >> "$LOG_FILE"
+                        add_to_array_if_not_present "skipped_files" "$infile"
+                    fi
                 fi
             elif [[ "$mode" == "make" ]]; then
                 echo -e "   \e[36m[[INFO]]\e[0m Output files will be generated by ${PROG} for suffixes (01, 02, 03)"

@@ -741,7 +741,7 @@ for infile in "${infiles[@]}"; do
                 echo -e "   \e[31m[[ERROR]]\e[0m Output file tl.line was not generated, but reference file exists"
                 echo -e "   \e[31mThis indicates the executable failed to generate expected output\e[0m"
                 fail_files+=("$infile")
-                
+
                 # Stop processing if --stop-on-error flag is set
                 if $stop_on_error; then
                     echo -e "\e[31m--stop-on-error flag set. Terminating processing loop.\e[0m"
