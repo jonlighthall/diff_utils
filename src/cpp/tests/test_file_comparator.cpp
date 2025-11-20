@@ -18,8 +18,8 @@ class FileComparatorTest : public ::testing::Test {
     std::filesystem::create_directories(TEST_DIR);
 
     // Set up test with default thresholds
-    // Constructor: (significant_threshold, critical_threshold, table_threshold, verbosity, debug, is_percent, percent_value)
-    comparator = std::make_unique<FileComparator>(0.05, 10.0, 1.0, 0, 0, false, 0.0);
+    // Constructor: (significant_threshold, critical_threshold, table_threshold, verbosity, debug, is_percent, percent_value, max_rows)
+    comparator = std::make_unique<FileComparator>(0.05, 10.0, 1.0, 0, 0, false, 0.0, 32);
 
     // Clean up any existing test files
     cleanup_test_files();
@@ -208,7 +208,7 @@ TEST_F(FileComparatorTest, ExtractColumnValues) {
 // Test threshold behavior
 TEST_F(FileComparatorTest, StrictThresholdBehavior) {
   // Create comparator with very strict threshold
-  FileComparator strict_comparator(0.0001, 10.0, 1.0, 0, 0, false, 0.0);
+  FileComparator strict_comparator(0.0001, 10.0, 1.0, 0, 0, false, 0.0, 32);
 
   createTestFile("test_different1.txt", {"1.000"});
   createTestFile("test_different2.txt",

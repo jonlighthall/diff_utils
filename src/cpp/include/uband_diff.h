@@ -507,13 +507,14 @@ class FileComparator {
   FileComparator(double user_thresh, double hard_thresh, double table_thresh,
                  int verbosity_level = 0, int debug_level = 0,
                  bool significant_is_percent = false,
-                 double significant_percent = 0.0)
+                 double significant_percent = 0.0,
+                 size_t max_rows = 32)
       : thresh{user_thresh, hard_thresh, table_thresh},
         verbosity{verbosity_level, verbosity_level < 0,
                   verbosity_level >= 1, verbosity_level >= 2},
         debug{debug_level, debug_level >= 1, debug_level >= 2,
               debug_level >= 3},
-        table{table_thresh, 32, table_thresh == 0.0},
+        table{table_thresh, max_rows, table_thresh == 0.0},
         file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
         format_tracker_(std::make_unique<FormatTracker>(

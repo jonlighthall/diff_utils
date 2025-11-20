@@ -2318,8 +2318,8 @@ void FileComparator::print_summary(const std::string& file1,
     print_tl_metrics();
   }
 
-  // FLAGS and COUNTERS sections are for debugging/verbose mode
-  if (verbosity.show_statistics) {
+  // FLAGS and COUNTERS sections are for detailed debugging (verbosity 2+)
+  if (verbosity.show_detailed) {
     print_flag_status();
     print_counter_info();
   }

@@ -40,6 +40,7 @@ struct ProgramArgs {
   double table_threshold = 1.0;  // Renamed from print_level (clearer purpose)
   int verbosity_level = 0;  // User-facing output verbosity
   int debug_level = 0;      // Developer diagnostics
+  size_t max_rows = 32;     // Maximum table rows before truncation
   // If true, interpret significant_threshold as a percent threshold (fraction stored
   // in significant_percent). This is set when the user supplies a negative
   // threshold on the command line (e.g. -1 -> 1%).
@@ -55,8 +56,16 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args);
 bool parse_threshold_argument(const char* arg, double& value,
                               const std::string& name);
 bool parse_debug_level_argument(const char* arg, int& value);
+bool is_named_flag(const std::string& arg);
 void call_plot_script(const std::string& file1, const std::string& file2,
                       double threshold, int debug_level);
+
+bool is_named_flag(const std::string& arg) {
+  return (arg == "--plot" ||
+          arg == "-v" || arg.substr(0, 12) == "--verbosity=" ||
+          arg == "-d" || arg.substr(0, 8) == "--debug=" ||
+          arg == "-m" || arg.substr(0, 11) == "--max-rows=");
+}
 
 bool show_help_if_requested(int argc, char* argv[]) {
   if (argc >= 2 &&
@@ -66,7 +75,7 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "USAGE:" << std::endl;
     std::cout << "  " << argv[0]
               << " <file1> <file2> [threshold] [hard_threshold] "
-                 "[table_threshold] [verbosity] [debug] [--plot]"
+                 "[table_threshold] [verbosity] [debug] [OPTIONS]"
               << std::endl;
     std::cout << "\nARGUMENTS:" << std::endl;
     std::cout << "  file1              First input file to compare" << std::endl;
@@ -91,12 +100,11 @@ bool show_help_if_requested(int argc, char* argv[]) {
               << std::endl;
     std::cout << "                     (default: 0, for troubleshooting only)" << std::endl;
     std::cout << "\nOPTIONS:" << std::endl;
-    std::cout
-        << "  --plot          Generate comparison plot using Python script"
-        << std::endl;
-    std::cout
-        << "                  (calls plot_tl_comparison.py with threshold)"
-        << std::endl;
+    std::cout << "  -v, --verbosity=N   Set verbosity level (overrides positional arg)" << std::endl;
+    std::cout << "  -d, --debug=N       Set debug level (overrides positional arg)" << std::endl;
+    std::cout << "  -m, --max-rows=N    Set maximum table rows before truncation (default: 32)" << std::endl;
+    std::cout << "  --plot              Generate comparison plot using Python script" << std::endl;
+    std::cout << "                      (calls plot_tl_comparison.py with threshold)" << std::endl;
     std::cout << "\nEXAMPLES:" << std::endl;
     std::cout << "  " << argv[0] << " data1.txt data2.txt" << std::endl;
     std::cout << "  " << argv[0] << " file1.dat file2.dat 0.01" << std::endl;
@@ -257,18 +265,56 @@ bool parse_debug_level_argument(const char* arg, int& value) {
 }
 
 bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
-  // Check for --plot flag anywhere in arguments
+  // Parse named flags first (can appear anywhere after file arguments)
   for (int i = 3; i < argc; i++) {
-    if (std::string(argv[i]) == "--plot") {
+    std::string arg = argv[i];
+
+    if (arg == "--plot") {
       args.plot_enabled = true;
-      break;
+    } else if (arg == "-v" || arg.substr(0, 12) == "--verbosity=") {
+      int value;
+      if (arg == "-v" && i + 1 < argc) {
+        if (!parse_debug_level_argument(argv[++i], value)) return false;
+      } else if (arg.substr(0, 12) == "--verbosity=") {
+        if (!parse_debug_level_argument(arg.substr(12).c_str(), value)) return false;
+      } else {
+        std::cerr << "\n\033[1;31mERROR:\033[0m -v requires a value" << std::endl;
+        return false;
+      }
+      args.verbosity_level = value;
+    } else if (arg == "-d" || arg.substr(0, 8) == "--debug=") {
+      int value;
+      if (arg == "-d" && i + 1 < argc) {
+        if (!parse_debug_level_argument(argv[++i], value)) return false;
+      } else if (arg.substr(0, 8) == "--debug=") {
+        if (!parse_debug_level_argument(arg.substr(8).c_str(), value)) return false;
+      } else {
+        std::cerr << "\n\033[1;31mERROR:\033[0m -d requires a value" << std::endl;
+        return false;
+      }
+      args.debug_level = value;
+    } else if (arg == "-m" || arg.substr(0, 11) == "--max-rows=") {
+      int value;
+      if (arg == "-m" && i + 1 < argc) {
+        if (!parse_debug_level_argument(argv[++i], value)) return false;
+      } else if (arg.substr(0, 11) == "--max-rows=") {
+        if (!parse_debug_level_argument(arg.substr(11).c_str(), value)) return false;
+      } else {
+        std::cerr << "\n\033[1;31mERROR:\033[0m -m requires a value" << std::endl;
+        return false;
+      }
+      if (value < 0) {
+        std::cerr << "\n\033[1;31mERROR:\033[0m max-rows must be non-negative" << std::endl;
+        return false;
+      }
+      args.max_rows = static_cast<size_t>(value);
     }
   }
 
-  // Parse threshold arguments (skip --plot if encountered)
+  // Parse threshold arguments (skip flags if encountered)
   if (argc >= 4) {
-    // Skip if it's the --plot flag
-    if (std::string(argv[3]) == "--plot") {
+    // Skip if it's a named flag
+    if (is_named_flag(argv[3])) {
       return true;
     }
 
@@ -302,8 +348,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   }
 
   if (argc >= 5) {
-    // Skip if it's the --plot flag
-    if (std::string(argv[4]) == "--plot") {
+    // Skip if it's a named flag
+    if (is_named_flag(argv[4])) {
       return true;
     }
 
@@ -322,8 +368,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   }
 
   if (argc >= 6) {
-    // Skip if it's the --plot flag
-    if (std::string(argv[5]) == "--plot") {
+    // Skip if it's a named flag
+    if (is_named_flag(argv[5])) {
       return true;
     }
 
@@ -334,8 +380,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   }
 
   if (argc >= 7) {
-    // Skip if it's the --plot flag
-    if (std::string(argv[6]) == "--plot") {
+    // Skip if it's a named flag
+    if (is_named_flag(argv[6])) {
       return true;
     }
 
@@ -345,8 +391,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   }
 
   if (argc >= 8) {
-    // Skip if it's the --plot flag
-    if (std::string(argv[7]) == "--plot") {
+    // Skip if it's a named flag
+    if (is_named_flag(argv[7])) {
       return true;
     }
 
@@ -463,7 +509,7 @@ int main(int argc, char* argv[]) {
   FileComparator comparator(args.significant_threshold, args.critical_threshold,
                             args.table_threshold, args.verbosity_level,
                             args.debug_level, args.significant_threshold_is_percent,
-                            args.significant_percent);
+                            args.significant_percent, args.max_rows);
   bool result = comparator.compare_files(args.file1, args.file2);
   comparator.print_summary(args.file1, args.file2, argc, argv);
 
