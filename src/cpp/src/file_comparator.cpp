@@ -1301,6 +1301,11 @@ void FileComparator::print_maximum_difference_analysis(
     std::cout << std::endl;
   }
 
+  // Skip threshold comparison messages in quiet mode
+  if (verbosity.quiet) {
+    return;
+  }
+
   if (debug.enabled) {
     std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
               << ") to significant thresh (" << thresh.significant << ")..."
@@ -1428,6 +1433,9 @@ void FileComparator::print_diff_like_summary(
               << std::endl;
   }
 
+  // Always print maximum difference even in quiet mode
+  print_maximum_difference_analysis(params);
+
   // Early return for non-trivial differences at low print levels
   if (counter.diff_non_trivial > 0 && !verbosity.show_statistics) {
     return;
@@ -1437,7 +1445,6 @@ void FileComparator::print_diff_like_summary(
   print_exact_matches_info(params);
   print_non_zero_differences_info(params);
   print_difference_counts(params);
-  print_maximum_difference_analysis(params);
 
   printbar(1);
 }
@@ -1579,6 +1586,9 @@ void FileComparator::print_significant_summary(
     return;
   }
 
+  // Always print maximum significant difference even in quiet mode
+  print_maximum_significant_difference_analysis(params);
+
   if (verbosity.quiet) {
     return;  // Early return for low print levels
   }
@@ -1619,7 +1629,6 @@ void FileComparator::print_significant_summary(
     }
   }
 
-  print_maximum_significant_difference_analysis(params);
   print_file_comparison_result(params);
   print_significant_differences_printing_status(params);
 
@@ -1753,9 +1762,15 @@ void FileComparator::print_maximum_significant_difference_analysis(
     const SummaryParams& params) const {
   if (differ.max_significant > thresh.significant) {
     print_maximum_significant_difference_details();
-    print_max_diff_threshold_comparison_above();
+    // Skip threshold comparison in quiet mode
+    if (!verbosity.quiet) {
+      print_max_diff_threshold_comparison_above();
+    }
   } else {
-    print_max_diff_threshold_comparison_below();
+    // Skip threshold comparison in quiet mode
+    if (!verbosity.quiet) {
+      print_max_diff_threshold_comparison_below();
+    }
   }
 }
 
