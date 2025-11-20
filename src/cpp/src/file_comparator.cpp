@@ -1623,23 +1623,21 @@ void FileComparator::print_significant_summary(
                                        counter.diff_marginal -
                                        counter.diff_critical;
 
-    std::cout << "  LEVEL 4 DISCRIMINATION: both values less than "
-              << thresh.marginal << std::endl;
+    std::cout << "  LEVEL 4 DISCRIMINATION: Zero-Weighted vs Non-Zero-Weighted (Operational Significance)" << std::endl;
     if (counter.diff_marginal > 0) {
-      print_count_with_percent(params, "Marginal differences",
+      print_count_with_percent(params, "Zero-weighted differences (>" + std::to_string(static_cast<int>(thresh.marginal)) + " dB, weighted to zero)",
                                counter.diff_marginal, "\033[1;33m");
     }
-    std::cout << "   Non-marginal differences: " << non_marginal_non_critical
+    std::cout << "   Non-zero-weighted differences (≤" << thresh.marginal << " dB): " << non_marginal_non_critical
               << std::endl;
 
     // Print binary discrimination total
     std::cout << "   LEVEL 4 total: " << counter.diff_marginal
-              << " marginal + " << non_marginal_non_critical
-              << " non-marginal = " << counter.diff_significant
-              << " significant differences" << std::endl;
+              << " zero-weighted + " << non_marginal_non_critical
+              << " non-zero-weighted = " << counter.diff_significant
+              << " normal differences" << std::endl;
     printbar(1);
-    std::cout << "  LEVEL 5 DISCRIMINATION: difference less than "
-              << thresh.critical << std::endl;
+    std::cout << "  LEVEL 5 DISCRIMINATION: Critical vs Non-Critical (Magnitude Threshold >" << thresh.critical << " dB)" << std::endl;
     if (counter.diff_critical > 0) {
       print_count_with_percent(params, "Critical differences",
                                counter.diff_critical, "\033[1;31m");
@@ -1651,12 +1649,11 @@ void FileComparator::print_significant_summary(
     std::cout << "   LEVEL 5 total: " << counter.diff_critical
               << " critical + " << non_marginal_non_critical
               << " non-critical = " << non_marginal_non_critical + counter.diff_critical
-              << " non-marginal differences" << std::endl;
+              << " non-zero-weighted differences" << std::endl;
     printbar(1);
     if (non_marginal_non_critical > 0) {
-      std::cout << "  LEVEL 6 DISCRIMINATION: difference less than "
-                << thresh.significant << std::endl;
-      print_count_with_percent(params, "Non-marginal, non-critical significant",
+      std::cout << "  LEVEL 6 ASSESSMENT: User-Threshold Exceedances (" << counter.elem_number << " elements, tolerance <2%)" << std::endl;
+      print_count_with_percent(params, "Non-zero-weighted, non-critical differences (>" + std::to_string(thresh.significant) + " user threshold)",
                                non_marginal_non_critical, "\033[1;36m");
     }
   }
@@ -1669,9 +1666,8 @@ void FileComparator::print_significant_summary(
 
 void FileComparator::print_significant_differences_count(
     const SummaryParams& params) const {
-  std::cout << "  LEVEL 3 DISCRIMINATION: both values less than "
-            << thresh.ignore << std::endl;
-  std::cout << "   Significant differences   ( >" << thresh.significant
+  std::cout << "  LEVEL 3 DISCRIMINATION: Subnormal vs Normal (Machine Precision Limit)" << std::endl;
+  std::cout << "   Normal differences (≤" << thresh.ignore << " dB TL, user threshold >" << thresh.significant
             << "): ";
 
   std::cout << "\033[1;31m" << std::setw(params.fmt_wid)
@@ -1692,11 +1688,11 @@ void FileComparator::print_significant_percentage() const {
   std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
             << percent << "%)" << std::endl;
 
-  // Calculate non-marginal, non-critical, significant differences
+  // Calculate non-zero-weighted, non-critical, normal differences
   // These are the differences of real interest that cannot be attributed to:
   // - Model failure (critical)
-  // - Being outside operational interest (marginal)
-  // - Machine precision errors (insignificant)
+  // - Being outside operational range (zero-weighted, >110 dB)
+  // - Machine precision errors (subnormal, >138.47 dB)
   size_t non_marginal_non_critical_significant =
       counter.diff_significant - counter.diff_marginal - counter.diff_critical;
 
@@ -1754,7 +1750,7 @@ void FileComparator::print_significant_percentage() const {
   } else if (critical_percent > 0) {
     // Add pattern-aware messaging even for passing cases
     if (has_transient_spikes) {
-      std::cout << "   \033[1;32mPASS: Non-marginal, non-critical significant "
+      std::cout << "   \033[1;32mPASS: Non-zero-weighted, non-critical "
                    "differences ("
                 << non_marginal_non_critical_significant << ", " << std::fixed
                 << std::setprecision(2) << critical_percent << "%) within "
@@ -1763,7 +1759,7 @@ void FileComparator::print_significant_percentage() const {
                    "systematic)\033[0m"
                 << std::endl;
     } else {
-      std::cout << "   \033[1;33mPASS: Non-marginal, non-critical significant "
+      std::cout << "   \033[1;33mPASS: Non-zero-weighted, non-critical "
                    "differences ("
                 << non_marginal_non_critical_significant << ", " << std::fixed
                 << std::setprecision(2) << critical_percent << "%) within "
@@ -1772,7 +1768,7 @@ void FileComparator::print_significant_percentage() const {
     }
     flag.files_are_close_enough = true;
   } else {
-    std::cout << "   \033[1;32mPASS: No non-marginal, non-critical significant "
+    std::cout << "   \033[1;32mPASS: No non-zero-weighted, non-critical "
                  "differences found\033[0m"
               << std::endl;
     flag.files_are_close_enough = true;
@@ -1781,19 +1777,19 @@ void FileComparator::print_significant_percentage() const {
 
 void FileComparator::print_insignificant_differences_count(
     const SummaryParams& params) const {
-  // Print insignificant differences if any exist
+  // Print subnormal differences if any exist (pressures < single-precision epsilon)
   if (counter.diff_insignificant > 0) {
     print_count_with_percent(params,
-                             "Insignificant differences (<=" +
-                                 std::to_string(thresh.significant) + ")",
+                             "Subnormal differences (>" +
+                                 std::to_string(thresh.ignore) + " dB, pressures < ε_single)",
                              counter.diff_insignificant);
   }
 
   // Print binary discrimination total at verbosity 1+
   if (verbosity.show_statistics) {
     std::cout << "   LEVEL 3 total: " << counter.diff_insignificant
-              << " insignificant + " << counter.diff_significant
-              << " significant = " << counter.diff_non_trivial
+              << " subnormal + " << counter.diff_significant
+              << " normal = " << counter.diff_non_trivial
               << " non-trivial differences" << std::endl;
   }
 }

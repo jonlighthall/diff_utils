@@ -123,8 +123,8 @@ LSB = 10^(-min_dp)  // Least Significant Bit based on format
 big_zero = LSB / 2.0  // Half-ULP criterion
 rounded_diff = round_to_decimals(raw_diff, min_dp)
 
-trivial = (rounded_diff == 0.0) OR 
-          (raw_diff < big_zero) OR 
+trivial = (rounded_diff == 0.0) OR
+          (raw_diff < big_zero) OR
           (|raw_diff - big_zero| < FP_TOLERANCE × max(raw_diff, big_zero))
 ```
 
@@ -142,15 +142,17 @@ percent_error = 100 × raw_diff / |value2|  // value2 is reference
 
 ---
 
-### LEVEL 3: Significance Assessment (Machine Precision)
+### LEVEL 3: Subnormal vs Normal (Machine Precision Limit)
 
-**Purpose**: Among non-trivial differences, separate those that are numerically meaningful from those dominated by machine precision limitations
+**Purpose**: Among non-trivial differences, separate those that are numerically reliable from those in the subnormal range where values are dominated by machine precision limitations
 
-**Partition**: `non_trivial = insignificant + significant`
+**Partition**: `non_trivial = subnormal + normal`
+
+**Physical Context**: In transmission loss (TL) calculations, TL = -20×log₁₀(pressure). When TL > 138.47 dB, the corresponding pressure is less than single-precision epsilon (ε_single ≈ 1.19×10⁻⁷). These values are in the subnormal/denormal range and are numerically unreliable.
 
 **Decision Rule**:
 ```cpp
-// Check if both values exceed ignore threshold (domain-specific)
+// Check if both values exceed ignore threshold (subnormal boundary)
 both_above_ignore = (value1 > thresh.ignore) AND (value2 > thresh.ignore)
 
 // For range data detection: skip TL thresholds for column 0 if monotonic with fixed delta
@@ -160,49 +162,53 @@ if (skip_tl_check) {
 }
 
 if (both_above_ignore) {
-    insignificant  // Values too large to be reliable in single precision
+    subnormal  // Both values > 138.47 dB: pressures < ε_single, unreliable
 } else {
-    // Apply significance threshold
+    // Apply user significance threshold to normal-range differences
     if (thresh.significant_is_percent) {
         // Percent mode: compare fractional difference
         ref = |value2|
         if (ref <= thresh.zero) {
-            exceeds_significance = (rounded_diff > thresh.zero)  // Conservative
+            exceeds_user_threshold = (rounded_diff > thresh.zero)  // Conservative
         } else {
-            exceeds_significance = (rounded_diff / ref) > thresh.significant_percent
+            exceeds_user_threshold = (rounded_diff / ref) > thresh.significant_percent
         }
     } else if (thresh.significant == 0.0) {
-        // Sensitive mode: all non-trivial below ignore are significant
-        exceeds_significance = true
+        // Sensitive mode: all non-trivial below ignore are normal
+        exceeds_user_threshold = true
     } else {
         // Standard mode: absolute threshold
-        exceeds_significance = (rounded_diff > thresh.significant)
+        exceeds_user_threshold = (rounded_diff > thresh.significant)
     }
-    
-    if (NOT both_above_ignore AND exceeds_significance) {
-        significant
+
+    if (NOT both_above_ignore AND exceeds_user_threshold) {
+        normal  // At least one value ≤ 138.47 dB: numerically reliable
     } else {
-        insignificant
+        subnormal  // Does not exceed user threshold or both values subnormal
     }
 }
 ```
 
 **Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
 
-**Counters**: `counter.diff_insignificant`, `counter.diff_significant`, `counter.diff_high_ignore`
+**Counters**: `counter.diff_insignificant` (subnormal), `counter.diff_significant` (normal), `counter.diff_high_ignore`
+
+**Terminology Note**: Code variables retain historical names (`diff_insignificant`, `diff_significant`) but output now uses clearer subnormal/normal terminology to reflect physical meaning.
 
 **Special Cases**:
 - **Percent Mode**: Enabled when `thresh.significant < 0` (interpreted as percentage). Uses value2 as reference.
-- **Sensitive Mode**: When `thresh.significant == 0.0`, all non-trivial differences below ignore threshold are significant.
+- **Sensitive Mode**: When `thresh.significant == 0.0`, all non-trivial differences below ignore threshold (138.47 dB) are normal.
 - **Range Data**: Column 0 data detected as range (monotonic + fixed delta + starting value < 100) bypasses TL-specific thresholds.
 
 ---
 
-### LEVEL 4: Marginal vs Non-Marginal (Operational Significance)
+### LEVEL 4: Zero-Weighted vs Non-Zero-Weighted (Operational Significance)
 
-**Purpose**: Within significant differences, distinguish between operationally marginal cases and truly non-marginal differences
+**Purpose**: Within normal differences, distinguish between those in the operationally weighted-to-zero range and those in the non-zero-weighted operational range
 
-**Partition**: `significant = marginal + non_marginal`
+**Partition**: `normal = zero_weighted + non_zero_weighted`
+
+**Physical Context**: Research (https://doi.org/10.23919/OCEANS.2009.5422312) shows transmission loss values above 110 dB are weighted to zero in acoustic propagation phase-space analysis. While numerically valid (unlike subnormal), these differences have no operational significance.
 
 **Decision Rule**:
 ```cpp
@@ -212,25 +218,27 @@ skip_tl_check = (column_index == 0) AND (flags.column1_is_range_data)
 if (NOT skip_tl_check AND
     value1 > thresh.marginal AND value1 < thresh.ignore AND
     value2 > thresh.marginal AND value2 < thresh.ignore) {
-    marginal  // Both values in marginal operational band [110, 138.47] dB
+    zero_weighted  // Both values in range (110, 138.47] dB: weighted to zero operationally
 } else {
-    non_marginal
+    non_zero_weighted  // At least one value ≤ 110 dB: operationally significant
 }
 ```
 
 **Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
 
-**Counters**: `counter.diff_marginal`
+**Counters**: `counter.diff_marginal` (zero-weighted)
 
-**Domain Context**: For transmission loss data, values between 110 and 138.47 dB represent the "warning zone"—numerically valid but outside the range of primary operational interest.
+**Terminology Note**: Code variable `diff_marginal` represents zero-weighted differences. Output uses zero-weighted/non-zero-weighted terminology to clarify the operational weighting.
+
+**Domain Context**: For transmission loss data, values between 110 and 138.47 dB represent the "operationally negligible zone"—numerically valid but outside the range of operational interest due to phase-space weighting.
 
 ---
 
 ### LEVEL 5: Critical vs Non-Critical (Model Failure Detection)
 
-**Purpose**: Detect catastrophically large differences that may indicate model failure
+**Purpose**: Among non-zero-weighted differences, detect catastrophically large differences that may indicate model failure or discontinuous behavior
 
-**Partition**: `non_marginal = critical + non_critical`
+**Partition**: `non_zero_weighted = critical + non_critical`
 
 **Decision Rule**:
 ```cpp
@@ -248,7 +256,7 @@ if (NOT skip_tl_check AND
 }
 ```
 
-**Implementation**: 
+**Implementation**:
 - Early check: `DifferenceAnalyzer::process_difference()` (top-level)
 - Per-element: `DifferenceAnalyzer::process_rounded_values()`
 
@@ -258,44 +266,41 @@ if (NOT skip_tl_check AND
 
 ---
 
-### LEVEL 6: Error vs Non-Error (User Threshold)
+### LEVEL 6: Pass/Fail Assessment (2% Tolerance Rule)
 
-**Purpose**: Among non-critical, non-marginal significant differences, apply user-specified threshold to determine failure criteria
+**Purpose**: Evaluate overall file comparison success based on the count of non-zero-weighted, non-critical differences relative to total elements
 
-**Partition**: `non_critical = error + non_error`
+**Assessment**: `pass_threshold = 0.02 × total_elements`
 
 **Decision Rule**:
 ```cpp
-if (thresh.significant_is_percent) {
-    // Percent mode
-    ref = |value2|
-    if (ref <= thresh.zero) {
-        percent_exceeds = (rounded_diff > thresh.zero)
-    } else {
-        percent_exceeds = (rounded_diff / ref) > thresh.significant_percent
-    }
-    
-    if (percent_exceeds) {
-        error
-    } else {
-        non_error
-    }
+// Count non-zero-weighted, non-critical, normal differences
+// (These exclude: subnormal, zero-weighted, and critical differences)
+non_zero_weighted_non_critical = counter.diff_significant -
+                                  counter.diff_marginal -
+                                  counter.diff_critical
+
+// Calculate percentage of total elements
+critical_percent = 100.0 × non_zero_weighted_non_critical / total_elements
+
+if (critical_percent < 2.0) {
+    PASS  // Files are "close enough" within tolerance
 } else {
-    // Standard mode: already classified at LEVEL 3
-    // This level uses same threshold for consistency
-    if (rounded_diff > thresh.significant) {
-        error
-    } else {
-        non_error
-    }
+    FAIL  // Too many operationally significant differences
 }
 ```
 
-**Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
+**Implementation**: `FileComparator::print_significant_percentage()` in `src/cpp/src/file_comparator.cpp`
 
-**Counters**: `counter.diff_error`, `counter.diff_non_error`
+**Rationale**: This assessment focuses on differences that are:
+1. **Normal** (not subnormal): Numerically reliable (≤138.47 dB)
+2. **Non-zero-weighted** (not zero-weighted): Operationally significant (≤110 dB)
+3. **Non-critical**: Not model failures (< critical threshold)
+4. **Exceed user threshold**: Detected as meaningful by user criteria
 
-**Note**: This level primarily serves to subdivide the non-critical, non-marginal differences for detailed reporting. The user threshold was already applied at LEVEL 3 for initial significance assessment.
+If fewer than 2% of elements fall into this category, files pass despite having differences, reflecting operational tolerance for small numbers of localized discrepancies.
+
+**Special Handling**: Error accumulation analysis may detect transient spike patterns (isolated outliers), which trigger a green PASS message rather than yellow, indicating the differences are not systematic.
 
 ---
 
@@ -311,25 +316,25 @@ LEVEL 1: total = zero + non_zero
 LEVEL 2: non_zero = trivial + non_trivial
          total = zero + trivial + non_trivial
 
-LEVEL 3: non_trivial = insignificant + significant
-         non_zero = trivial + insignificant + significant
-         total = zero + trivial + insignificant + significant
+LEVEL 3: non_trivial = subnormal + normal
+         non_zero = trivial + subnormal + normal
+         total = zero + trivial + subnormal + normal
 
-LEVEL 4: significant = marginal + non_marginal
-         non_trivial = insignificant + marginal + non_marginal
-         non_zero = trivial + insignificant + marginal + non_marginal
-         total = zero + trivial + insignificant + marginal + non_marginal
+LEVEL 4: normal = zero_weighted + non_zero_weighted
+         non_trivial = subnormal + zero_weighted + non_zero_weighted
+         non_zero = trivial + subnormal + zero_weighted + non_zero_weighted
+         total = zero + trivial + subnormal + zero_weighted + non_zero_weighted
 
-LEVEL 5: non_marginal = critical + non_critical
-         significant = marginal + critical + non_critical
-         non_trivial = insignificant + marginal + critical + non_critical
-         non_zero = trivial + insignificant + marginal + critical + non_critical
-         total = zero + trivial + insignificant + marginal + critical + non_critical
+LEVEL 5: non_zero_weighted = critical + non_critical
+         normal = zero_weighted + critical + non_critical
+         non_trivial = subnormal + zero_weighted + critical + non_critical
+         non_zero = trivial + subnormal + zero_weighted + critical + non_critical
+         total = zero + trivial + subnormal + zero_weighted + critical + non_critical
 
-LEVEL 6: non_critical = error + non_error
-         non_marginal = critical + error + non_error
-         significant = marginal + critical + error + non_error
-         non_trivial = insignificant + marginal + critical + error + non_error
+LEVEL 6: Assessment only (no binary partition)
+         Evaluates: non_zero_weighted_non_critical_count / total < 0.02
+         Where: non_zero_weighted_non_critical = normal - zero_weighted - critical
+```
          non_zero = trivial + insignificant + marginal + critical + error + non_error
          total = zero + trivial + insignificant + marginal + critical + error + non_error
 ```
@@ -439,3 +444,51 @@ The comparison fails (non-zero exit code) under these conditions:
 - Edge case handling (sub-LSB, percent mode, sensitive mode)
 - Threshold boundary conditions
 - File structure validation
+
+---
+
+## Quick Code Reference
+
+For developers working on the discrimination algorithm:
+
+**Core Implementation Files**:
+- `src/cpp/include/uband_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
+- `src/cpp/include/difference_analyzer.h` — `DifferenceAnalyzer` class declaration
+- `src/cpp/src/difference_analyzer.cpp` — Core logic: `process_difference()`, `process_raw_values()`, `process_rounded_values()`, `round_to_decimals()`
+- `src/cpp/src/file_comparator.cpp` — Orchestration: `compare_files()`, `process_line()`, `process_column()`, summary printing
+- `src/cpp/main/uband_diff.cpp` — CLI parsing and threshold initialization
+
+**Key Functions by Level**:
+- LEVEL 1: `DifferenceAnalyzer::process_raw_values()`
+- LEVELS 2-6: `DifferenceAnalyzer::process_rounded_values()`
+- Summary: `FileComparator::print_diff_like_summary()`, `print_rounded_summary()`, `print_significant_summary()`
+
+---
+
+## Alternative Comparison Approaches
+
+The current implementation uses specific choices for comparison logic. For future consideration, here are alternative approaches:
+
+### Symmetric Relative Difference
+Instead of using `value2` as reference:
+```cpp
+symmetric_relative = |value1 - value2| / max(|value1|, |value2|)
+```
+**Pros**: Avoids asymmetry when reference may be noisy
+**Cons**: Still undefined when both values near zero
+
+### Combined Absolute + Relative Rule
+```cpp
+significant = (abs_diff > abs_threshold) OR (abs_diff / max(|v1|,|v2|) > rel_threshold)
+```
+**Pros**: Handles both large absolute differences and relative precision requirements
+**Cons**: Two thresholds to configure
+
+### ULP-Based Comparisons
+```cpp
+meaningful_threshold = max(|value1|, |value2|) × machine_epsilon × safety_factor
+```
+**Pros**: Scale-aware, based on floating-point representation
+**Cons**: May be too lenient for high-precision requirements
+
+These alternatives are not currently implemented but could be added with corresponding command-line flags if needed.
