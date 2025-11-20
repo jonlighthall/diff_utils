@@ -9,10 +9,10 @@
 \toprule
 \textbf{Threshold} & \textbf{Default Value} & \textbf{Source} & \textbf{Purpose} \\ \midrule
 \texttt{zero} & $1.19 \times 10^{-7}$ & $2^{-23}$ & Machine epsilon (single precision) \\
-\texttt{significant} & 0.0 & User & Sensitivity threshold (0 = max sensitivity) \\
+\texttt{significant} & 0.0 & User & User-defined assessment threshold \\
 \texttt{critical} & 10.0 & User/Domain & Hard failure threshold \\
-\texttt{marginal} & 110.0 dB & Domain & TL operational boundary \\
-\texttt{ignore} & 138.47 dB & Derived & TL numerical reliability limit \\ \bottomrule
+\texttt{marginal} & 110.0 dB & Domain & TL zero-weighting boundary \\
+\texttt{ignore} & 138.47 dB & Derived & TL subnormal threshold (numerical limit) \\ \bottomrule
 \end{tabular}
 \caption{Default threshold values and their derivations}
 \label{tab:thresholds}
@@ -30,7 +30,7 @@
 
 This is the ULP (Unit in the Last Place) for normalized single-precision floating-point numbers.
 
-\subsubsection{Ignore Threshold (TL Domain)}
+\subsubsection{Ignore Threshold (TL Subnormal Boundary)}
 
 From acoustic pressure-to-TL relationship:
 
@@ -42,7 +42,7 @@ From acoustic pressure-to-TL relationship:
     &\approx 138.47 \text{ dB}
 \end{align}
 
-\subsubsection{Marginal Threshold}
+\subsubsection{Zero-Weighting Threshold}
 
 Based on operational research (Schneider et al., OCEANS 2009):
 

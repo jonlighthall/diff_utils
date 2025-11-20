@@ -36,14 +36,14 @@ The implementation includes comprehensive unit tests covering all discrimination
     \item \textbf{Sensitive Threshold} (\texttt{test\_sensitive\_threshold.cpp})
     \begin{itemize}
         \item Zero threshold mode (maximum sensitivity)
-        \item All non-trivial classified as significant
+        \item All non-trivial classified as normal
         \item Ignore threshold still applies
     \end{itemize}
 
     \item \textbf{TL-Specific} (\texttt{test\_trivial\_exclusion.cpp}, \texttt{test\_unit\_mismatch.cpp})
     \begin{itemize}
-        \item Marginal band classification [110, 138] dB
-        \item Ignore threshold exclusion (>138 dB)
+        \item Zero-weighting band classification [110, 138] dB
+        \item Subnormal threshold exclusion (>138 dB)
         \item Range data bypass
         \item Unit mismatch detection
     \end{itemize}

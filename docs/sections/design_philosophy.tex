@@ -33,8 +33,8 @@ Differences smaller than $\LSB/2$ are \emph{sub-LSB} and cannot be distinguished
 For transmission loss (TL) acoustic data, the algorithm incorporates physics-based thresholds:
 
 \begin{itemize}
-    \item \textbf{Ignore threshold} ($\approx 138$ dB): Values exceeding this represent pressures below single-precision arithmetic limits
-    \item \textbf{Marginal threshold} (110 dB): Based on operational research, TL values above 110 dB are weighted to zero in propagation analysis \cite{doi:10.23919/OCEANS.2009.5422312}
+    \item \textbf{Subnormal threshold} ($\approx 138$ dB): Values exceeding this represent pressures below single-precision arithmetic limits (subnormal)
+    \item \textbf{Zero-weighting threshold} (110 dB): Based on operational research, TL values above 110 dB are weighted to zero in propagation analysis \cite{doi:10.23919/OCEANS.2009.5422312}
 \end{itemize}
 
 These domain constraints are bypassed for range/distance data (column 0), which is automatically detected via monotonicity and fixed-delta criteria.

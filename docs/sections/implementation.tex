@@ -28,11 +28,11 @@ struct ColumnValues {
 };
 
 struct Thresholds {
-    double zero;           // Machine epsilon
-    double significant;    // User threshold
+    double zero;           // Machine epsilon (ε_single = 2^-23)
+    double significant;    // User threshold (code variable name retained)
     double critical;       // Hard failure threshold
-    double marginal;       // TL marginal band (110 dB)
-    double ignore;         // TL ignore threshold (~138 dB)
+    double marginal;       // TL zero-weighting threshold (110 dB)
+    double ignore;         // TL subnormal threshold (~138 dB)
     bool significant_is_percent;
     double significant_percent;
 };
@@ -41,9 +41,9 @@ struct CountStats {
     size_t diff_non_zero;
     size_t diff_trivial;
     size_t diff_non_trivial;
-    size_t diff_insignificant;
-    size_t diff_significant;
-    size_t diff_marginal;
+    size_t diff_insignificant;  // Code: subnormal (< ε_single)
+    size_t diff_significant;    // Code: normal (≥ ε_single)
+    size_t diff_marginal;       // Code: zero-weighted [110, 138 dB]
     size_t diff_critical;
     // ... more counters
 };
@@ -51,7 +51,7 @@ struct CountStats {
 struct DiffStats {
     double max_non_zero;
     double max_non_trivial;
-    double max_significant;
+    double max_significant;  // Code: max_normal
     double max_percent_error;
     int max_non_zero_dp;
     int max_non_trivial_dp;
@@ -127,7 +127,7 @@ Three levels of summary output:
 \begin{description}
     \item[\texttt{print\_diff\_like\_summary()}] Level 1 summary (zero vs non-zero)
     \item[\texttt{print\_rounded\_summary()}] Level 2 summary (trivial vs non-trivial)
-    \item[\texttt{print\_significant\_summary()}] Levels 3--5 (full discrimination)
+    \item[\texttt{print\_significant\_summary()}] Levels 3--5 (subnormal/normal, zero-weighted/non-zero-weighted, critical/non-critical)
 \end{description}
 
 Each summary maintains accounting invariants and highlights maximum differences with ANSI color codes (purple underline).

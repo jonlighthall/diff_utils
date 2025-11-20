@@ -64,7 +64,7 @@ COMPARISON: Files are EQUIVALENT (0 non-trivial differences)
 
 \textbf{Interpretation:} All differences are sub-LSB (formatting-induced).
 
-\subsubsection{Significant Differences}
+\subsubsection{Normal Differences}
 
 \begin{verbatim}
 SUMMARY (rounded to minimum decimal places):
@@ -78,27 +78,27 @@ After rounding:
   Non-trivial differences: 100
     Maximum non-trivial difference: 1.20 (at 2 decimal places)
 
-Significance classification (threshold = 0.10):
-  Insignificant differences: 30
-  Significant differences: 70
-    Maximum significant difference: 1.20 (2dp)
+Machine precision classification (ε = 1.19e-7):
+  Subnormal differences: 30
+  Normal differences: 70
+    Maximum normal difference: 1.20 (2dp)
     Maximum percent error: 5.6%
-  
-  Marginal TL differences [110, 138 dB]: 10
-  Non-marginal significant differences: 60
+
+  Zero-weighted TL differences [110, 138 dB]: 10
+  Non-zero-weighted differences: 60
     Critical differences (> 10.0): 0
     Non-critical differences: 60
 
-COMPARISON: Files DIFFER (60 significant differences, 6.25% of total)
+COMPARISON: Files DIFFER (60 non-zero-weighted differences, 6.25% of total)
 \end{verbatim}
 
-\textbf{Interpretation:} 60 significant differences detected (6.25\% of 960 values). No critical failures. Files differ but within expected numerical variability.
+\textbf{Interpretation:} 60 non-zero-weighted differences detected (6.25\% of 960 values). No critical failures. Files differ but within expected numerical variability.
 
 \subsection{Exit Codes}
 
 \begin{description}
-    \item[0] Files are equivalent (no significant differences)
-    \item[1] Files differ (significant differences found)
+    \item[0] Files are equivalent (no non-zero-weighted differences)
+    \item[1] Files differ (non-zero-weighted differences found)
     \item[2] File access error or structural mismatch
     \item[3] Critical difference detected (hard failure)
 \end{description}

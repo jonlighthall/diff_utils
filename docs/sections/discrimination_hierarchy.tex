@@ -11,9 +11,10 @@ The discrimination algorithm implements a six-level binary partition hierarchy. 
     \text{Level 0:} \quad & \text{total} = \Sigma(\text{lines} \times \text{columns}) \\
     \text{Level 1:} \quad & \text{total} = \text{zero} + \text{non-zero} \\
     \text{Level 2:} \quad & \text{non-zero} = \text{trivial} + \text{non-trivial} \\
-    \text{Level 3:} \quad & \text{non-trivial} = \text{insignificant} + \text{significant} \\
-    \text{Level 4:} \quad & \text{significant} = \text{marginal} + \text{non-marginal} \\
-    \text{Level 5:} \quad & \text{non-marginal} = \text{critical} + \text{non-critical}
+    \text{Level 3:} \quad & \text{non-trivial} = \text{subnormal} + \text{normal} \\
+    \text{Level 4:} \quad & \text{normal} = \text{zero-weighted} + \text{non-zero-weighted} \\
+    \text{Level 5:} \quad & \text{non-zero-weighted} = \text{critical} + \text{non-critical} \\
+    \text{Level 6:} \quad & \text{Assessment: } \frac{\text{non-zero-weighted, non-critical}}{\text{total}} < 0.02
 \end{align*}
 
 \subsection{Level 0: Structure Validation}
@@ -98,13 +99,15 @@ trivial = (rounded_diff == 0.0) || sub_lsb;
     \end{cases}
 \end{equation}
 
-\subsection{Level 3: Significance Assessment}
+\subsection{Level 3: Subnormal vs Normal (Machine Precision Limit)}
 
-\textbf{Purpose:} Among non-trivial differences, separate numerically meaningful from those dominated by machine precision
+\textbf{Purpose:} Among non-trivial differences, separate numerically reliable values from those in the subnormal range where pressures are below single-precision epsilon
+
+\textbf{Physical Context:} In transmission loss calculations, $\text{TL} = -20 \log_{10}(\text{pressure})$. When $\text{TL} > 138.47$ dB, pressure $< \epsilon_{\text{single}} \approx 1.19 \times 10^{-7}$, entering the subnormal/denormal range.
 
 \textbf{Partition:}
 \begin{equation}
-    \text{non\_trivial} = \text{insignificant} + \text{significant}
+    \text{non\_trivial} = \text{subnormal} + \text{normal}
 \end{equation}
 
 \textbf{Decision Rule:}
@@ -115,47 +118,51 @@ both_above_ignore = (value1 > thresh.ignore) &&
                    !is_range_data;
 
 if (both_above_ignore) {
-    classification = INSIGNIFICANT;  // Beyond numerical reliability
+    classification = SUBNORMAL;  // Both values > 138.47 dB: pressures < epsilon
 } else {
-    // Apply significance threshold
+    // Apply user threshold to normal-range differences
     if (thresh.significant_is_percent) {
         // Percent mode
         ref = abs(value2);
         if (ref <= thresh.zero) {
-            exceeds = (rounded_diff > thresh.zero);
+            exceeds_user_threshold = (rounded_diff > thresh.zero);
         } else {
-            exceeds = (rounded_diff / ref) > thresh.significant_percent;
+            exceeds_user_threshold = (rounded_diff / ref) > thresh.significant_percent;
         }
     } else if (thresh.significant == 0.0) {
-        // Sensitive mode: all non-trivial = significant
-        exceeds = true;
+        // Sensitive mode: all non-trivial below ignore are normal
+        exceeds_user_threshold = true;
     } else {
         // Standard mode: absolute threshold
-        exceeds = (rounded_diff > thresh.significant);
+        exceeds_user_threshold = (rounded_diff > thresh.significant);
     }
 
-    classification = exceeds ? SIGNIFICANT : INSIGNIFICANT;
+    classification = exceeds_user_threshold ? NORMAL : SUBNORMAL;
 }
 \end{lstlisting}
 
 \textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_rounded\_values()}
 
-\textbf{Counters:} \texttt{counter.diff\_insignificant}, \texttt{counter.diff\_significant}, \texttt{counter.diff\_high\_ignore}
+\textbf{Counters:} \texttt{counter.diff\_insignificant} (subnormal), \texttt{counter.diff\_significant} (normal), \texttt{counter.diff\_high\_ignore}
+
+\textbf{Terminology Note:} Code variables retain historical names (\texttt{diff\_insignificant}, \texttt{diff\_significant}) but represent subnormal and normal differences respectively.
 
 \textbf{Special Modes:}
 \begin{description}
     \item[Percent Mode] Enabled when \texttt{thresh.significant < 0} (e.g., -10 for 10\%)
-    \item[Sensitive Mode] When \texttt{thresh.significant == 0.0}, all non-trivial below ignore are significant
+    \item[Sensitive Mode] When \texttt{thresh.significant == 0.0}, all non-trivial differences below 138.47 dB are normal
     \item[Range Data] Column 0 bypasses TL-specific thresholds if detected as monotonic range values
 \end{description}
 
-\subsection{Level 4: Marginal vs Non-Marginal}
+\subsection{Level 4: Zero-Weighted vs Non-Zero-Weighted (Operational Significance)}
 
-\textbf{Purpose:} Distinguish operationally marginal from truly non-marginal differences
+\textbf{Purpose:} Within normal differences, distinguish those in the operationally weighted-to-zero range from those in the non-zero-weighted operational range
+
+\textbf{Physical Context:} Research \cite{ocean2009} shows transmission loss values above 110 dB are weighted to zero in acoustic propagation phase-space analysis. While numerically valid (unlike subnormal), these differences have no operational significance.
 
 \textbf{Partition:}
 \begin{equation}
-    \text{significant} = \text{marginal} + \text{non\_marginal}
+    \text{normal} = \text{zero-weighted} + \text{non-zero-weighted}
 \end{equation}
 
 \textbf{Decision Rule:}
@@ -163,25 +170,27 @@ if (both_above_ignore) {
 if (!is_range_data &&
     value1 > thresh.marginal && value1 < thresh.ignore &&
     value2 > thresh.marginal && value2 < thresh.ignore) {
-    classification = MARGINAL;  // Both in [110, 138.47] dB band
+    classification = ZERO_WEIGHTED;  // Both in (110, 138.47] dB: weighted to zero
 } else {
-    classification = NON_MARGINAL;
+    classification = NON_ZERO_WEIGHTED;  // At least one <= 110 dB: operationally significant
 }
 \end{lstlisting}
 
 \textbf{Implementation:} \texttt{DifferenceAnalyzer::process\_rounded\_values()}
 
-\textbf{Counter:} \texttt{counter.diff\_marginal}
+\textbf{Counter:} \texttt{counter.diff\_marginal} (zero-weighted)
 
-\textbf{Domain Context:} For TL data, the marginal band [110, 138.47] dB represents numerically valid but operationally insignificant values.
+\textbf{Terminology Note:} Code variable \texttt{diff\_marginal} represents zero-weighted differences.
 
-\subsection{Level 5: Critical vs Non-Critical}
+\textbf{Domain Context:} For TL data, the band (110, 138.47] dB represents the operationally negligible zone---numerically valid but outside the range of operational interest due to phase-space weighting.
 
-\textbf{Purpose:} Detect catastrophically large differences indicating potential model failure
+\subsection{Level 5: Critical vs Non-Critical (Model Failure Detection)}
+
+\textbf{Purpose:} Among non-zero-weighted differences, detect catastrophically large differences indicating potential model failure or discontinuous behavior
 
 \textbf{Partition:}
 \begin{equation}
-    \text{non\_marginal} = \text{critical} + \text{non\_critical}
+    \text{non-zero-weighted} = \text{critical} + \text{non\_critical}
 \end{equation}
 
 \textbf{Decision Rule:}
@@ -214,12 +223,14 @@ TOTAL ELEMENTS (Level 0)
 `-- NON-ZERO DIFF (Level 1)
     |-- TRIVIAL (Level 2: sub-LSB or rounded=0)
     `-- NON-TRIVIAL (Level 2)
-        |-- INSIGNIFICANT (Level 3)
-        `-- SIGNIFICANT (Level 3)
-            |-- MARGINAL (Level 4)
-            `-- NON-MARGINAL (Level 4)
-                |-- CRITICAL (Level 5)
+        |-- SUBNORMAL (Level 3: TL > 138.47 dB, p < epsilon)
+        `-- NORMAL (Level 3: numerically reliable)
+            |-- ZERO-WEIGHTED (Level 4: TL > 110 dB, operational wt=0)
+            `-- NON-ZERO-WEIGHTED (Level 4: operationally significant)
+                |-- CRITICAL (Level 5: model failure)
                 `-- NON-CRITICAL (Level 5)
+                    |
+                    Level 6: Pass/Fail Assessment (< 2% tolerance)
 \end{verbatim}
 \caption{Six-level discrimination hierarchy}
 \label{fig:hierarchy}

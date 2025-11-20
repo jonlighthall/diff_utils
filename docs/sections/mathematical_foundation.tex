@@ -23,7 +23,7 @@ Double-precision floating-point numbers (IEEE 754 binary64) have 52 mantissa bit
 
 \subsection{Domain-Specific Threshold Derivations}
 
-\subsubsection{Ignore Threshold}
+\subsubsection{Subnormal Threshold}
 
 For transmission loss in underwater acoustics, the relationship between pressure and transmission loss is:
 
@@ -34,21 +34,21 @@ For transmission loss in underwater acoustics, the relationship between pressure
 The minimum representable pressure in single-precision arithmetic (relative to reference pressure) is $\epsilon_{\text{single}}$. The corresponding transmission loss is:
 
 \begin{align}
-    TL_{\text{ignore}} &= -20 \log_{10}(\epsilon_{\text{single}}) \\
+    TL_{\text{subnormal}} &= -20 \log_{10}(\epsilon_{\text{single}}) \\
     &= -20 \log_{10}(2^{-23}) \\
     &= -20 \times (-23) \log_{10}(2) \\
     &= 460 \log_{10}(2) \\
     &\approx 138.47 \text{ dB}
 \end{align}
 
-\textbf{Physical interpretation:} Transmission loss values above 138.47 dB represent acoustic pressures that cannot be reliably represented in single-precision arithmetic.
+\textbf{Physical interpretation:} Transmission loss values above 138.47 dB represent acoustic pressures below the single-precision normal number threshold (subnormal pressures).
 
-\subsubsection{Marginal Threshold}
+\subsubsection{Zero-Weighting Threshold}
 
 Based on acoustic propagation research \cite{doi:10.23919/OCEANS.2009.5422312}, transmission loss values exceeding 110 dB are weighted to zero in practical sonar calculations. This threshold defines the boundary of operational significance.
 
 \begin{equation}
-    TL_{\text{marginal}} = 110 \text{ dB}
+    TL_{\text{zero-weight}} = 110 \text{ dB}
 \end{equation}
 
 \subsection{LSB and Sub-LSB Criteria}
