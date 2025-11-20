@@ -20,13 +20,6 @@ DifferenceAnalyzer::DifferenceAnalyzer(const Thresholds& thresholds)
 bool DifferenceAnalyzer::process_difference(
     const ColumnValues& column_data, size_t column_index, double threshold,
     CountStats& counter, DiffStats& differ, Flags& flags) const {
-  // Write to file for debugging
-  std::ofstream debug_file("/tmp/debug_diff.txt", std::ios::app);
-  debug_file << "PROCESS_DIFFERENCE: v1=" << column_data.value1
-             << " v2=" << column_data.value2 << " threshold=" << threshold
-             << std::endl;
-  debug_file.close();
-
   // Calculate raw difference (used for Levels 2-6)
   double raw_diff = std::abs(column_data.value1 - column_data.value2);
 
@@ -208,14 +201,6 @@ void DifferenceAnalyzer::process_hierarchy(const ColumnValues& column_data,
         exceeds_significance = (raw_diff > threshold);
       }
 
-      // DEBUG instrumentation (can be removed after validation)
-      if (counter.line_number < 5 && column_index < 5) {
-        std::ofstream dbg("/tmp/debug_significance.txt", std::ios::app);
-        dbg << "LN " << counter.line_number << " COL " << column_index + 1
-            << " raw_diff=" << raw_diff << " threshold=" << threshold
-            << " both_above_ignore=" << both_above_ignore
-            << " exceeds_significance=" << exceeds_significance << std::endl;
-      }
       if (both_above_ignore || !exceeds_significance) {
         // INSIGNIFICANT
         counter.diff_insignificant++;

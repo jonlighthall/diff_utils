@@ -430,11 +430,6 @@ auto round_to_decimals = [](double value, int precision) {
 
 bool FileComparator::compare_files(const std::string& file1,
                                    const std::string& file2) {
-  // DEBUG: Write to file
-  std::ofstream debug_file("/tmp/debug_compare.txt", std::ios::app);
-  debug_file << "compare_files called: " << file1 << " vs " << file2
-             << std::endl;
-  debug_file.close();
   std::ifstream infile1;
   std::ifstream infile2;
 
@@ -530,6 +525,13 @@ bool FileComparator::compare_files(const std::string& file1,
   // Finalize TL metrics (calculate last 4% statistics)
   tl_metrics.finalize();
 
+  // Compute accumulation metrics if we have sufficient data
+  // This populates the cache for later use in print_summary
+  if (accumulation_data_.n_points >= 5) {
+    ErrorAccumulationAnalyzer analyzer;
+    accumulation_metrics_ = analyzer.analyze(accumulation_data_);
+  }
+
   // Validate file lengths and return result
   if (!file_reader_->compare_file_lengths(file1, file2)) {
     return false;
@@ -597,11 +599,6 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
 bool FileComparator::process_column(const LineData& data1,
                                     const LineData& data2, size_t column_index,
                                     std::vector<int>& dp_per_col) {
-  // DEBUG
-  std::ofstream debug_file("/tmp/debug_column.txt", std::ios::app);
-  debug_file << "process_column called for column " << column_index
-             << std::endl;
-  debug_file.close();
   ColumnValues column_data = extract_column_values(data1, data2, column_index);
   process_raw_values(column_data);
 
@@ -756,12 +753,6 @@ double FileComparator::calculate_threshold(int ndp) {
 // ========================================================================
 bool FileComparator::process_difference(const ColumnValues& column_data,
                                         size_t column_index) {
-  // DEBUG: File-based logging
-  std::ofstream debug_file("/tmp/debug_fc.txt", std::ios::app);
-  debug_file << "FC::process_difference called: v1=" << column_data.value1
-             << " v2=" << column_data.value2 << std::endl;
-  debug_file.close();
-
   // Calculate threshold for this column
   double ithreshold = calculate_threshold(column_data.min_dp);
 

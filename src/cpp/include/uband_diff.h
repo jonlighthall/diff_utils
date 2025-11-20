@@ -592,7 +592,7 @@ class FileComparator {
 
   // Error accumulation analysis data
   ErrorAccumulationData accumulation_data_;
-  // Cached accumulation metrics (computed before pass/fail decision)
+  // Cached accumulation metrics (lazy evaluation cache for const methods)
   mutable std::optional<AccumulationMetrics> accumulation_metrics_;
 
   // ========================================================================
