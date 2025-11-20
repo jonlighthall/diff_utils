@@ -2306,8 +2306,13 @@ void FileComparator::print_summary(const std::string& file1,
   SummaryParams params{file1, file2, fmt_wid};
   print_settings(params.file1, params.file2);
   print_statistics(params.file1);
-  print_rmse_statistics();
-  print_tl_metrics();
+
+  // RMSE and TL metrics require verbosity level 1 or higher
+  if (verbosity.show_statistics) {
+    print_rmse_statistics();
+    print_tl_metrics();
+  }
+
   print_flag_status();
   print_counter_info();
 
@@ -2531,12 +2536,12 @@ void FileComparator::print_accumulation_analysis() const {
   // Only perform analysis if:
   // 1. We have significant differences (Level 3+)
   // 2. We have enough data points (at least 10 significant errors)
-  // 3. We're not in minimal print mode
+  // 3. We have verbosity level 2 or higher (detailed analysis)
   //
   // This ensures we only analyze when there are meaningful errors to
   // investigate, not for trivial formatting differences or random noise
 
-  if (verbosity.show_statistics) {
+  if (verbosity.show_detailed) {
     std::cout << "\nDEBUG: Accumulation analysis check:\n";
     std::cout << "  has_significant_diff: " << flag.has_significant_diff
               << "\n";
@@ -2555,9 +2560,9 @@ void FileComparator::print_accumulation_analysis() const {
     return;
   }
 
-  // Skip if insufficient significant error data points
-  if (accumulation_data_.n_points < 10 || verbosity.quiet) {
-    if (verbosity.level >= 1 && accumulation_data_.n_points > 0) {
+  // Skip if insufficient significant error data points or verbosity too low
+  if (accumulation_data_.n_points < 10 || !verbosity.show_detailed) {
+    if (verbosity.show_statistics && accumulation_data_.n_points > 0) {
       std::cout << "Skipping accumulation analysis (n_significant_points="
                 << accumulation_data_.n_points << " < 10)\n";
     }
