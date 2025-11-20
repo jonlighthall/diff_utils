@@ -504,23 +504,22 @@ std::tuple<double, double, int, int> readComplex(std::istringstream& stream,
 class FileComparator {
  public:
   // Constructor
-  FileComparator(double user_thresh, double hard_thresh, double print_thresh,
-                 int debug_level = 0, bool significant_is_percent = false,
+  FileComparator(double user_thresh, double hard_thresh, double table_thresh,
+                 int verbosity_level = 0, int debug_level = 0,
+                 bool significant_is_percent = false,
                  double significant_percent = 0.0)
-      : thresh{user_thresh, hard_thresh, print_thresh},
-        print{debug_level, debug_level < 0, debug_level >= 1, debug_level >= 2,
+      : thresh{user_thresh, hard_thresh, table_thresh},
+        verbosity{verbosity_level, verbosity_level < 0,
+                  verbosity_level >= 1, verbosity_level >= 2},
+        debug{debug_level, debug_level >= 1, debug_level >= 2,
               debug_level >= 3},
+        table{table_thresh, 32, table_thresh == 0.0},
         file_reader_(std::make_unique<FileReader>()),
         line_parser_(std::make_unique<LineParser>()),
         format_tracker_(std::make_unique<FormatTracker>(
-            PrintLevel{debug_level, debug_level < 0, debug_level >= 1,
-                       debug_level >= 2, debug_level >= 3})),
+            verbosity, debug)),
         difference_analyzer_(thresh) {
-    // Apply percent-mode significant settings (if any) before constructing
-    // the DifferenceAnalyzer which relies on Thresholds. Note: thresh is an
-    // aggregate-initialized member and will be constructed before
-    // difference_analyzer_ (member init order is declaration order). We still
-    // set the percent flags here to ensure correct runtime behavior.
+    // Apply percent-mode significant settings
     thresh.significant_is_percent = significant_is_percent;
     thresh.significant_percent = significant_percent;
   };
@@ -562,10 +561,10 @@ class FileComparator {
   // Data Members (must be declared before composition classes that use them)
   // ========================================================================
   Thresholds thresh;
-  PrintLevel print;
-  // Cap for number of difference table rows to print. Analysis continues
-  // after the cap; only additional table rows are suppressed.
-  size_t max_print_rows_ = 32;  // reasonable default to avoid terminal spam
+  VerbosityControl verbosity;
+  DebugControl debug;
+  TableControl table;
+  // Cap for number of difference table rows to print
   bool truncation_notice_printed_ = false;  // ensure single truncation notice
 
   // ========================================================================

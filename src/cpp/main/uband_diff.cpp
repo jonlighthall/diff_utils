@@ -37,8 +37,9 @@ struct ProgramArgs {
   std::string file2 = "file2.txt";
   double count_level = 0.05;
   double stop_level = 10.0;
-  double print_level = 1.0;
-  int debug_level = 0;
+  double table_threshold = 1.0;  // Renamed from print_level (clearer purpose)
+  int verbosity_level = 0;  // User-facing output verbosity
+  int debug_level = 0;      // Developer diagnostics
   // If true, interpret count_level as a percent threshold (fraction stored
   // in count_percent). This is set when the user supplies a negative
   // threshold on the command line (e.g. -1 -> 1%).
@@ -64,30 +65,31 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "uband_diff - Numerical File Comparison Tool\n" << std::endl;
     std::cout << "USAGE:" << std::endl;
     std::cout << "  " << argv[0]
-              << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level] [--plot]"
+              << " <file1> <file2> [threshold] [hard_threshold] "
+                 "[table_threshold] [verbosity] [debug] [--plot]"
               << std::endl;
     std::cout << "\nARGUMENTS:" << std::endl;
-    std::cout << "  file1           First input file to compare" << std::endl;
-    std::cout << "  file2           Second input file to compare" << std::endl;
-    std::cout << "  threshold       Soft difference threshold for counting "
-                 "differences"
+    std::cout << "  file1              First input file to compare" << std::endl;
+    std::cout << "  file2              Second input file to compare" << std::endl;
+    std::cout << "  threshold          Soft threshold for counting differences"
               << std::endl;
     std::cout
-        << "                  (default: 0.05). If negative, interpreted as "
-           "a percent relative to the second file (e.g. -1 => 1%)"
+        << "                     (default: 0.05). If negative, interpreted as "
+           "percent (e.g. -1 => 1%)"
         << std::endl;
     std::cout
-        << "  hard_threshold  Hard difference threshold for failure detection"
+        << "  hard_threshold     Hard threshold for failure detection"
         << std::endl;
-    std::cout << "                  (default: 10.0, must be ≥ 0, typically > "
-                 "threshold)"
+    std::cout << "                     (default: 10.0, must be ≥ 0)" << std::endl;
+    std::cout << "  table_threshold    Minimum difference to show in table"
               << std::endl;
-    std::cout << "  print_level     Print verbosity level for difference table"
+    std::cout << "                     (default: 1.0, 0 shows all non-zero like diff)" << std::endl;
+    std::cout << "  verbosity          Output detail level: <0=quiet, 0=normal, 1+=verbose"
               << std::endl;
-    std::cout << "                  (default: 1.0, must be ≥ 0)" << std::endl;
-    std::cout << "  debug_level     Debug output level" << std::endl;
-    std::cout << "                  (default: 0, typically 0-3)" << std::endl;
+    std::cout << "                     (default: 0)" << std::endl;
+    std::cout << "  debug              Debug diagnostic level: 0=off, 1-3=increasing detail"
+              << std::endl;
+    std::cout << "                     (default: 0, for troubleshooting only)" << std::endl;
     std::cout << "\nOPTIONS:" << std::endl;
     std::cout
         << "  --plot          Generate comparison plot using Python script"
@@ -98,9 +100,11 @@ bool show_help_if_requested(int argc, char* argv[]) {
     std::cout << "\nEXAMPLES:" << std::endl;
     std::cout << "  " << argv[0] << " data1.txt data2.txt" << std::endl;
     std::cout << "  " << argv[0] << " file1.dat file2.dat 0.01" << std::endl;
-    std::cout << "  " << argv[0] << " test1.txt test2.txt 0.05 1.0 0.1 2"
+    std::cout << "  # threshold=0.05, hard=1.0, table=0.1, verbosity=1, debug=0" << std::endl;
+    std::cout << "  " << argv[0] << " test1.txt test2.txt 0.05 1.0 0.1 1 0"
               << std::endl;
-    std::cout << "  " << argv[0] << " ref.txt test.txt 0.4 10.0 1.0 0 --plot"
+    std::cout << "  # With plotting" << std::endl;
+    std::cout << "  " << argv[0] << " ref.txt test.txt 0.4 10.0 1.0 0 0 --plot"
               << std::endl;
     std::cout << "\nFEATURES:" << std::endl;
     std::cout << "  - Precision-aware numerical comparison" << std::endl;
@@ -119,20 +123,20 @@ bool validate_argument_count(int argc, char* argv[]) {
     std::cout << "\033[1;33mWARNING:\033[0m Two file names not provided."
               << std::endl;
     std::cout << "   Usage: " << argv[0]
-              << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level] [--plot]"
+              << " <file1> <file2> [threshold] [hard_threshold] "
+                 "[table_threshold] [verbosity] [debug] [--plot]"
               << std::endl;
     std::cout << "   Use '" << argv[0]
               << " --help' for detailed usage information." << std::endl;
     return false;
   }
 
-  if (argc > 9) {
+  if (argc > 10) {
     std::cerr << "\033[1;31mERROR:\033[0m Too many arguments provided."
               << std::endl;
     std::cerr << "Usage: " << argv[0]
-              << " <file1> <file2> [threshold] [hard_threshold] [print_level] "
-                 "[debug_level] [--plot]"
+              << " <file1> <file2> [threshold] [hard_threshold] "
+                 "[table_threshold] [verbosity] [debug] [--plot]"
               << std::endl;
     std::cerr << "Use '" << argv[0]
               << " --help' for detailed usage information." << std::endl;
@@ -323,8 +327,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return true;
     }
 
-    if (!parse_threshold_argument(argv[5], args.print_level,
-                                  "Print threshold")) {
+    if (!parse_threshold_argument(argv[5], args.table_threshold,
+                                  "Table threshold")) {
       return false;
     }
   }
@@ -335,7 +339,18 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return true;
     }
 
-    if (!parse_debug_level_argument(argv[6], args.debug_level)) {
+    if (!parse_debug_level_argument(argv[6], args.verbosity_level)) {
+      return false;
+    }
+  }
+
+  if (argc >= 8) {
+    // Skip if it's the --plot flag
+    if (std::string(argv[7]) == "--plot") {
+      return true;
+    }
+
+    if (!parse_debug_level_argument(argv[7], args.debug_level)) {
       return false;
     }
   }
@@ -445,7 +460,8 @@ int main(int argc, char* argv[]) {
 #endif
 
   // Create comparator and run comparison
-  FileComparator comparator(args.count_level, args.stop_level, args.print_level,
+  FileComparator comparator(args.count_level, args.stop_level,
+                            args.table_threshold, args.verbosity_level,
                             args.debug_level, args.count_level_is_percent,
                             args.count_percent);
   bool result = comparator.compare_files(args.file1, args.file2);

@@ -14,7 +14,8 @@
 
 // Forward declarations
 struct Flags;
-// PrintLevel now provided by print_level.h
+struct VerbosityControl;
+struct DebugControl;
 
 /**
  * @brief Manages decimal place format tracking and validation
@@ -27,7 +28,8 @@ struct Flags;
  */
 class FormatTracker {
  public:
-  explicit FormatTracker(const PrintLevel& print_settings);
+  FormatTracker(const VerbosityControl& verbosity_settings,
+                const DebugControl& debug_settings);
   ~FormatTracker() = default;
 
   // Format validation and tracking
@@ -65,8 +67,9 @@ class FormatTracker {
   void set_last_format_line(size_t line) { last_fmt_line = line; }
 
  private:
-  // Store by value to avoid dangling reference to a temporary PrintLevel
-  PrintLevel print;
+  // Store by value to avoid dangling reference
+  VerbosityControl verbosity;
+  DebugControl debug;
 
   // Format tracking state
   size_t this_fmt_line = 0;

@@ -12,8 +12,9 @@
 
 #include "uband_diff.h"  // For Flags and other struct definitions
 
-FormatTracker::FormatTracker(const PrintLevel& print_settings)
-    : print(print_settings) {}
+FormatTracker::FormatTracker(const VerbosityControl& verbosity_settings,
+                             const DebugControl& debug_settings)
+    : verbosity(verbosity_settings), debug(debug_settings) {}
 
 bool FormatTracker::validate_and_track_column_format(
     size_t n_col1, size_t n_col2, std::vector<int>& dp_per_col,
@@ -30,7 +31,7 @@ bool FormatTracker::validate_and_track_column_format(
   // Check if the number of columns has changed
   if (line_number == 1) {
     prev_n_col = n_col1;  // initialize prev_n_col on first line
-    if (print.debug2) {
+    if (debug.detailed) {
       std::cout << "   FORMAT: " << n_col1
                 << " columns (both files) - initialized" << std::endl;
     }
@@ -43,14 +44,14 @@ bool FormatTracker::validate_and_track_column_format(
     dp_per_col.clear();
     flags.new_fmt = true;
     this_fmt_line = line_number;
-    if (print.level > 0) {
+    if (verbosity.show_statistics) {
       std::cout << this_fmt_line << ": FMT number of columns has changed"
                 << std::endl;
       std::cout << "format has changed" << std::endl;
     }
   } else {
     if (line_number > 1) {
-      if (print.debug3) {
+      if (debug.verbose) {
         std::cout << "Line " << line_number << " same column format"
                   << std::endl;
       }
@@ -64,14 +65,14 @@ bool FormatTracker::validate_and_track_column_format(
 bool FormatTracker::validate_decimal_column_size(
     const std::vector<int>& dp_per_col, size_t column_index,
     size_t line_number) const {
-  if (print.debug3) {
+  if (debug.verbose) {
     for (size_t j = 0; j < dp_per_col.size(); ++j) {
       std::cout << "   minimum decimal places in column " << j + 1 << " = "
                 << dp_per_col[j] << std::endl;
     }
   }
 
-  if (print.debug2) {
+  if (debug.detailed) {
     std::cout << "   size of dp_per_col: " << dp_per_col.size();
     std::cout << ", column_index: " << column_index + 1 << std::endl;
   }
@@ -109,7 +110,7 @@ bool FormatTracker::initialize_decimal_place_format(
     return false;
   }
 
-  if (print.debug2) {
+  if (debug.detailed) {
     std::cout << "FORMAT: Line " << line_number << " initialization"
               << std::endl;
     std::cout << "   dp_per_col: ";
@@ -130,7 +131,7 @@ bool FormatTracker::update_decimal_place_format(int min_dp, size_t column_index,
                                                 std::vector<int>& dp_per_col,
                                                 size_t line_number,
                                                 Flags& flags) {
-  if (print.debug3) {
+  if (debug.verbose) {
     std::cout << "not first line" << std::endl;
   }
 
@@ -147,19 +148,19 @@ bool FormatTracker::update_decimal_place_format(int min_dp, size_t column_index,
   if (dp_per_col[column_index] != min_dp) {
     // If the minimum decimal places for this column is different from the
     // previous minimum decimal places, update it
-    if (print.debug3) {
+    if (debug.verbose) {
       std::cout << "DEBUG3: different" << std::endl;
       std::cout << "DEBUG3: format has changed" << std::endl;
     }
     dp_per_col[column_index] = min_dp;
     flags.new_fmt = true;
     this_fmt_line = line_number;
-    if (print.debug) {
+    if (debug.enabled) {
       std::cout << "FORMAT: Line " << this_fmt_line
                 << ": number of decimal places has changed" << std::endl;
     }
   }
-  if (print.debug3 && dp_per_col[column_index] == min_dp) {
+  if (debug.verbose && dp_per_col[column_index] == min_dp) {
     // If the minimum decimal places for this column is the same as the
     // previous minimum decimal places, do nothing
     std::cout << "DEBUG3: same" << std::endl;

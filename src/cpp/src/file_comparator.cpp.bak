@@ -441,22 +441,19 @@ bool FileComparator::compare_files(const std::string& file1,
 
   // Diagnostic: print the pointer value for difference_analyzer_ to help
   // debug possible memory corruption seen in unit tests.
-  if (debug.enabled) {
+  if (print.debug) {
     std::cerr << "DIAG: difference_analyzer_ at start = "
               << &difference_analyzer_ << std::endl;
   }
 
   // Perform column structure analysis before numerical comparison
   bool structures_compatible = true;
-  if (verbosity.level > 0 || debug.enabled) {
+  if (print.level > 0 || print.debug) {
     // Full detailed analysis for debug mode
     std::cout << "\n\033[1;36m=== Column Structure Analysis ===\033[0m"
               << std::endl;
-    // Create legacy PrintLevel for file_reader (TODO: update file_reader)
-    PrintLevel legacy_print{debug.level, verbosity.quiet, debug.enabled,
-                           debug.detailed, debug.verbose};
     structures_compatible =
-        file_reader_->compare_column_structures(file1, file2, legacy_print);
+        file_reader_->compare_column_structures(file1, file2, print);
 
     if (!structures_compatible) {
       std::cout << "\033[1;33mNote: Files have different column structures but "
@@ -566,7 +563,7 @@ bool FileComparator::process_line(const LineData& data1, const LineData& data2,
   size_t n_col2 = data2.values.size();
 
   // print line contents if DEBUG2 is defined
-  if (debug.detailed) {
+  if (print.debug2) {
     auto print_line_contents = [](const LineData& data, size_t n_col) {
       for (size_t i = 0; i < n_col; ++i) {
         int ndp = data.decimal_places[i];
@@ -701,10 +698,10 @@ double FileComparator::calculate_threshold(int ndp) {
   double dp_threshold =
       format_tracker_->calculate_threshold(ndp, thresh.significant);
 
-  if (flag.new_fmt && debug.enabled && !verbosity.quiet) {
+  if (flag.new_fmt && print.debug && !print.diff_only) {
     if (this_fmt_line != last_fmt_line) {
       // group together all format specifications on the same line
-      if (debug.detailed) {
+      if (print.debug2) {
         std::cout << "PRECISION: Line " << this_fmt_line;
         if (counter.line_number == 1) {
           std::cout << " (initial format)";
@@ -719,7 +716,7 @@ double FileComparator::calculate_threshold(int ndp) {
     // this_fmt_line
     auto line_num_width =
         static_cast<int>(std::to_string(this_line_ncols).length());
-    if (debug.detailed) {
+    if (print.debug2) {
       // indent the column format specification under the line number
       std::cout << "      Column " << std::setw(line_num_width)
                 << this_fmt_column << ": ";
@@ -735,13 +732,13 @@ double FileComparator::calculate_threshold(int ndp) {
   }
   if (ndp > differ.ndp_max) {
     differ.ndp_max = ndp;
-    if (verbosity.show_detailed) {
+    if (print.level > 1) {
       std::cout << "      Maximum decimal places so far: " << differ.ndp_max
                 << std::endl;
     }
   }
   if (thresh.significant < dp_threshold) {
-    if (debug.enabled && flag.new_fmt && thresh.significant > 0) {
+    if (print.debug && flag.new_fmt && thresh.significant > 0) {
       std::cout << "   \033[1;33mNOTE: minimum non-zero difference ("
                 << dp_threshold << ") is greater than significant threshold ("
                 << thresh.significant << ")\033[0m" << std::endl;
@@ -794,7 +791,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
     // Only add to accumulation data if this is a significant error
     bool is_significant = (diff_unrounded > thresh.significant);
 
-    if (debug.enabled && is_significant && counter.line_number < 10) {
+    if (print.debug && is_significant && counter.line_number < 10) {
       std::cout << "[DEBUG] Line " << counter.line_number << ", col "
                 << column_index << ": is_significant=" << is_significant
                 << ", diff=" << diff_unrounded
@@ -809,12 +806,12 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
           column_data.value2,  // TL from test file
           is_significant       // significance flag (always true here)
       );
-      if (debug.enabled && accumulation_data_.n_points <= 3) {
+      if (print.debug && accumulation_data_.n_points <= 3) {
         std::cout << "[DEBUG] Added point #" << accumulation_data_.n_points
                   << " at range=" << column_data.range << "\n";
       }
     }
-  } else if (debug.enabled && column_index == 0 && counter.line_number < 3) {
+  } else if (print.debug && column_index == 0 && counter.line_number < 3) {
     std::cout << "[DEBUG] Line " << counter.line_number << ", col "
               << column_index << " - SKIPPED (column_index = 0)\n";
   }
@@ -836,11 +833,11 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // epsilon) This makes print_thresh=0 behave like 'diff' - showing all
   // non-zero differences
   double effective_print_thresh =
-      (table.threshold == 0.0) ? thresh.zero : table.threshold;
+      (thresh.print == 0.0) ? thresh.zero : thresh.print;
 
   // When print_thresh==0, we want diff-like behavior (print everything
   // non-zero), Check raw diff instead of rounded diff to avoid suppression
-  bool print_all_nonzero = (table.threshold == 0.0);
+  bool print_all_nonzero = (thresh.print == 0.0);
   bool diff_is_zero = print_all_nonzero ? (diff_unrounded <= thresh.zero)
                                         : (diff_rounded == 0.0);
 
@@ -848,7 +845,7 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   // diff. Suppress rows where rounding makes the diff zero unless debug output
   // is requested or print_thresh==0 (diff-like mode).
   if (diff_for_threshold > effective_print_thresh) {
-    if (diff_is_zero && !debug.enabled && !debug.detailed && !debug.verbose) {
+    if (diff_is_zero && !print.debug && !print.debug2 && !print.debug3) {
       // Still count it internally but do not emit a row.
       // We intentionally do NOT increment diff_print here since nothing was
       // printed.
@@ -859,10 +856,10 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
                   diff_unrounded, percent_error);
     }
   } else {
-    if (debug.detailed) {
+    if (print.debug2) {
       auto line_num_width =
           static_cast<int>(std::to_string(this_line_ncols).length());
-      if (debug.verbose) {
+      if (print.debug3) {
         std::cout << "ncols: " << this_line_ncols
                   << ", column_index: " << column_index + 1 << std::endl;
       }
@@ -905,7 +902,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // If a critical difference has already been encountered OR we've hit the
   // maximum row print cap, stop printing further table rows. Continue
   // analyzing silently.
-  if (flag.has_critical_diff || counter.diff_print >= table.max_rows) {
+  if (flag.has_critical_diff || counter.diff_print >= max_print_rows_) {
     if (!truncation_notice_printed_) {
       std::cout
           << "\n[... diff table truncated after " << counter.diff_print
@@ -933,7 +930,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
   // This function is called when a difference is found that exceeds the
   // print threshold
 
-  if (debug.detailed) {
+  if (print.debug2) {
     std::cout << "   DIFF: Difference at line " << counter.line_number
               << ", column " << column_index + 1 << ": " << diff_rounded
               << " (threshold: " << line_threshold << ")" << std::endl;
@@ -973,8 +970,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   if (counter.diff_print == 0) {
     std::cout << "DIFFERENCES:" << std::endl;
-    if (thresh.significant < table.threshold) {
-      std::cout << "\033[1;33mWarning: Threshold for printing (" << table.threshold
+    if (thresh.significant < thresh.print) {
+      std::cout << "\033[1;33mWarning: Threshold for printing (" << thresh.print
                 << ") is greater than the significant difference threshold ("
                 << thresh.significant
                 << "). Some significant differences may not be "
@@ -1144,7 +1141,7 @@ std::string FileComparator::format_number(double value, int prec,
   int padding_width = max_integer_width - intWidth;
   // Prevent negative padding
   if (padding_width < 0) {
-    if (verbosity.show_statistics) {
+    if (print.level > 0) {
       std::cout << std::endl
                 << "max_integer_width: " << max_integer_width << std::endl
                 << "intWidth: " << intWidth << std::endl
@@ -1166,7 +1163,7 @@ void FileComparator::print_hard_threshold_error(double rounded1,
                                                 double rounded2,
                                                 double diff_rounded,
                                                 size_t column_index) const {
-  if (verbosity.quiet) {
+  if (print.level < 0) {
     return;
   }
   difference_analyzer_.print_hard_threshold_error(
@@ -1176,11 +1173,11 @@ void FileComparator::print_hard_threshold_error(double rounded1,
 
 void FileComparator::print_format_info(const ColumnValues& column_data,
                                        size_t column_index) const {
-  if (debug.detailed) {
+  if (print.debug2) {
     std::cout << "   NEW FORMAT" << std::endl;
   }
   // print the format
-  if (debug.detailed) {
+  if (print.debug2) {
     std::cout << "   DEBUG : Line " << counter.line_number << ", Column "
               << column_index + 1 << std::endl;
     std::cout << "      FORMAT: number of decimal places file1: "
@@ -1208,7 +1205,7 @@ std::string FileComparator::get_count_color(size_t count) const {
 // Helper function to print identical files message
 void FileComparator::print_identical_files_message(
     const SummaryParams& params) const {
-  if (!verbosity.quiet) {
+  if (print.level >= 0) {
     std::cout << "   ";
   }
   std::cout << "\033[1;32mFiles " << params.file1 << " and " << params.file2
@@ -1226,7 +1223,7 @@ void FileComparator::print_exact_matches_info(
   // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
-  if (zero_diff > 0 && debug.enabled) {
+  if (zero_diff > 0 && print.debug) {
     std::cout << "  LEVEL 1 DISCRIMINATION: raw difference" << std::endl;
     std::cout << "   Exact matches        ( =" << 0.0 << "): ";
     std::cout << get_count_color(zero_diff);
@@ -1251,14 +1248,14 @@ void FileComparator::print_non_zero_differences_info(
 void FileComparator::print_difference_counts(
     const SummaryParams& params) const {
   if (counter.diff_print < counter.diff_non_zero) {
-    if (debug.enabled) {
-      std::cout << "   Printed differences  ( >" << table.threshold
+    if (print.debug) {
+      std::cout << "   Printed differences  ( >" << thresh.print
                 << "): " << std::setw(params.fmt_wid) << counter.diff_print
                 << std::endl;
     }
     size_t not_printed = counter.diff_non_zero - counter.diff_print;
     if (not_printed > 0) {
-      std::cout << "   Not printed          (<=" << table.threshold
+      std::cout << "   Not printed          (<=" << thresh.print
                 << "): " << std::setw(params.fmt_wid) << not_printed
                 << std::endl;
     }
@@ -1301,7 +1298,7 @@ void FileComparator::print_maximum_difference_analysis(
     std::cout << std::endl;
   }
 
-  if (debug.enabled) {
+  if (print.debug) {
     std::cout << "   DEBUG: comparing max diff (" << differ.max_non_zero
               << ") to significant thresh (" << thresh.significant << ")..."
               << std::endl;
@@ -1310,7 +1307,7 @@ void FileComparator::print_maximum_difference_analysis(
   // Analyze maximum difference relative to significant threshold
   if (differ.max_non_zero > thresh.significant) {
     // Maximum difference exceeds threshold
-    if (debug.enabled) {
+    if (print.debug) {
       std::cout
           << "   DEBUG: max non-zero diff is greater than significant threshold"
           << std::endl;
@@ -1322,7 +1319,7 @@ void FileComparator::print_maximum_difference_analysis(
         << "   Max non-zero diff is greater than the significant threshold: "
         << thresh.significant << "\033[0m" << std::endl;
 
-    if (debug.enabled) {
+    if (print.debug) {
       std::cout << "   DEBUG: non-trivial diff count: "
                 << counter.diff_non_trivial << std::endl;
     }
@@ -1429,7 +1426,7 @@ void FileComparator::print_diff_like_summary(
   }
 
   // Early return for non-trivial differences at low print levels
-  if (counter.diff_non_trivial > 0 && !verbosity.show_statistics) {
+  if (counter.diff_non_trivial > 0 && print.level < 1) {
     return;
   }
 
@@ -1458,7 +1455,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << "\033[0m" << std::endl;
     return;
   }
-  if (counter.diff_significant > 0 && !verbosity.show_statistics) {
+  if (counter.diff_significant > 0 && print.level < 1) {
     return;
   }
 
@@ -1467,7 +1464,7 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   const size_t trivial_diff = counter.diff_non_zero - counter.diff_non_trivial;
   std::cout << "  LEVEL 2 DISCRIMINATION: rounded difference" << std::endl;
-  if (verbosity.show_statistics) {
+  if (print.level > 0) {
     std::cout << "   DEBUG: Trivial differences: " << trivial_diff
               << ", Non-trivial differences: " << counter.diff_non_trivial
               << std::endl;
@@ -1517,15 +1514,15 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   }
 
   if (counter.diff_print < counter.diff_non_trivial) {
-    if (verbosity.show_statistics) {
-      std::cout << "   Printed differences     ( >" << table.threshold
+    if (print.level > 0) {
+      std::cout << "   Printed differences     ( >" << thresh.print
                 << "): " << std::setw(params.fmt_wid) << counter.diff_print
                 << std::endl;
     }
     size_t not_printed = counter.diff_non_trivial - counter.diff_print;
     if (not_printed > 0) {
       std::cout << "   Not printed differences (" << thresh.significant
-                << " < TL <= " << table.threshold
+                << " < TL <= " << thresh.print
                 << "): " << std::setw(params.fmt_wid) << not_printed
                 << std::endl;
     }
@@ -1579,7 +1576,7 @@ void FileComparator::print_significant_summary(
     return;
   }
 
-  if (verbosity.quiet) {
+  if (print.level < 0) {
     return;  // Early return for low print levels
   }
 
@@ -1588,7 +1585,7 @@ void FileComparator::print_significant_summary(
   printbar(1);
 
   // Print detailed breakdown of significant differences
-  if (counter.diff_significant > 0 && verbosity.show_statistics) {
+  if (counter.diff_significant > 0 && print.level > 0) {
     size_t non_marginal_non_critical = counter.diff_significant -
                                        counter.diff_marginal -
                                        counter.diff_critical;
@@ -1839,7 +1836,7 @@ void FileComparator::print_significant_differences_printing_status(
   // Otherwise provide a more nuanced accounting.
   print_count_with_percent(
       params,
-      "Printed differences       ( >" + std::to_string(table.threshold) + ")",
+      "Printed differences       ( >" + std::to_string(thresh.print) + ")",
       counter.diff_print);
 
   size_t not_printed_signif = 0;
@@ -1915,11 +1912,11 @@ std::string FileComparator::format_boolean_status(bool value, bool showStatus,
 void FileComparator::print_arguments_and_files(const std::string& file1,
                                                const std::string& file2,
                                                int argc, char* argv[]) const {
-  if (!verbosity.show_statistics) {
+  if (print.level < 1) {
     return;
   }
 
-  if (debug.enabled) {
+  if (print.debug) {
     std::cout << "ARGUMENTS:" << std::endl;
   }
   // print command line arguments
@@ -1928,7 +1925,7 @@ void FileComparator::print_arguments_and_files(const std::string& file1,
     std::cout << " " << argv[i];
   }
   std::cout << std::endl;
-  if (debug.enabled) {
+  if (print.debug) {
     std::cout << "   File1: " << file1 << std::endl;
     std::cout << "   File2: " << file2 << std::endl;
   }
@@ -1936,7 +1933,7 @@ void FileComparator::print_arguments_and_files(const std::string& file1,
 
 // Helper function to print statistics
 void FileComparator::print_statistics(const std::string& file1) const {
-  if (verbosity.quiet) {
+  if (print.level < 0) {
     return;
   }
   std::cout << "STATISTICS:" << std::endl;
@@ -1964,7 +1961,7 @@ void FileComparator::print_statistics(const std::string& file1) const {
 
 // Helper function to print RMSE statistics
 void FileComparator::print_rmse_statistics() const {
-  if (verbosity.level < 0 || rmse_stats.count_all == 0) {
+  if (print.level < 0 || rmse_stats.count_all == 0) {
     return;
   }
 
@@ -2040,7 +2037,7 @@ void FileComparator::print_rmse_statistics() const {
 // Helper function to print TL curve comparison metrics
 void FileComparator::print_tl_metrics() const {
   // Only print if we have TL data and weighted RMSE
-  if (verbosity.level < 0 || !tl_metrics.has_data ||
+  if (print.level < 0 || !tl_metrics.has_data ||
       !rmse_stats.has_weighted_data()) {
     return;
   }
@@ -2108,7 +2105,7 @@ void FileComparator::print_tl_metrics() const {
 
 // Helper function to print flag status
 void FileComparator::print_flag_status() const {
-  if (!verbosity.show_statistics) {
+  if (print.level < 1) {
     return;
   }
   std::cout << "FLAGS:" << std::endl;
@@ -2144,7 +2141,7 @@ void FileComparator::print_flag_status() const {
               << std::endl;
     std::cout << "      has_printed_diff    : "
               << format_boolean_status(flag.has_printed_diff, true, true,
-                                       table.threshold <= thresh.significant)
+                                       thresh.print <= thresh.significant)
               << std::endl;
     std::cout << "   new_fmt: "
               << format_boolean_status(flag.new_fmt, false, false) << std::endl;
@@ -2153,7 +2150,7 @@ void FileComparator::print_flag_status() const {
 
 // Helper function to print counter information
 void FileComparator::print_counter_info() const {
-  if (!verbosity.show_statistics) {
+  if (print.level <= 0) {
     return;
   }
   std::cout << "COUNTERS:" << std::endl;
@@ -2245,10 +2242,10 @@ void FileComparator::print_additional_diff_info(
     // Only show this message if there are no significant differences at all
     // If there are significant differences but none printed, this is misleading
     // The "Not printed differences" summary line already handles this case
-    if (table.threshold > thresh.significant && counter.diff_significant > 0) {
+    if (thresh.print > thresh.significant && counter.diff_significant > 0) {
       std::cout << "\033[1;33m   Warning: All significant differences are "
                    "below the print threshold ("
-                << table.threshold << ")\033[0m" << std::endl;
+                << thresh.print << ")\033[0m" << std::endl;
     } else if (counter.diff_significant == 0) {
       std::cout << "\033[1;32m   Files " << params.file1 << " and "
                 << params.file2
@@ -2297,18 +2294,18 @@ void FileComparator::print_summary(const std::string& file1,
   print_counter_info();
 
   // Print summary header if needed
-  if ((!verbosity.quiet || debug.enabled || flag.error_found) &&
-      (verbosity.level >= 0 || counter.diff_non_zero > 0)) {
+  if ((!print.diff_only || print.debug || flag.error_found) &&
+      (print.level >= 0 || counter.diff_non_zero > 0)) {
     std::cout << "SUMMARY:" << std::endl;
   }
 
   print_detailed_summary(params);
   print_additional_diff_info(params);
   print_critical_threshold_info();
-  if (debug.enabled) print_consistency_checks();
+  if (print.debug) print_consistency_checks();
 
   // Print error accumulation analysis if applicable
-  if (debug.enabled) {
+  if (print.debug) {
     std::cout << "\n[DEBUG] About to call print_accumulation_analysis():\n";
     std::cout << "  accumulation_data_.n_points = "
               << accumulation_data_.n_points << "\n";
@@ -2320,15 +2317,15 @@ void FileComparator::print_summary(const std::string& file1,
 
 void FileComparator::print_settings(const std::string& file1,
                                     const std::string& file2) const {
-  if (verbosity.quiet) {
+  if (print.level < 0) {
     return;
   }
   std::cout << "SETTINGS: " << std::endl;
-  if (debug.enabled || verbosity.show_statistics) {
-    std::cout << "   Debug mode : " << (debug.enabled ? "ON" : "OFF")
+  if (print.debug || print.level > 0) {
+    std::cout << "   Debug mode : " << (print.debug ? "ON" : "OFF")
               << std::endl;
-    std::cout << "   Debug level: " << verbosity.level << std::endl;
-    std::cout << "   Print mode : " << (verbosity.quiet ? "DIFF" : "FULL")
+    std::cout << "   Debug level: " << print.level << std::endl;
+    std::cout << "   Print mode : " << (print.diff_only ? "DIFF" : "FULL")
               << std::endl;
     std::cout << "   File1: " << file1 << std::endl;
     std::cout << "   File2: " << file2 << std::endl;
@@ -2345,8 +2342,8 @@ void FileComparator::print_settings(const std::string& file1,
   }
   std::cout << "      Critical   : \033[1;31m" << thresh.critical
             << "\033[0m (halt)" << std::endl;
-  std::cout << "      Print      : " << table.threshold << " (print)" << std::endl;
-  if (verbosity.show_statistics) {
+  std::cout << "      Print      : " << thresh.print << " (print)" << std::endl;
+  if (print.level > 0) {
     std::cout << "   Fixed Thresholds " << std::endl;
     std::cout << "      Zero       : " << thresh.zero << std::endl;
     std::cout << "      Marginal   : \033[1;33m" << thresh.marginal << "\033[0m"
@@ -2356,7 +2353,7 @@ void FileComparator::print_settings(const std::string& file1,
   }
 }
 void FileComparator::print_consistency_checks() const {
-  if (verbosity.quiet) return;
+  if (print.level < 0) return;
   if (counter.elem_number == 0) return;
 
   auto passfail = [](bool ok) {
@@ -2521,19 +2518,19 @@ void FileComparator::print_accumulation_analysis() const {
   // This ensures we only analyze when there are meaningful errors to
   // investigate, not for trivial formatting differences or random noise
 
-  if (verbosity.show_statistics) {
+  if (print.level >= 1) {
     std::cout << "\nDEBUG: Accumulation analysis check:\n";
     std::cout << "  has_significant_diff: " << flag.has_significant_diff
               << "\n";
     std::cout << "  accumulation_data_.n_points: "
               << accumulation_data_.n_points << "\n";
     std::cout << "  diff_significant: " << counter.diff_significant << "\n";
-    std::cout << "  verbosity.level: " << verbosity.level << "\n";
+    std::cout << "  print.level: " << print.level << "\n";
   }
 
   // Skip if no significant differences found
   if (!flag.has_significant_diff) {
-    if (verbosity.show_statistics) {
+    if (print.level >= 1) {
       std::cout
           << "Skipping accumulation analysis (no significant differences)\n";
     }
@@ -2541,8 +2538,8 @@ void FileComparator::print_accumulation_analysis() const {
   }
 
   // Skip if insufficient significant error data points
-  if (accumulation_data_.n_points < 10 || verbosity.quiet) {
-    if (verbosity.level >= 1 && accumulation_data_.n_points > 0) {
+  if (accumulation_data_.n_points < 10 || print.level < 0) {
+    if (print.level >= 1 && accumulation_data_.n_points > 0) {
       std::cout << "Skipping accumulation analysis (n_significant_points="
                 << accumulation_data_.n_points << " < 10)\n";
     }
