@@ -35,16 +35,16 @@
 struct ProgramArgs {
   std::string file1 = "file1.txt";
   std::string file2 = "file2.txt";
-  double count_level = 0.05;
-  double stop_level = 10.0;
+  double significant_threshold = 0.05;
+  double critical_threshold = 10.0;
   double table_threshold = 1.0;  // Renamed from print_level (clearer purpose)
   int verbosity_level = 0;  // User-facing output verbosity
   int debug_level = 0;      // Developer diagnostics
-  // If true, interpret count_level as a percent threshold (fraction stored
-  // in count_percent). This is set when the user supplies a negative
+  // If true, interpret significant_threshold as a percent threshold (fraction stored
+  // in significant_percent). This is set when the user supplies a negative
   // threshold on the command line (e.g. -1 -> 1%).
-  bool count_level_is_percent = false;
-  double count_percent = 0.0;  // fractional (0.01 == 1%)
+  bool significant_threshold_is_percent = false;
+  double significant_percent = 0.0;  // fractional (0.01 == 1%)
   bool plot_enabled = false;   // If true, call Python plotting script
 };
 
@@ -276,13 +276,13 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       double parsed = std::stod(argv[3]);
       if (parsed < 0.0) {
         // Negative indicates percent-mode: -1 => 1%
-        args.count_level_is_percent = true;
-        args.count_percent = std::abs(parsed) / 100.0;  // store fractional
-        // Set count_level to zero for internal absolute-threshold usages
-        args.count_level = 0.0;
+        args.significant_threshold_is_percent = true;
+        args.significant_percent = std::abs(parsed) / 100.0;  // store fractional
+        // Set significant_threshold to zero for internal absolute-threshold usages
+        args.significant_threshold = 0.0;
       } else {
         // Non-negative: regular absolute threshold
-        args.count_level = parsed;
+        args.significant_threshold = parsed;
       }
     } catch (const std::invalid_argument&) {
       std::cerr << "\n\033[1;31mERROR:\033[0m Invalid Diff threshold format."
@@ -307,14 +307,14 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return true;
     }
 
-    if (!parse_threshold_argument(argv[4], args.stop_level, "High threshold")) {
+    if (!parse_threshold_argument(argv[4], args.critical_threshold, "High threshold")) {
       return false;
     }
-    if (args.stop_level < args.count_level) {
+    if (args.critical_threshold < args.significant_threshold) {
       std::cerr << "\033[1;33mWARNING:\033[0m Critical threshold ("
-                << "\033[1;31m" << args.stop_level << "\033[0m"
+                << "\033[1;31m" << args.critical_threshold << "\033[0m"
                 << ") is less than significant threshold ("
-                << "\033[1;36m" << args.count_level << "\033[0m"
+                << "\033[1;36m" << args.significant_threshold << "\033[0m"
                 << ")." << std::endl;
       std::cerr << "         Difference table will not be printed."
                 << std::endl;
@@ -460,16 +460,16 @@ int main(int argc, char* argv[]) {
 #endif
 
   // Create comparator and run comparison
-  FileComparator comparator(args.count_level, args.stop_level,
+  FileComparator comparator(args.significant_threshold, args.critical_threshold,
                             args.table_threshold, args.verbosity_level,
-                            args.debug_level, args.count_level_is_percent,
-                            args.count_percent);
+                            args.debug_level, args.significant_threshold_is_percent,
+                            args.significant_percent);
   bool result = comparator.compare_files(args.file1, args.file2);
   comparator.print_summary(args.file1, args.file2, argc, argv);
 
   // Call plotting script if requested
   if (args.plot_enabled) {
-    call_plot_script(args.file1, args.file2, args.count_level,
+    call_plot_script(args.file1, args.file2, args.significant_threshold,
                      args.debug_level);
   }
 
