@@ -19,7 +19,8 @@ static void write_file(const std::string& path, const std::string& line) {
 
 TEST(PercentThresholdTest, FractionalDifferenceAbovePercentIsSignificant) {
   // File2 is treated as reference. Use 1% (0.01) percent threshold.
-  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0, 0,
+  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0,
+                      /*verbosity*/ 0, /*debug*/ 0,
                       /*significant_is_percent*/ true,
                       /*significant_percent*/ 0.01);
 
@@ -28,8 +29,9 @@ TEST(PercentThresholdTest, FractionalDifferenceAbovePercentIsSignificant) {
 
   // Reference value = 100.0; test value differs by 1.5 -> 1.5% > 1% ->
   // significant
-  write_file(f1, "101.5");
-  write_file(f2, "100.0");
+  // Need range column + data column (first column is always skipped as range)
+  write_file(f1, "101.5 101.5");
+  write_file(f2, "101.5 100.0");
 
   bool ok = comp.compare_files(f1, f2);
   EXPECT_FALSE(ok);
@@ -41,7 +43,8 @@ TEST(PercentThresholdTest, FractionalDifferenceAbovePercentIsSignificant) {
 }
 
 TEST(PercentThresholdTest, FractionalDifferenceBelowPercentIsNotSignificant) {
-  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0, 0,
+  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0,
+                      /*verbosity*/ 0, /*debug*/ 0,
                       /*significant_is_percent*/ true,
                       /*significant_percent*/ 0.01);
 
@@ -49,8 +52,9 @@ TEST(PercentThresholdTest, FractionalDifferenceBelowPercentIsNotSignificant) {
   std::string f2 = std::string(TEST_DIR) + "percent_b2.txt";
 
   // Reference = 100.0; diff = 0.5 -> 0.5% <= 1% -> not significant
-  write_file(f1, "100.5");
-  write_file(f2, "100.0");
+  // Need range column + data column (first column is always skipped as range)
+  write_file(f1, "101.5 100.5");
+  write_file(f2, "101.5 100.0");
 
   bool ok = comp.compare_files(f1, f2);
   EXPECT_TRUE(ok);
@@ -64,7 +68,8 @@ TEST(PercentThresholdTest, FractionalDifferenceBelowPercentIsNotSignificant) {
 TEST(PercentThresholdTest, NearZeroReferenceTreatsNonTrivialAsSignificant) {
   // When reference value is near-zero (<= thresh.zero), any non-trivial
   // difference should be treated as exceeding percent threshold.
-  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0, 0,
+  FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0,
+                      /*verbosity*/ 0, /*debug*/ 0,
                       /*significant_is_percent*/ true,
                       /*significant_percent*/ 0.01);
 
@@ -72,8 +77,9 @@ TEST(PercentThresholdTest, NearZeroReferenceTreatsNonTrivialAsSignificant) {
   std::string f2 = std::string(TEST_DIR) + "percent_c2.txt";
 
   // Reference value = 0.0 (<= zero). Test value 0.5 should count as significant
-  write_file(f1, "0.5");
-  write_file(f2, "0.0");
+  // Need range column + data column (first column is always skipped as range)
+  write_file(f1, "104.0 0.5");
+  write_file(f2, "104.0 0.0");
 
   bool ok = comp.compare_files(f1, f2);
   EXPECT_FALSE(ok);
