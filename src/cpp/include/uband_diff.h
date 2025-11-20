@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>

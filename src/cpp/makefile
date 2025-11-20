@@ -32,7 +32,7 @@ UFLAGS = $(warnings) $(debug) $(macros) $(includes) $(output)
 # C flags
 CFLAGS =
 # C++ flags
-CXXFLAGS =
+CXXFLAGS = -std=c++17
 # dependency generation flags
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 # compile C source
@@ -43,10 +43,12 @@ COMPILE.cxx = $(CXX) $(CXXFLAGS) $(DEPFLAGS) $(UFLAGS) $(compile)
 # linker flags
 LDFLAGS =
 # library flags
-LDLIBS =
+# Note: -lstdc++fs required for GCC < 9.0 when using std::filesystem
+# On GCC 9+ and most other compilers, filesystem is built into the standard library
+LDLIBS = -lstdc++fs
 
 # link objects
-LINK.o = $(LD) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
+LINK.o = $(LD) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(UFLAGS) $^
 
 # build directories (relative to root)
 BINDIR := ../../build/bin
