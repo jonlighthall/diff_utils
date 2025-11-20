@@ -1274,35 +1274,40 @@ void FileComparator::print_maximum_difference_analysis(
     return;  // No significant maximum difference to analyze
   }
 
-  // Print maximum difference (underlined, purple)
-  // Use appropriate precision: at least the stored ndp, but ensure we show
-  // the actual magnitude (use max of ndp_non_zero and digits needed to show
-  // value)
-  int display_precision = std::max(
-      differ.ndp_non_zero,
-      static_cast<int>(-std::floor(std::log10(differ.max_non_zero)) + 2));
-  std::cout << "   \033[4;35mMaximum raw difference: "
-            << format_number(differ.max_non_zero, display_precision,
-                             static_cast<int>(std::round(std::log10(std::max(
-                                                  differ.max_non_zero, 1.0))) +
-                                              2),
-                             display_precision)
-            << "\033[0m" << std::endl;
+  // Only print raw maximum at verbosity 1+ (show_statistics)
+  // At verbosity 0, we'll show the rounded maximum in LEVEL 2 instead
+  if (verbosity.show_statistics) {
+    std::cout << "  LEVEL 1 DISCRIMINATION: raw difference" << std::endl;
+    // Print maximum difference (underlined, purple)
+    // Use appropriate precision: at least the stored ndp, but ensure we show
+    // the actual magnitude (use max of ndp_non_zero and digits needed to show
+    // value)
+    int display_precision = std::max(
+        differ.ndp_non_zero,
+        static_cast<int>(-std::floor(std::log10(differ.max_non_zero)) + 2));
+    std::cout << "   \033[4;35mMaximum raw difference: "
+              << format_number(differ.max_non_zero, display_precision,
+                               static_cast<int>(std::round(std::log10(std::max(
+                                                    differ.max_non_zero, 1.0))) +
+                                                2),
+                               display_precision)
+              << "\033[0m" << std::endl;
 
-  // Print maximum percent error immediately after
-  if (differ.max_percent_error > 0.0) {
-    std::cout << "   Maximum percent error: ";
-    if (std::isfinite(differ.max_percent_error)) {
-      std::cout << std::fixed << std::setprecision(2)
-                << differ.max_percent_error << "%";
-    } else {
-      std::cout << "INF";
+    // Print maximum percent error immediately after
+    if (differ.max_percent_error > 0.0) {
+      std::cout << "   Maximum percent error: ";
+      if (std::isfinite(differ.max_percent_error)) {
+        std::cout << std::fixed << std::setprecision(2)
+                  << differ.max_percent_error << "%";
+      } else {
+        std::cout << "INF";
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 
-  // Skip threshold comparison messages in quiet mode
-  if (verbosity.quiet) {
+  // Skip threshold comparison messages at verbosity 0 (only show at verbosity 1+)
+  if (!verbosity.show_statistics) {
     return;
   }
 
@@ -1762,13 +1767,13 @@ void FileComparator::print_maximum_significant_difference_analysis(
     const SummaryParams& params) const {
   if (differ.max_significant > thresh.significant) {
     print_maximum_significant_difference_details();
-    // Skip threshold comparison in quiet mode
-    if (!verbosity.quiet) {
+    // Skip threshold comparison at verbosity 0 (only show at verbosity 1+)
+    if (verbosity.show_statistics) {
       print_max_diff_threshold_comparison_above();
     }
   } else {
-    // Skip threshold comparison in quiet mode
-    if (!verbosity.quiet) {
+    // Skip threshold comparison at verbosity 0 (only show at verbosity 1+)
+    if (verbosity.show_statistics) {
       print_max_diff_threshold_comparison_below();
     }
   }
@@ -2313,8 +2318,11 @@ void FileComparator::print_summary(const std::string& file1,
     print_tl_metrics();
   }
 
-  print_flag_status();
-  print_counter_info();
+  // FLAGS and COUNTERS sections are for debugging/verbose mode
+  if (verbosity.show_statistics) {
+    print_flag_status();
+    print_counter_info();
+  }
 
   // Print summary header if needed
   if ((!verbosity.quiet || debug.enabled || flag.error_found) &&
