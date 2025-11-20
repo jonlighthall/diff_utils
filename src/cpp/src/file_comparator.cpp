@@ -1245,6 +1245,14 @@ void FileComparator::print_non_zero_differences_info(
 
   std::cout << "\033[1;33m   Files " << params.file1 << " and " << params.file2
             << " are different\033[0m" << std::endl;
+
+  // Print binary discrimination total at verbosity 1+
+  if (verbosity.show_statistics) {
+    const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
+    std::cout << "   LEVEL 1 total: " << zero_diff << " exact matches + "
+              << counter.diff_non_zero << " non-zero = "
+              << counter.elem_number << " elements" << std::endl;
+  }
 }
 
 // Helper function to print difference counts (printed vs not printed)
@@ -1547,6 +1555,13 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
               << std::endl;
   }
 
+  // Print binary discrimination total at verbosity 1+
+  if (verbosity.show_statistics) {
+    std::cout << "   LEVEL 2 total: " << trivial_diff << " trivial + "
+              << counter.diff_non_trivial << " non-trivial = "
+              << counter.diff_non_zero << " non-zero differences" << std::endl;
+  }
+
   if (differ.max_non_trivial > thresh.significant) {
     std::cout
         << "\033[1;31m   Max diff is greater than the significant threshold: "
@@ -1616,6 +1631,12 @@ void FileComparator::print_significant_summary(
     }
     std::cout << "   Non-marginal differences: " << non_marginal_non_critical
               << std::endl;
+
+    // Print binary discrimination total
+    std::cout << "   LEVEL 4 total: " << counter.diff_marginal
+              << " marginal + " << non_marginal_non_critical
+              << " non-marginal = " << counter.diff_significant
+              << " significant differences" << std::endl;
     printbar(1);
     std::cout << "  LEVEL 5 DISCRIMINATION: difference less than "
               << thresh.critical << std::endl;
@@ -1625,6 +1646,12 @@ void FileComparator::print_significant_summary(
     } else {
       std::cout << "   No critical differences found." << std::endl;
     }
+
+    // Print binary discrimination total
+    std::cout << "   LEVEL 5 total: " << counter.diff_critical
+              << " critical + " << non_marginal_non_critical
+              << " non-critical = " << non_marginal_non_critical + counter.diff_critical
+              << " non-marginal differences" << std::endl;
     printbar(1);
     if (non_marginal_non_critical > 0) {
       std::cout << "  LEVEL 6 DISCRIMINATION: difference less than "
@@ -1760,6 +1787,14 @@ void FileComparator::print_insignificant_differences_count(
                              "Insignificant differences (<=" +
                                  std::to_string(thresh.significant) + ")",
                              counter.diff_insignificant);
+  }
+
+  // Print binary discrimination total at verbosity 1+
+  if (verbosity.show_statistics) {
+    std::cout << "   LEVEL 3 total: " << counter.diff_insignificant
+              << " insignificant + " << counter.diff_significant
+              << " significant = " << counter.diff_non_trivial
+              << " non-trivial differences" << std::endl;
   }
 }
 
