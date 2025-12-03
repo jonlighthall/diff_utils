@@ -1,3 +1,10 @@
+# diff_utils
+
+**Numerical and text-based comparison utilities for NSPE and related acoustics data.**
+
+> **Note:** For plotting and visualization tools, see the separate repository at `~/utils/nspe_python_plot_utils`.
+> This repository focuses on numerical comparison, difference calculations, and text-based analysis only.
+
 ## programs - .f90 files
 
    | file                     | program | ext     | description                                                |
