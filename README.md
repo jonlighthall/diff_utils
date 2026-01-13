@@ -27,6 +27,8 @@
 
 This repository provides comparison tools for a family of acoustics / TL (Transmission Loss) related data products. The modernized C++ core implements a rich six-level difference classification hierarchy to distinguish between: raw vs rounded differences, trivially representational vs physically meaningful discrepancies, marginal operating-range warnings, and truly critical failures.
 
+Note: For recent updates and version history, see [CHANGELOG.md](CHANGELOG.md).
+
 ### Executable of interest
 
 `uband_diff` (C++) — refactored comparison engine replacing / augmenting several earlier Fortran utilities. It performs:

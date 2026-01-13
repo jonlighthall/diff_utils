@@ -153,6 +153,26 @@ Column 0 is automatically analyzed for range-like characteristics. When detected
 - Include mathematical notation where precision/thresholds matter
 - Document why, not just what (especially for numerical edge cases)
 
+**Standing order (cross-linking):**
+- Keep long-form technical writeups in `docs/` (e.g., `docs/IMPLEMENTATION_SUMMARY.md`, `docs/SUB_LSB_DETECTION.md`).
+- Add a concise, user-facing summary to the root `README.md` when a change materially affects usage or behavior (3–8 lines) and link to the detailed doc.
+- Avoid duplicating full technical content in the root `README.md`; prefer a short summary + link.
+
+### Changelog
+
+Maintain a project changelog in the repository root: [CHANGELOG.md](CHANGELOG.md).
+
+- Format: Follow "Keep a Changelog" style with sections `Unreleased` and versioned entries `X.Y.Z - YYYY-MM-DD`.
+- Categories: Use `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security` as applicable.
+- Inclusion criteria: Add entries for user-facing behavior changes, CLI flags/threshold updates, output format changes, and classification semantics adjustments. Skip trivial internal refactors.
+- Versioning: Use Semantic Versioning. Bump:
+    - MAJOR for breaking behavior changes (e.g., classification semantics or thresholds with incompatible impact)
+    - MINOR for backward-compatible feature additions
+    - PATCH for bug fixes
+- Cross-links: Link to detailed docs (e.g., [docs/IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md)) and reference PRs/commits when helpful.
+- README tie-in: Keep README concise. Optionally highlight top 1–3 bullets from the latest release; defer full detail to the changelog and docs.
+- Process: Update `Unreleased` on merge of qualifying changes; date and tag a release when publishing.
+
 ---
 
 ## Build & Test Procedures

@@ -151,7 +151,7 @@ Column index 0 is unconditionally treated as the **range column** (e.g., distanc
 ```cpp
 FileComparator(
     double user_thresh,           // User significance threshold
-    double hard_thresh,           // Critical threshold  
+    double hard_thresh,           // Critical threshold
     double table_thresh,          // Print threshold for table output
     int verbosity_level = 0,      // Verbosity (0=quiet, 1=normal, 2=verbose)
     int debug_level = 0,          // Debug level (0=none, 1-3=increasing)
@@ -312,7 +312,7 @@ The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only p
 - `data/README.md` — Test case descriptions for data directory (NEW)
 - `data/notes.md` — Development history and algorithmic insights only
 
-**Previously:** 
+**Previously:**
 - DISCRIMINATION_HIERARCHY.md referenced notes.md extensively
 - notes.md mixed test descriptions, hierarchy definitions, and development notes
 - No README in data directory
@@ -358,6 +358,12 @@ The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only p
 **Solution:** Add range column so data becomes column 1: `write_file(f1, "101.5 100.5")`
 **Also fixed:** Missing `debug_level` parameter in FileComparator constructor calls
 **Source:** Session 2025-11-20
+
+### Root README Implementation Summary
+**Current:** Root `README.md` includes a short "Implementation summary" subsection describing the sub‑LSB fix, FP tolerance, decimal-place limit increase (17), and added tests. It links to `docs/IMPLEMENTATION_SUMMARY.md` for full details.
+**Previously:** Detailed implementation notes were only in `docs/IMPLEMENTATION_SUMMARY.md` and `docs/SUB_LSB_DETECTION.md` without a high-visibility summary in the root README.
+**Why changed:** Provide user-facing visibility in the root README while keeping long-form technical details in `docs/` to avoid clutter.
+**Source:** Session 2025-10-27
 
 ---
 
