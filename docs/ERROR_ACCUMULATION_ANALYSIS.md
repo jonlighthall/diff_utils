@@ -50,7 +50,7 @@ error[i] = slope × range[i] + intercept
 **Acoustic modeling context:**
 - Propagation models accumulate error with distance
 - A non-zero slope indicates systematic model difference
-- Used in ray-tracing validation (Bellhop, RAM, etc.)
+- Used in acoustic propagation model validation (RAM, NSPE, uBand, etc.)
 
 ### 2. Autocorrelation of Residuals
 
@@ -444,7 +444,6 @@ if (flag.column1_is_range_data && accumulation_data_.n_points >= 10) {
 ## References
 
 1. **Acoustic propagation validation:**
-   - Porter, M.B. (2011). "The BELLHOP Manual and User's Guide"
    - Collins, M.D. (1993). "A split-step Padé solution for the parabolic equation method"
 
 2. **Statistical tests:**

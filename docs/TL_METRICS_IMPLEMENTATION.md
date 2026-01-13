@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document describes the implementation of TL (Transmission Loss) curve comparison metrics in `uband_diff`, based on the methodology from Goodman et al. for comparing acoustic propagation models.
+This document describes the implementation of TL (Transmission Loss) curve comparison metrics in `uband_diff`, based on the **IEEE peer-reviewed methodology from Fabre et al.** for comparing acoustic propagation models.
+
+**CRITICAL**: This is currently the ONLY known peer-reviewed, published quantitative standard for TL curve comparison. Any authoritative pass/fail decision on TL curve equivalence MUST use this algorithm. The role of `uband_diff` is to enable application of Fabre's method by first filtering out formatting artifacts that would otherwise prevent comparison.
 
 ## Metrics Implemented
 
@@ -201,12 +203,31 @@ Data points: 1777 (max range: 20.01, last 4%: 66 points)
 - **Definition**: Average of all 5 metrics (M1-M5)
 - **Status**: Awaiting M4/M5 implementation
 
+## Overview
+
+Fabre et al. presents a comprehensive metric for quantifying transmission loss (TL) curve differences, with application to acoustic propagation model validation. **Critical for implementation:** The method must be understood in context of its optimization paradigm (tactical vs. theoretical equivalence—see note below).
+
+## Method Paradigm (CRITICAL - PENDING CLARIFICATION)
+
+**Question:** Does Fabre's method optimize for:
+1. **Tactical equivalence:** Curves sufficiently similar for operational decision-making?
+2. **Theoretical/computational equivalence:** Curves match at numerical/phase error analysis level?
+
+**Evidence Requiring Investigation:** Fabre Figures 2--6 show curves with similar gross structure but apparent range-offset differences (possible accumulated phase error). The scoring of these cases will reveal the paradigm.
+
+**Why Important:** This affects interpretation of phase error accumulation, horizontal stretch compensation, and all downstream extensions. See [docs/FUTURE_WORK.md](../docs/FUTURE_WORK.md#critical-paradigm-investigation-prerequisite) for investigation plan.
+
 ## References
 
 Based on methodology from:
-- Goodman, R., et al. "Comparison of Acoustic Propagation Models"
-- TL weighting parameters from operational acoustic analysis standards
-- Scoring function (Figure 1) from Goodman paper
+- **J. P. Fabre**, "A metric for comparing acoustic transmission loss curves," *OCEANS 2009*, Biloxi, MS, USA, 2009, pp. 1-6, doi: 10.23919/OCEANS.2009.5422312. Available at: https://doi.org/10.23919/OCEANS.2009.5422312
+  - **This is the ONLY known peer-reviewed, published standard for quantitative TL curve comparison**
+  - Weighting approach: 60 dB operational, 110 dB marginal thresholds
+  - Last 4% range analysis for end-use relevance
+  - Correlation and coverage metrics
+- Operational acoustic analysis standards
+
+**CRITICAL**: Fabre's method is the authoritative standard. Any implementation of TL comparison MUST use this algorithm. If alternative or improved algorithms are developed through this work, they must be clearly distinguished as novel contributions and validated independently.
 
 ## Code Locations
 

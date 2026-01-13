@@ -2,13 +2,15 @@
 
 ## Overview
 
-This document describes the multi-level binary discrimination algorithm used for numerical file comparison in the `uband_diff` utility. The algorithm implements a progressive refinement pipeline that classifies numeric differences between two files into hierarchical categories, enabling domain-specific and precision-aware comparison.
+This document describes the six-level hierarchical discrimination algorithm used for numerical file comparison in `uband_diff`. **This hierarchy is the author's novel organizing principle** for progressive refinement pipeline that classifies numeric differences into hierarchical categories, enabling domain-specific and precision-aware comparison.
+
+The program implements **early-exit logic**: it continues through subsequent levels only when a match is found or critical failure occurs, not as a mere taxonomy but as an operational decision-making framework.
 
 ## Design Philosophy
 
 The comparison algorithm is designed around three core principles:
 
-1. **Progressive Refinement**: Each level partitions one set into exactly two subsets, with one subset undergoing further subdivision at the next level
+1. **Progressive Refinement with Early Exit**: Each level partitions one set into exactly two subsets. Upon match or critical failure, the program halts; otherwise, the unmatched subset undergoes further subdivision at the next level. This is the organizing principle.
 2. **Precision Awareness**: Differences are evaluated in the context of printed precision, machine epsilon, and floating-point representation
 3. **Domain Specificity**: Special handling for transmission loss (TL) data, including physics-based thresholds derived from acoustic pressure limits and single-precision arithmetic constraints
 
@@ -19,7 +21,7 @@ The algorithm implements a six-level hierarchy where each level applies specific
 **Key source files:**
 - `src/cpp/include/uband_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
 - `src/cpp/include/difference_analyzer.h` — Core analyzer interface
-- `src/cpp/src/difference_analyzer.cpp` — Discrimination logic implementation
+- `src/cpp/src/difference_analyzer.cpp` — Discrimination logic implementation (early-exit control flow)
 - `src/cpp/src/file_comparator.cpp` — File parsing, orchestration, summary generation
 - `src/cpp/main/uband_diff.cpp` — Command-line interface
 

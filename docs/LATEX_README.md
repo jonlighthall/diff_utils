@@ -1,19 +1,24 @@
-# uband_diff Technical Report
+# uband_diff Documentation
 
 ## Overview
 
-This directory contains a comprehensive technical report on the `uband_diff` utility, combining documentation from:
-- DISCRIMINATION_HIERARCHY.md
-- SUB_LSB_DETECTION.md
-- IMPLEMENTATION_SUMMARY.md
+This directory contains two LaTeX documents for the `uband_diff` utility:
+
+1. **Technical Memorandum** - Concise overview emphasizing novelty and operational impact (8-12 pages)
+2. **Technical Report** - Comprehensive reference with full implementation details (30+ pages)
 
 ## Files
 
-### Main Document
-- **UBAND_DIFF_TECHNICAL_REPORT.tex** - Main LaTeX document (31 pages)
-- **UBAND_DIFF_TECHNICAL_REPORT.pdf** - Compiled PDF output
+### Main Documents
+- **UBAND_DIFF_MEMO.tex** - Technical memorandum (concise, emphasis on innovation)
+- **UBAND_DIFF_MEMO.pdf** - Compiled memo PDF
+
+- **UBAND_DIFF_TECHNICAL_REPORT.tex** - Full technical report (comprehensive reference)
+- **UBAND_DIFF_TECHNICAL_REPORT.pdf** - Compiled report PDF
 
 ### Sections (in `sections/`)
+
+**Both documents use these sections:**
 1. **introduction.tex** - Motivation, problem statement, design goals
 2. **design_philosophy.tex** - Core principles and architectural patterns
 3. **mathematical_foundation.tex** - Threshold derivations, LSB/sub-LSB math
@@ -26,6 +31,24 @@ This directory contains a comprehensive technical report on the `uband_diff` uti
 10. **appendix_thresholds.tex** - Threshold reference tables
 11. **appendix_code_structure.tex** - Directory structure, build system
 
+**Note:** The memo uses a subset of this content in condensed form, while the technical report includes all sections with full detail.
+
+## Document Purpose
+
+### Technical Memorandum (UBAND_DIFF_MEMO.tex)
+- **Audience:** Program managers, technical leadership, external reviewers
+- **Length:** 8-12 pages
+- **Focus:** Novel contributions, operational impact, validation results
+- **Style:** Concise, high-level, emphasizes "what" and "why"
+- **Use case:** Publication, funding proposals, technical briefings
+
+### Technical Report (UBAND_DIFF_TECHNICAL_REPORT.tex)  
+- **Audience:** Developers, implementers, peer reviewers, maintainers
+- **Length:** 30+ pages
+- **Focus:** Complete implementation details, algorithms, code structure
+- **Style:** Comprehensive, detailed, emphasizes "how"
+- **Use case:** Developer reference, code documentation, detailed validation
+
 ## Compiling
 
 ### Requirements
@@ -35,18 +58,42 @@ This directory contains a comprehensive technical report on the `uband_diff` uti
 ### Build Commands
 
 ```bash
-# Single compilation
+# Build the memo
 cd docs
-pdflatex UBAND_DIFF_TECHNICAL_REPORT.tex
+pdflatex UBAND_DIFF_MEMO.tex
 
-# Full build (for references and TOC)
+# Build the technical report (includes section files)
 pdflatex UBAND_DIFF_TECHNICAL_REPORT.tex
-pdflatex UBAND_DIFF_TECHNICAL_REPORT.tex
+pdflatex UBAND_DIFF_TECHNICAL_REPORT.tex  # Second pass for TOC
 
 # Using LaTeX Workshop in VS Code
-Open UBAND_DIFF_TECHNICAL_REPORT.tex and press Ctrl+Alt+B
-or click the green "Build LaTeX project" button
+# Open either .tex file and press Ctrl+Alt+B
+# or click the green "Build LaTeX project" button
 ```
+
+## Markdown Documentation
+
+The following markdown files are maintained as developer/implementer guides:
+
+### Implementation History (Change Logs)
+- **IMPLEMENTATION_SUMMARY.md** - Sub-LSB fix history (Oct 16, 2025)
+- **RAW_DIFF_FIX_SUMMARY.md** - Raw vs rounded diff fix (Oct 28, 2025)  
+- **TRANSIENT_SPIKES_ENHANCEMENT.md** - Pattern analysis integration
+- **RMSE_IMPLEMENTATION.md** - RMSE feature addition
+- **TL_METRICS_IMPLEMENTATION.md** - Goodman metrics implementation
+
+### User/Developer Guides
+- **MAKEFILE_BEST_PRACTICES.md** - Build system documentation
+- **DIFF_LEVEL_OPTION.md** - CLI usage guide  
+- **PI_PRECISION_TEST_SUITE.md** - Test validation guide
+- **EARTH_ACOUSTIC_README.md** - Supporting tool documentation
+
+### Technical Content (Inform LaTeX)
+- **DISCRIMINATION_HIERARCHY.md** - Detailed algorithm documentation
+- **SUB_LSB_DETECTION.md** - Sub-LSB theory and implementation
+- **ERROR_ACCUMULATION_ANALYSIS.md** - Statistical pattern analysis (proposed enhancement)
+
+These markdown files provide developer context, implementation history, and detailed examples that complement the LaTeX documents.
 
 ## Document Structure
 
