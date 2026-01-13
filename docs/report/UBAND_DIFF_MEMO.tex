@@ -177,44 +177,233 @@ The floating-point tolerance ($10^{-12}$) handles edge cases where FP arithmetic
 \label{tab:tool-comparison}
 \end{table}
 
+\subsubsection{Cross-Platform Robustness Example}
+
+Consider two platforms calculating the same physical quantity:
+
+\textbf{Platform A} (x86-64, GCC, -O2):
+\begin{verbatim}
+double result = complex_calculation();  // => 30.849999999...
+printf("%.1f\n", result);                // Output: 30.8
+\end{verbatim}
+
+\textbf{Platform B} (ARM, Clang, -O3):
+\begin{verbatim}
+double result = complex_calculation();  // => 30.850000001...
+printf("%.2f\n", result);                // Output: 30.85
+\end{verbatim}
+
+\textbf{Conclusion:} Same calculation, different output formatting $\implies$ should \emph{not} fail comparison!
+
+\subsubsection{Implementation: The Bug and The Fix}
+
+\textbf{Original (Buggy) Implementation:}
+\begin{verbatim}
+bool trivial_after_rounding = (rounded_diff <= big_zero);
+\end{verbatim}
+
+\textbf{Why this fails:}
+\begin{align*}
+    \text{rounded\_diff} &= 0.1 \quad \text{(30.8 vs 30.9 at 1dp)} \\
+    \text{big\_zero} &= 0.05 \\
+    0.1 \leq 0.05 &\implies \texttt{FALSE} \quad \text{(incorrectly NON-TRIVIAL)}
+\end{align*}
+
+\textbf{Corrected Implementation:}
+\begin{verbatim}
+constexpr double FP_TOLERANCE = 1e-12;
+bool sub_lsb_diff = (raw_diff < big_zero) ||
+    (abs(raw_diff - big_zero) < FP_TOLERANCE * max(raw_diff, big_zero));
+bool trivial_after_rounding = (rounded_diff == 0.0 || sub_lsb_diff);
+\end{verbatim}
+
+\textbf{Why this works:}
+\begin{enumerate}
+    \item First check: Are rounded values identical? (handles exact matches)
+    \item Second check: Is raw difference sub-LSB? (handles edge case)
+    \item Floating-point tolerance handles representation errors
+\end{enumerate}
+
+\subsubsection{Floating-Point Robustness}
+
+The \texttt{FP\_TOLERANCE} handles cases where:
+\begin{align*}
+    \text{raw\_diff} &= 0.05000000000000071054 \quad \text{(FP representation)} \\
+    \text{big\_zero} &= 0.05000000000000000278 \\
+    \text{Difference:} &\approx 7 \times 10^{-16} \quad \text{(FP error)}
+\end{align*}
+
+Without tolerance, \texttt{raw\_diff > big\_zero} would fail. With tolerance, correctly classified as equivalent.
+
 \subsection{Six-Level Hierarchical Discrimination}
 
-The algorithm implements progressive refinement through six binary partitions, each applying specific mathematical criteria:
+The discrimination algorithm implements a six-level binary partition hierarchy. Each level applies specific criteria to progressively categorize differences from raw comparison through domain-specific significance assessment.
 
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{clc}
-\toprule
-\textbf{Level} & \textbf{Partition} & \textbf{Criterion} \\
-\midrule
-0 & Structure validation & File compatibility \\
-1 & Zero vs non-zero & $|\Delta v| > \epsilon_{\text{single}}$ \\
-2 & Trivial vs non-trivial & Sub-LSB detection \\
-3 & Insignificant vs significant & User threshold \\
-4 & Marginal vs operational & TL $> 110$ dB \\
-5 & Critical vs acceptable & TL $< 60$ dB, large $\Delta$ \\
-\bottomrule
-\end{tabular}
-\caption{Six-level discrimination hierarchy with progressive refinement. Level 0 validates structure; Levels 1-5 classify differences based on magnitude and operational significance.}
-\label{tab:hierarchy}
-\end{table}
+\subsubsection{Hierarchical Invariants}
 
-\noindent\textbf{Key invariant:} At each level, all elements remain accounted for:
+\begin{align*}
+    \text{Level 0:} \quad & \text{total} = \Sigma(\text{lines} \times \text{columns}) \\
+    \text{Level 1:} \quad & \text{total} = \text{zero} + \text{non-zero} \\
+    \text{Level 2:} \quad & \text{non-zero} = \text{trivial} + \text{non-trivial} \\
+    \text{Level 3:} \quad & \text{non-trivial} = \text{subnormal} + \text{normal} \\
+    \text{Level 4:} \quad & \text{normal} = \text{zero-weighted} + \text{non-zero-weighted} \\
+    \text{Level 5:} \quad & \text{non-zero-weighted} = \text{critical} + \text{non-critical} \\
+    \text{Level 6:} \quad & \text{Assessment: } \frac{\text{non-zero-weighted, non-critical}}{\text{total}} < 0.02
+\end{align*}
+
+\subsubsection{Level 0: Structure Validation}
+
+\textbf{Purpose:} Verify file structure compatibility and count total elements.
+
+\textbf{Partition:}
 \begin{equation}
-    \text{Level } n: \quad S_n = A_n \cup B_n, \quad A_n \cap B_n = \emptyset
+    \text{total\_elements} = \text{countable\_elements} + \text{structural\_mismatches}
 \end{equation}
 
-This ensures rigorous statistical accounting from raw comparison through final classification.
+\textbf{Failure Behavior:} If element counts differ between files, comparison continues up to the structural divergence point but is marked as failed.
+
+\subsubsection{Level 1: Raw Difference Detection}
+
+\textbf{Purpose:} Distinguish identical elements from those with any measurable difference.
+
+\textbf{Partition:}
+\begin{equation}
+    \text{total} = \text{zero\_diff} + \text{non\_zero\_diff}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{verbatim}
+raw_diff = |value1 - value2|
+non_zero = (raw_diff > thresh.zero)  // thresh.zero = epsilon_single
+\end{verbatim}
+
+\textbf{Significance:} If non-zero count is zero, files are bitwise equivalent (within epsilon). This provides functionality similar to \texttt{diff} but with epsilon tolerance.
+
+\subsubsection{Level 2: Precision-Based Trivial Detection}
+
+\textbf{Purpose:} Separate format-driven differences from substantive numerical differences.
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non\_zero} = \text{trivial} + \text{non\_trivial}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{verbatim}
+LSB = pow(10.0, -min_dp)   // Least Significant Bit
+big_zero = LSB / 2.0        // Half-ULP criterion
+rounded_diff = round_to_decimals(raw_diff, min_dp)
+
+constexpr double FP_TOLERANCE = 1e-12;
+bool sub_lsb = (raw_diff < big_zero) ||
+    (abs(raw_diff - big_zero) < FP_TOLERANCE * max(raw_diff, big_zero));
+
+trivial = (rounded_diff == 0.0) || sub_lsb;
+\end{verbatim}
+
+\textbf{Example:} Comparing \texttt{30.8} (1dp) vs \texttt{30.85} (2dp):
+\begin{align*}
+    \LSB &= 10^{-1} = 0.1 \\
+    \text{big\_zero} &= 0.05 \\
+    \text{raw\_diff} &= |30.8 - 30.85| = 0.05 \\
+    \text{Test:} \quad 0.05 &\leq 0.05 \quad \checkmark \\
+    \text{Classification:} \quad & \textbf{TRIVIAL} \text{ (sub-LSB difference)}
+\end{align*}
+
+\subsubsection{Level 3: Subnormal vs Normal (Machine Precision Limit)}
+
+\textbf{Purpose:} Among non-trivial differences, separate numerically reliable values from those in the subnormal range.
+
+\textbf{Physical Context:} In transmission loss calculations, $\text{TL} = -20 \log_{10}(\text{pressure})$. When $\text{TL} > 138.47$ dB, pressure $< \epsilon_{\text{single}} \approx 1.19 \times 10^{-7}$, entering the subnormal/denormal range.
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non\_trivial} = \text{subnormal} + \text{normal}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{verbatim}
+both_above_ignore = (value1 > thresh.ignore) &&
+                   (value2 > thresh.ignore) &&
+                   !is_range_data;
+
+if (both_above_ignore) {
+    classification = SUBNORMAL;  // Both values > 138.47 dB
+}
+\end{verbatim}
+
+\subsubsection{Level 4: Zero-Weighted vs Non-Zero-Weighted (Operational Significance)}
+
+\textbf{Purpose:} Within normal differences, distinguish those in the operationally weighted-to-zero range.
+
+\textbf{Physical Context:} Research \cite{fabre2009} shows transmission loss values above 110 dB are weighted to zero in acoustic propagation phase-space analysis.
+
+\textbf{Partition:}
+\begin{equation}
+    \text{normal} = \text{zero-weighted} + \text{non-zero-weighted}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{verbatim}
+if (!is_range_data &&
+    value1 > thresh.marginal && value1 < thresh.ignore &&
+    value2 > thresh.marginal && value2 < thresh.ignore) {
+    classification = ZERO_WEIGHTED;  // Both in (110, 138.47] dB
+}
+\end{verbatim}
+
+\subsubsection{Level 5: Critical vs Non-Critical (Model Failure Detection)}
+
+\textbf{Purpose:} Among non-zero-weighted differences, detect catastrophically large differences indicating potential model failure.
+
+\textbf{Partition:}
+\begin{equation}
+    \text{non-zero-weighted} = \text{critical} + \text{non\_critical}
+\end{equation}
+
+\textbf{Decision Rule:}
+\begin{verbatim}
+if (!is_range_data &&
+    rounded_diff > thresh.critical &&
+    value1 <= thresh.ignore && value2 <= thresh.ignore) {
+    classification = CRITICAL;
+    flags.has_critical_diff = true;
+}
+\end{verbatim}
+
+\subsubsection{Complete Hierarchy Diagram}
+
+\begin{verbatim}
+TOTAL ELEMENTS (Level 0)
+|-- ZERO DIFF (Level 1)
+`-- NON-ZERO DIFF (Level 1)
+    |-- TRIVIAL (Level 2: sub-LSB or rounded=0)
+    `-- NON-TRIVIAL (Level 2)
+        |-- SUBNORMAL (Level 3: TL > 138.47 dB)
+        `-- NORMAL (Level 3: numerically reliable)
+            |-- ZERO-WEIGHTED (Level 4: TL > 110 dB)
+            `-- NON-ZERO-WEIGHTED (Level 4: operationally significant)
+                |-- CRITICAL (Level 5: model failure)
+                `-- NON-CRITICAL (Level 5)
+                    |
+                    Level 6: Pass/Fail Assessment (< 2% tolerance)
+\end{verbatim}
 
 \subsection{Physics-Based Threshold Derivation}
 
-\subsubsection{Subnormal Threshold from IEEE 754}
+\subsubsection{Machine Precision Constants}
 
-Single-precision floating-point (IEEE 754 binary32) has mantissa precision:
+Single-precision floating-point (IEEE 754 binary32) has 23 mantissa bits:
 \begin{equation}
     \epsilon_{\text{single}} = 2^{-23} \approx 1.19 \times 10^{-7}
 \end{equation}
+
+Double-precision floating-point (IEEE 754 binary64) has 52 mantissa bits:
+\begin{equation}
+    \epsilon_{\text{double}} = 2^{-52} \approx 2.22 \times 10^{-16}
+\end{equation}
+
+\subsubsection{Subnormal Threshold from IEEE 754}
 
 For transmission loss in underwater acoustics ($TL = -20\log_{10}(p/p_{\text{ref}})$), the minimum representable pressure corresponds to:
 
@@ -223,6 +412,15 @@ For transmission loss in underwater acoustics ($TL = -20\log_{10}(p/p_{\text{ref
 \end{equation}
 
 \textbf{Operational interpretation:} TL values exceeding 138.47 dB represent pressures below single-precision normal number limits—inherently unreliable for numerical comparison.
+
+\subsubsection{Percent Error Calculation}
+
+For non-trivial differences, percent error is computed using the second file as reference:
+\begin{equation}
+    E_{\%} = 100 \times \frac{|\Delta v|}{|v_2|}
+\end{equation}
+
+\textbf{Special case:} When $|v_2| \leq \epsilon_{\text{single}}$, the percent error is undefined and reported as $\infty$ (sentinel value).
 
 \subsubsection{Zero-Weighting Threshold from Acoustic Theory}
 
@@ -320,6 +518,59 @@ Comprehensive unit test suite with 50 tests covering:
 \end{itemize}
 
 \noindent\textbf{Status:} 50/50 tests passing (100\% coverage)
+
+\subsubsection{Test Categories}
+
+\begin{enumerate}
+    \item \textbf{Semantic Invariants} (\texttt{test\_semantic\_invariants.cpp})
+    \begin{itemize}
+        \item Counter summation invariants at each level
+        \item Partition completeness verification
+        \item Mutual exclusivity of categories
+    \end{itemize}
+
+    \item \textbf{Sub-LSB Boundary} (\texttt{test\_sub\_lsb\_boundary.cpp})
+    \begin{itemize}
+        \item Exact half-LSB difference (30.8 vs 30.85)
+        \item Sub-LSB at multiple precision levels
+        \item Supra-LSB differences remain non-trivial
+        \item Cross-platform formatting equivalence
+    \end{itemize}
+
+    \item \textbf{Percent Threshold} (\texttt{test\_percent\_threshold.cpp})
+    \begin{itemize}
+        \item Percent mode activation (negative threshold)
+        \item Reference value (value2) usage
+        \item Near-zero reference handling (INF sentinel)
+    \end{itemize}
+
+    \item \textbf{Sensitive Threshold} (\texttt{test\_sensitive\_threshold.cpp})
+    \begin{itemize}
+        \item Zero threshold mode (maximum sensitivity)
+        \item All non-trivial classified as normal
+        \item Ignore threshold still applies
+    \end{itemize}
+
+    \item \textbf{TL-Specific} (\texttt{test\_trivial\_exclusion.cpp}, \texttt{test\_unit\_mismatch.cpp})
+    \begin{itemize}
+        \item Zero-weighting band classification [110, 138] dB
+        \item Subnormal threshold exclusion (>138 dB)
+        \item Range data bypass
+        \item Unit mismatch detection
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Test File Naming Convention}
+
+Test files follow structured naming:
+\begin{verbatim}
+test_<scenario>_<variant><file_number>.txt
+
+Examples:
+test_2percent_tl1.txt      # 2% threshold, transmission loss, file 1
+test_critical1.txt         # Critical difference case, file 1
+test_sub_lsb_edge1.txt     # Sub-LSB edge case, file 1
+\end{verbatim}
 
 \subsection{Production Validation}
 
@@ -438,6 +689,17 @@ Automatically identifies transmission loss data vs range/distance columns:
 
 This enables appropriate handling without manual configuration.
 
+\subsection{Fail-Fast vs. Fail-Complete Strategy}
+
+The implementation uses a \textbf{hybrid strategy}:
+
+\begin{itemize}
+    \item \textbf{Fail-fast}: First critical difference triggers immediate error reporting
+    \item \textbf{Fail-complete}: Processing continues to gather complete statistics
+\end{itemize}
+
+This provides both rapid feedback (useful in automated testing) and comprehensive diagnostics (useful in debugging).
+
 \subsection{Build and Deployment}
 
 \begin{itemize}
@@ -446,6 +708,141 @@ This enables appropriate handling without manual configuration.
     \item \textbf{CI integration:} GitHub Actions, Jenkins support
     \item \textbf{Portability:} Compiles on Linux, macOS, Windows (WSL)
 \end{itemize}
+
+\section{Usage Examples}
+\label{sec:examples}
+
+\subsection{Basic Usage}
+
+\subsubsection{Default Comparison (threshold = 0)}
+
+\begin{verbatim}
+$ uband_diff file1.txt file2.txt
+\end{verbatim}
+
+Reports all non-trivial differences (maximum sensitivity mode).
+
+\subsubsection{Absolute Threshold}
+
+\begin{verbatim}
+$ uband_diff -t 0.01 file1.txt file2.txt
+\end{verbatim}
+
+Ignores differences below 0.01 (after rounding to common precision).
+
+\subsubsection{Percent Threshold}
+
+\begin{verbatim}
+$ uband_diff -t -2 file1.txt file2.txt
+\end{verbatim}
+
+Ignores differences below 2\% (negative value activates percent mode).
+
+\subsection{Output Interpretation}
+
+\subsubsection{Successful Comparison}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 0 non-zero, 960 zero
+
+After rounding:
+  Trivial differences (formatting only): 0
+  Non-trivial differences: 0
+
+COMPARISON: Files are EQUIVALENT (0 non-trivial differences)
+\end{verbatim}
+
+\textbf{Interpretation:} Files are bitwise identical at printed precision.
+
+\subsubsection{Sub-LSB Differences}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 120 non-zero, 840 zero
+  Maximum non-zero difference: 0.05 (at 1 decimal places)
+
+After rounding:
+  Trivial differences (sub-LSB or rounded=0): 120
+  Non-trivial differences: 0
+
+COMPARISON: Files are EQUIVALENT (0 non-trivial differences)
+\end{verbatim}
+
+\textbf{Interpretation:} All differences are sub-LSB (formatting-induced).
+
+\subsubsection{Normal Differences}
+
+\begin{verbatim}
+SUMMARY (rounded to minimum decimal places):
+Files compared: 960 values total
+
+Raw differences: 150 non-zero, 810 zero
+  Maximum non-zero difference: 1.25 (at 2 decimal places)
+
+After rounding:
+  Trivial differences: 50
+  Non-trivial differences: 100
+    Maximum non-trivial difference: 1.20 (at 2 decimal places)
+
+Machine precision classification:
+  Subnormal differences: 30
+  Normal differences: 70
+    Maximum percent error: 5.6%
+
+  Zero-weighted TL differences [110, 138 dB]: 10
+  Non-zero-weighted differences: 60
+    Critical differences (> 10.0): 0
+    Non-critical differences: 60
+
+COMPARISON: Files DIFFER (60 non-zero-weighted differences, 6.25% of total)
+\end{verbatim}
+
+\textbf{Interpretation:} 60 non-zero-weighted differences detected (6.25\% of 960 values). No critical failures.
+
+\subsection{Exit Codes}
+
+\begin{description}
+    \item[0] Files are equivalent (no non-zero-weighted differences)
+    \item[1] Files differ (non-zero-weighted differences found)
+    \item[2] File access error or structural mismatch
+    \item[3] Critical difference detected (hard failure)
+\end{description}
+
+\subsection{Integration with Automated Testing}
+
+\subsubsection{Makefile Integration}
+
+\begin{verbatim}
+test: test_regression
+    @uband_diff -t 0.01 reference.txt output.txt
+    @echo "Validation passed"
+
+.PHONY: test
+\end{verbatim}
+
+\subsubsection{CI/CD Pipeline}
+
+\begin{verbatim}
+#!/bin/bash
+# run_validation.sh
+
+MODEL_OUTPUT="output/transmission_loss.txt"
+REFERENCE="data/reference/tl_baseline.txt"
+THRESHOLD=0.05
+
+if uband_diff -t ${THRESHOLD} ${REFERENCE} ${MODEL_OUTPUT}; then
+    echo "[PASS] Model validation PASSED"
+    exit 0
+else
+    echo "[FAIL] Model validation FAILED"
+    exit 1
+fi
+\end{verbatim}
 
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
@@ -474,6 +871,20 @@ The tool enables:
     \item Cross-platform scientific software verification and validation
 \end{itemize}
 
+\subsection{Lessons Learned}
+
+\subsubsection{Floating-Point Tolerance is Essential}
+
+The initial sub-LSB implementation failed edge cases due to floating-point representation errors. Adding \texttt{FP\_TOLERANCE = 1e-12} resolved cross-platform consistency issues.
+
+\subsubsection{Information Theory Guides Design}
+
+Recognizing that printed values represent \emph{intervals} rather than exact numbers led to the sub-LSB criterion, which is both mathematically rigorous and practically useful.
+
+\subsubsection{Progressive Refinement Maintains Clarity}
+
+The six-level hierarchy keeps each discrimination step simple and testable while building to complex domain-specific classification.
+
 \subsection{Future Enhancements}
 
 Potential extensions include:
@@ -490,9 +901,225 @@ Potential extensions include:
     \item \textbf{Extended domain support:} Generalize physics-based thresholds to other scientific domains (CFD, climate modeling, quantum chemistry)
 \end{enumerate}
 
+\subsection{Applicability Beyond Acoustics}
+
+While developed for underwater acoustic propagation, \ubdiff{}'s precision-aware methodology is applicable to any domain requiring numerical validation:
+
+\begin{itemize}
+    \item Computational fluid dynamics (CFD)
+    \item Climate modeling
+    \item Finite element analysis (FEA)
+    \item Molecular dynamics simulations
+    \item Financial modeling
+    \item Scientific data analysis
+\end{itemize}
+
+The domain-specific thresholds (zero-weighting, subnormal, critical) can be adapted to physics-based or operational constraints in any field.
+
+\subsection{Open Source Potential}
+
+The modular architecture and comprehensive test suite position \ubdiff{} as a candidate for open-source release. Potential benefits include:
+
+\begin{itemize}
+    \item Community contributions for domain-specific threshold libraries
+    \item Port to other languages (Python, Julia, Rust)
+    \item Integration with existing test frameworks (pytest, GoogleTest)
+    \item Standardization of precision-aware comparison methodology
+\end{itemize}
+
+\subsection{Final Remarks}
+
+Numerical comparison is a deceptively complex problem. Traditional tools treat numbers as strings, ignoring representational precision. \ubdiff{} demonstrates that incorporating information theory, floating-point arithmetic, and domain knowledge produces a more robust, meaningful, and practical solution.
+
+The sub-LSB detection innovation---recognizing that ``30.8'' and ``30.85'' are informationally equivalent---exemplifies the power of precision-aware design. This single insight enables cross-platform validation that would otherwise fail, directly addressing a critical pain point in multi-platform scientific computing.
+
+As computational science increasingly relies on cross-platform, multi-language, and distributed computing environments, precision-aware comparison tools will become essential infrastructure. \ubdiff{} provides a rigorous, tested, and production-ready implementation of this methodology.
+
 \subsection{Availability}
 
 \ubdiff{} is implemented in C++17 with comprehensive documentation and test suite. The tool and technical report are available for research and operational use.
+
+\appendix
+
+\section{Threshold Reference}
+\label{app:thresholds}
+
+\subsection{Default Threshold Values}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Threshold} & \textbf{Default Value} & \textbf{Source} & \textbf{Purpose} \\ \midrule
+\texttt{zero} & $1.19 \times 10^{-7}$ & $2^{-23}$ & Machine epsilon (single precision) \\
+\texttt{significant} & 0.0 & User & User-defined assessment threshold \\
+\texttt{critical} & 10.0 & User/Domain & Hard failure threshold \\
+\texttt{marginal} & 110.0 dB & Domain & TL zero-weighting boundary \\
+\texttt{ignore} & 138.47 dB & Derived & TL subnormal threshold \\ \bottomrule
+\end{tabular}
+\caption{Default threshold values and their derivations}
+\label{tab:thresholds}
+\end{table}
+
+\subsection{Threshold Derivation Details}
+
+\subsubsection{Zero Threshold ($\epsilon_{\text{single}}$)}
+
+\begin{align}
+    \epsilon_{\text{single}} &= 2^{-23} = \frac{1}{8388608} \approx 1.192 \times 10^{-7}
+\end{align}
+
+This is the ULP (Unit in the Last Place) for normalized single-precision floating-point numbers.
+
+\subsubsection{Ignore Threshold (TL Subnormal Boundary)}
+
+From acoustic pressure-to-TL relationship:
+
+\begin{align}
+    TL &= -20 \log_{10}\left(\frac{p}{p_{\text{ref}}}\right) \\
+    TL_{\text{ignore}} &= -20 \log_{10}(\epsilon_{\text{single}}) \\
+    &= -20 \times (-23) \log_{10}(2) \\
+    &= 460 \times 0.301029995664 \approx 138.47 \text{ dB}
+\end{align}
+
+\subsection{Percent Mode Activation}
+
+When user specifies negative threshold value:
+\begin{verbatim}
+if (user_threshold < 0) {
+    thresh.significant_is_percent = true;
+    thresh.significant_percent = abs(user_threshold) / 100.0;
+}
+\end{verbatim}
+
+\textbf{Example:} \texttt{-t -5} $\to$ 5\% threshold
+
+\subsection{Recommended Thresholds by Use Case}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Use Case} & \textbf{Threshold} & \textbf{Rationale} \\ \midrule
+Regression testing & 0.0 & Detect any numerical change \\
+Cross-platform validation & 0.0 (with sub-LSB) & Tolerate format differences \\
+Model verification & 0.01--0.1 & Physics-based tolerance \\
+Quick smoke test & -1 (1\%) & Rapid pass/fail \\
+High-precision science & $10^{-10}$ & Near machine precision \\ \bottomrule
+\end{tabular}
+\caption{Recommended thresholds by application}
+\label{tab:recommended}
+\end{table}
+
+\section{Code Structure Reference}
+\label{app:code}
+
+\subsection{Directory Structure}
+
+\begin{verbatim}
+diff_utils/
+|-- src/
+|   |-- cpp/
+|   |   |-- include/
+|   |   |   |-- uband_diff.h           # Threshold/stat structures
+|   |   |   |-- difference_analyzer.h  # Core analyzer
+|   |   |   |-- file_comparator.h      # File orchestration
+|   |   |   |-- file_reader.h          # Parsing utilities
+|   |   |   |-- line_parser.h          # Low-level parsing
+|   |   |   `-- format_tracker.h       # Precision tracking
+|   |   |-- src/
+|   |   |   |-- difference_analyzer.cpp
+|   |   |   |-- file_comparator.cpp
+|   |   |   |-- file_reader.cpp
+|   |   |   |-- line_parser.cpp
+|   |   |   `-- format_tracker.cpp
+|   |   |-- main/
+|   |   |   `-- uband_diff.cpp         # CLI entry point
+|   |   `-- tests/
+|   `-- fortran/
+|       `-- pi_precision_test.f90      # Validation program
+|-- build/
+|   |-- bin/
+|   |   `-- uband_diff                 # Main executable
+|   |-- obj/                           # Object files
+|   `-- test/                          # Test outputs
+|-- data/
+|   `-- test_*.txt                     # Test input files
+`-- docs/
+    |-- report/
+    |   `-- UBAND_DIFF_MEMO.tex        # This document
+    `-- guide/
+        |-- discrimination-hierarchy.md
+        `-- sub-lsb-detection.md
+\end{verbatim}
+
+\subsection{Key Function Reference}
+
+\subsubsection{DifferenceAnalyzer Class}
+
+\begin{verbatim}
+class DifferenceAnalyzer {
+public:
+    void process_difference(const ColumnValues& vals);
+
+private:
+    void process_raw_values(const ColumnValues& vals);
+    void process_rounded_values(const ColumnValues& vals);
+
+    double round_to_decimals(double value, int dp);
+    bool is_sub_lsb_difference(double raw_diff, double big_zero);
+
+    Thresholds thresh;
+    CountStats counter;
+    DiffStats differ;
+    Flags flags;
+};
+\end{verbatim}
+
+\subsubsection{FileComparator Class}
+
+\begin{verbatim}
+class FileComparator {
+public:
+    bool compare_files();
+
+private:
+    bool process_line(const string& line1, const string& line2);
+    void process_column(size_t col, const string& str1, const string& str2);
+    void process_difference(const ColumnValues& vals);
+
+    void print_diff_like_summary();
+    void print_rounded_summary();
+    void print_significant_summary();
+
+    FileReader reader1, reader2;
+    DifferenceAnalyzer analyzer;
+};
+\end{verbatim}
+
+\subsection{Build System}
+
+\subsubsection{Makefile Targets}
+
+\begin{description}
+    \item[\texttt{make all}] Build main executable and tests
+    \item[\texttt{make uband\_diff}] Build main executable only
+    \item[\texttt{make tests}] Build test suite
+    \item[\texttt{make test}] Run all unit tests
+    \item[\texttt{make clean}] Remove build artifacts
+\end{description}
+
+\subsection{Dependency Graph}
+
+\begin{verbatim}
+uband_diff (main)
+  `-- FileComparator
+      |-- FileReader
+      |   `-- LineParser
+      |       `-- FormatTracker
+      `-- DifferenceAnalyzer
+          `-- (Thresholds, CountStats, DiffStats, Flags)
+\end{verbatim}
 
 % Bibliography (add references as needed)
 \begin{thebibliography}{9}
