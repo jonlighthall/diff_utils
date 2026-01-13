@@ -45,14 +45,14 @@
     Theory and Implementation of \ubdiff{}
 }
 \author{}
-\date{\today}
+\date{December 2025}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-This technical report presents the design, implementation, and validation of \ubdiff{}, a precision-aware numerical file comparison utility. The tool implements a six-level hierarchical discrimination algorithm that classifies numeric differences based on printed precision, machine epsilon, and domain-specific thresholds. Key innovations include sub-LSB (Least Significant Bit) detection for cross-platform robustness, transmission loss domain specialization for acoustic propagation analysis, and a progressive refinement architecture that maintains rigorous accounting invariants. The implementation has been validated through comprehensive unit testing and domain-specific test suites, demonstrating reliable operation across multiple precision levels and threshold configurations.
+This technical report presents the comprehensive design, implementation, and validation of \ubdiff{}, a precision-aware numerical file comparison utility. The tool enables authoritative quantitative curve comparison by first filtering formatting and precision artifacts, then applying peer-reviewed comparison methods (Fabre et al.). The novel contribution is solving the cross-platform bitwise-different-but-visually-identical problem: results that pass visual inspection but fail traditional \texttt{diff} due to floating-point representation, rounding, or platform differences. Key innovations include sub-LSB (Least Significant Bit) detection for information-theoretic equivalence, six-level hierarchical discrimination with operational significance thresholds, and rigorous accounting invariants ensuring reproducibility. The implementation has been validated through comprehensive unit testing (50/50 tests passing), mathematical proof via $\pi$ precision series, and applied to acoustic propagation model validation (RAM, NSPE, uBand), demonstrating reliable operation across multiple precision levels, threshold configurations, and computing platforms while enabling downstream application of peer-reviewed quantitative comparison standards.
 \end{abstract}
 
 \tableofcontents
