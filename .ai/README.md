@@ -15,7 +15,7 @@
 - Do not replace, remove, or deprecate Fabre's method
 - If new algorithms emerge during development, distinguish them clearly as novel contributions
 - Validate new methods independently before integration
-- Document research ideas in `docs/FUTURE_WORK.md`
+- Document research ideas in `docs/future-work.md`
 
 ## What's Included
 
@@ -59,7 +59,7 @@ This `.ai/` directory contains a complete knowledge base for AI agents assisting
    - File-specific quick fixes
    - Emergency reset procedures
 
-6. **[FUTURE_WORK.md](../docs/FUTURE_WORK.md)** — Research and roadmap (phase-aware TL comparison, experimental diagnostics, uncertainty, multi-resolution)
+6. **[FUTURE_WORK.md](../docs/future-work.md)** — Research and roadmap (phase-aware TL comparison, experimental diagnostics, uncertainty, multi-resolution)
 
 ## Using This Framework
 
@@ -104,7 +104,7 @@ Differences are classified at six levels, with **Level 2 being immutable**:
 
 ### TL Comparison Methods
 - **Authoritative, production-ready**: IEEE peer-reviewed weighted TL difference (Fabre & Zingarelli / Goodman) implemented in TL metrics
-- **Experimental diagnostics**: Pattern analysis, phase/stretch detection concepts — see [FUTURE_WORK.md](../docs/FUTURE_WORK.md)
+- **Experimental diagnostics**: Pattern analysis, phase/stretch detection concepts — see [FUTURE_WORK.md](../docs/future-work.md)
 
 
 ### Sub-LSB Detection
@@ -144,8 +144,8 @@ When user provides `significant_threshold == 0.0`:
 |---------------|-----|------|
 | `src/cpp/src/difference_analyzer.cpp` | Core comparison logic | Modifying thresholds, classification |
 | `src/cpp/tests/test_semantic_invariants.cpp` | Invariant verification | Validating changes, debugging |
-| `docs/SUB_LSB_DETECTION.md` | Precision handling | Understanding FP edge cases |
-| `docs/DISCRIMINATION_HIERARCHY.md` | Six-level system | Understanding classification order |
+| `docs/guide/sub-lsb-detection.md` | Precision handling | Understanding FP edge cases |
+| `docs/guide/discrimination-hierarchy.md` | Six-level system | Understanding classification order |
 | `makefile` | Build configuration | Compilation issues |
 
 ## Testing is Mandatory
@@ -171,7 +171,7 @@ See [dev-workflow.md#testing](dev-workflow.md#testing) for detailed procedures.
 ## Getting Help
 
 ### Q: How do I understand the six-level hierarchy?
-→ Read [codebase.md - Threshold Logic](codebase.md#threshold-logic) and [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md)
+→ Read [codebase.md - Threshold Logic](codebase.md#threshold-logic) and [docs/guide/discrimination-hierarchy.md](../../docs/guide/discrimination-hierarchy.md)
 
 ### Q: My test is failing, how do I debug?
 → See [dev-workflow.md#debugging-workflow](dev-workflow.md#debugging-workflow) and [quick-reference.md#file-specific-quick-fixes](quick-reference.md#file-specific-quick-fixes)

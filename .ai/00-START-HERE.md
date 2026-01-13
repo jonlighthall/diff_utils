@@ -51,7 +51,7 @@ quick-reference.md (cheat sheet)
 - ✅ Precision handling (decimal place tracking)
 - ✅ Critical thresholds (marginal, ignore, significance)
 - ✅ Peer-reviewed TL comparison: IEEE weighted method (Fabre & Zingarelli / Goodman)
-- ⚠️ Experimental diagnostics: pattern analysis, phase/stretch ideas — see docs/FUTURE_WORK.md
+- ⚠️ Experimental diagnostics: pattern analysis, phase/stretch ideas — see docs/future-work.md
 
 ### 4. Working Code Examples
 - ✅ 15+ C++ patterns (floating-point, sub-LSB, zero-threshold)

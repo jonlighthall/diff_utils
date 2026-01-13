@@ -2,7 +2,7 @@
 
 ## Environment Setup
 
-**Scope**: Production workflows rely on peer-reviewed, authoritative methods (IEEE weighted TL difference, sub-LSB hierarchy). Experimental diagnostics (pattern analysis, phase/stretch ideas) are for investigation only; see `docs/FUTURE_WORK.md` before using them in decisions.
+**Scope**: Production workflows rely on peer-reviewed, authoritative methods (IEEE weighted TL difference, sub-LSB hierarchy). Experimental diagnostics (pattern analysis, phase/stretch ideas) are for investigation only; see `docs/future-work.md` before using them in decisions.
 
 ### Prerequisites
 ```bash
@@ -324,7 +324,7 @@ git commit -m "Fix: [Issue] - [Explanation]"
 
 4. **Update documentation**:
    ```markdown
-   # docs/IMPLEMENTATION_SUMMARY.md
+   # docs/implementation-summary.md
    Added NEW_THRESHOLD = 123.45 for [domain reason]
    ```
 

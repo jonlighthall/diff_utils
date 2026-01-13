@@ -478,7 +478,7 @@ bool is_trivial = (raw_diff <= big_zero);
 // which represents the effective precision of the shared minimum decimal places.
 // This prevents formatting artifacts (e.g., 30.8 vs 30.85) from being counted
 // as meaningful physical differences in acoustic calculations.
-// See docs/SUB_LSB_DETECTION.md for detailed explanation.
+// See docs/guide/sub-lsb-detection.md for detailed explanation.
 bool is_trivial = (raw_diff <= big_zero);
 ```
 

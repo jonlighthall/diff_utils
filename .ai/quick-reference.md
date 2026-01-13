@@ -28,15 +28,15 @@
 ### Documentation (By Purpose)
 | File | Use When |
 |------|----------|
-| [docs/UBAND_DIFF_MEMO.tex](../../docs/UBAND_DIFF_MEMO.tex) | **Primary paper** (complete, self-contained) |
-| [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md) | Understanding six-level system (author's novel organizing principle) |
-| [docs/SUB_LSB_DETECTION.md](../../docs/SUB_LSB_DETECTION.md) | Precision handling, cross-platform issues |
-| [docs/TL_METRICS_IMPLEMENTATION.md](../../docs/TL_METRICS_IMPLEMENTATION.md) | Fabre's IEEE peer-reviewed TL comparison method (authoritative) |
-| [docs/FUTURE_WORK.md](../../docs/FUTURE_WORK.md) | Experimental diagnostics and research roadmap (phase/stretch, paradigm investigation) |
-| [docs/IMPLEMENTATION_SUMMARY.md](../../docs/IMPLEMENTATION_SUMMARY.md) | Recent changes and fixes |
-| [docs/DIFF_LEVEL_OPTION.md](../../docs/DIFF_LEVEL_OPTION.md) | CLI option reference |
+| [docs/report/UBAND_DIFF_MEMO.tex](../../docs/report/UBAND_DIFF_MEMO.tex) | **Primary paper** (complete, self-contained) |
+| [docs/guide/discrimination-hierarchy.md](../../docs/guide/discrimination-hierarchy.md) | Understanding six-level system (author's novel organizing principle) |
+| [docs/guide/sub-lsb-detection.md](../../docs/guide/sub-lsb-detection.md) | Precision handling, cross-platform issues |
+| [docs/guide/tl-metrics-implementation.md](../../docs/guide/tl-metrics-implementation.md) | Fabre's IEEE peer-reviewed TL comparison method (authoritative) |
+| [docs/future-work.md](../../docs/future-work.md) | Experimental diagnostics and research roadmap (phase/stretch, paradigm investigation) |
+| [docs/implementation-summary.md](../../docs/implementation-summary.md) | Recent changes and fixes |
+| [docs/guide/diff-level-option.md](../../docs/guide/diff-level-option.md) | CLI option reference |
 
-**Note:** `UBAND_DIFF_TECHNICAL_REPORT.tex` is a legacy shell structure (not maintained). Use the MEMO for all paper work.
+**Note:** `docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex` is a legacy shell structure (not maintained). Use the MEMO for all paper work.
 
 ## Command Quick Reference
 
@@ -178,7 +178,7 @@ BEFORE ANY CODE MODIFICATION:
 5. Run full test suite: ./build/bin/tests/test_semantic_invariants
 
 WHEN MODIFYING:
-- Threshold logic: Update docs/IMPLEMENTATION_SUMMARY.md
+- Threshold logic: Update docs/implementation-summary.md
 - Numeric comparison: Check sub-LSB detection applies
 - File I/O: Ensure format validation is first stage
 - Fortran: Use provided formatting tasks after edits
@@ -230,7 +230,7 @@ AVOID:
 1. Check [src/cpp/src/difference_analyzer.cpp](../../src/cpp/src/difference_analyzer.cpp) zero-threshold block
 2. Verify formula: `sig = nontrivial - high_ignore`
 3. Run: `./build/bin/tests/test_semantic_invariants --gtest_filter="ZeroThreshold*"`
-4. See [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md) section "Zero-Threshold vs Trivial Filtering"
+4. See [docs/guide/discrimination-hierarchy.md](../../docs/guide/discrimination-hierarchy.md) section "Zero-Threshold vs Trivial Filtering"
 
 ### File Validation Failing
 1. Check [src/cpp/src/file_comparator.cpp](../../src/cpp/src/file_comparator.cpp) validate() method
@@ -250,7 +250,7 @@ AVOID:
 - [ ] Updated help text
 - [ ] Added unit tests for boundary conditions
 - [ ] Tested with zero-threshold mode
-- [ ] Updated docs/IMPLEMENTATION_SUMMARY.md
+- [ ] Updated docs/implementation-summary.md
 - [ ] All existing tests pass
 
 ### Fixing Numeric Logic
@@ -276,8 +276,8 @@ AVOID:
 | Architecture | [.ai/codebase.md](.ai/codebase.md) | System structure, components |
 | Development | [.ai/dev-workflow.md](.ai/dev-workflow.md) | Build, test, debug |
 | Code Patterns | [.ai/patterns.md](.ai/patterns.md) | Example implementations |
-| Six-Level Hierarchy | [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md) | Core algorithm |
-| Sub-LSB Details | [docs/SUB_LSB_DETECTION.md](../../docs/SUB_LSB_DETECTION.md) | Precision handling |
+| Six-Level Hierarchy | [docs/guide/discrimination-hierarchy.md](../../docs/guide/discrimination-hierarchy.md) | Core algorithm |
+| Sub-LSB Details | [docs/guide/sub-lsb-detection.md](../../docs/guide/sub-lsb-detection.md) | Precision handling |
 | Main README | [README.md](../../README.md) | Project overview |
 
 ## AI Agent Prompt Template

@@ -65,7 +65,7 @@ diff_utils/
 │   ├── TL_METRICS_IMPLEMENTATION.md
 │   ├── PI_PRECISION_TEST_SUITE.md
 │   ├── RAW_DIFF_FIX_SUMMARY.md
-│   ├── UBAND_DIFF_TECHNICAL_REPORT.tex  # Formal documentation
+│   ├── docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex  # Formal documentation
 │   └── (other technical reports)
 │
 ├── scripts/                          # Utility scripts
@@ -163,7 +163,7 @@ int max_decimal_places = 17;
 - Diagnostic pattern analysis (run tests, autocorrelation, regression)
 - Identify transient spikes or systematic biases (for investigation only)
 
-**Status**: Experimental. Use for analysis; do not rely on for authoritative decisions. See `docs/FUTURE_WORK.md` for research roadmap.
+**Status**: Experimental. Use for analysis; do not rely on for authoritative decisions. See `docs/future-work.md` for research roadmap.
 
 ## Precision Handling
 
@@ -203,7 +203,7 @@ is_trivial = (raw_diff < big_zero) OR
 
 ### TL Comparison Methodology
 - **Authoritative**: IEEE peer-reviewed weighted TL difference (Fabre & Zingarelli / Goodman) implemented in TL metrics
-- **Experimental**: Phase/stretch detection concepts, extended diagnostics — see `docs/FUTURE_WORK.md`
+- **Experimental**: Phase/stretch detection concepts, extended diagnostics — see `docs/future-work.md`
 | User | Print | Minimum to emit row | Still counted internally |
 
 ### Zero-Threshold Special Case

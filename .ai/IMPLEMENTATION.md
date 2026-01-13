@@ -86,7 +86,7 @@
 - High-level snapshot and navigation
 - Quick view of file inventory and key concepts
 
-### 8. ✅ [docs/FUTURE_WORK.md](../docs/FUTURE_WORK.md) — Research roadmap (external)
+### 8. ✅ [docs/future-work.md](../docs/future-work.md) — Research roadmap (external)
 - Phase-aware TL comparison ideas (stretch/compression, shape matching)
 - Experimental diagnostics (pattern analysis) marked non-production
 - Uncertainty, multi-resolution, adaptive thresholds, extended domains
@@ -184,9 +184,9 @@ Based on current industry best practices (as of Jan 2026):
 
 These files **complement** (not replace) existing docs:
 - `README.md` — Project overview (keep as is)
-- `docs/DISCRIMINATION_HIERARCHY.md` — Theory (referenced from `.ai/`)
-- `docs/SUB_LSB_DETECTION.md` — Technical deep-dive (referenced from `.ai/`)
-- `docs/IMPLEMENTATION_SUMMARY.md` — Change history (referenced from `.ai/`)
+- `docs/guide/discrimination-hierarchy.md` — Theory (referenced from `.ai/`)
+- `docs/guide/sub-lsb-detection.md` — Technical deep-dive (referenced from `.ai/`)
+- `docs/implementation-summary.md` — Change history (referenced from `.ai/`)
 
 The `.ai/` folder extracts and synthesizes relevant information for AI agents.
 

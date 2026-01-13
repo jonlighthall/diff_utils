@@ -33,7 +33,7 @@ A precision-aware sub-LSB (Least Significant Bit/2) detection fix is core to cro
 - Differences ≤ half the shared LSB are treated as trivial (informationally equivalent)
 - Example: `30.8` vs `30.85` with threshold=0 → EQUIVALENT (not SIGNIFICANT)
 - Uses floating-point tolerance (FP_TOLERANCE = 1e-12) to handle binary representation edge cases
-- See `docs/SUB_LSB_DETECTION.md` and `docs/IMPLEMENTATION_SUMMARY.md`
+- See `docs/guide/sub-lsb-detection.md` and `docs/implementation-summary.md`
 
 ### Zero-Threshold Semantics
 When `user_significant == 0.0`:
@@ -59,12 +59,12 @@ This project contains author-created innovations:
 - Early-exit architecture: program continues to next level only upon match or critical failure
 - Physics-based thresholds from IEEE 754 and peer-reviewed standards
 - Not merely a taxonomy, but an operational decision framework
-- Location: [docs/DISCRIMINATION_HIERARCHY.md](../docs/DISCRIMINATION_HIERARCHY.md)
+- Location: [docs/guide/discrimination-hierarchy.md](../docs/guide/discrimination-hierarchy.md)
 
 **Sub-LSB Detection (Information-Theoretic)**:
 - Recognizes printed value as interval, not point
 - Enables robust cross-precision comparison
-- Location: [docs/SUB_LSB_DETECTION.md](../docs/SUB_LSB_DETECTION.md)
+- Location: [docs/guide/sub-lsb-detection.md](../docs/guide/sub-lsb-detection.md)
 
 **Rigorous Accounting Invariants**:
 - Structural and semantic consistency throughout classification
@@ -84,7 +84,7 @@ This project contains author-created innovations:
 
 **Observations from Fabre Figures 2--6:** Curves with similar gross structure but apparent range-offset differences (possible accumulated phase error). Whether these score high or low in Fabre's method determines the paradigm.
 
-**Why it matters:** This distinction affects interpretation of all subsequent phase-error and horizontal-stretch comparison work. See [docs/FUTURE_WORK.md](../docs/FUTURE_WORK.md) for investigation plan.
+**Why it matters:** This distinction affects interpretation of all subsequent phase-error and horizontal-stretch comparison work. See [docs/future-work.md](../docs/future-work.md) for investigation plan.
 
 ## Code Quality Standards
 
@@ -169,10 +169,10 @@ cd build && make test       # Runs C++ unit test suite
 - `src/fortran/programs/tsdiff.f90` - Time series comparison
 
 ### Documentation Hierarchy
-- **Quick Start**: `README.md`, `docs/DIFF_LEVEL_OPTION.md`
-- **Theory**: `docs/DISCRIMINATION_HIERARCHY.md`, `docs/ERROR_ACCUMULATION_ANALYSIS.md`
-- **Implementation**: `docs/IMPLEMENTATION_SUMMARY.md`, `docs/SUB_LSB_DETECTION.md`
-- **Technical Reports**: `docs/UBAND_DIFF_TECHNICAL_REPORT.tex`
+- **Quick Start**: `README.md`, `docs/guide/diff-level-option.md`
+- **Theory**: `docs/guide/discrimination-hierarchy.md`, `docs/ERROR_ACCUMULATION_ANALYSIS.md`
+- **Implementation**: `docs/implementation-summary.md`, `docs/guide/sub-lsb-detection.md`
+- **Technical Reports**: `docs/docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex`
 
 ## When to Ask for Clarification
 
@@ -200,8 +200,8 @@ Ask for clarification if:
 - Validate cross-platform builds (especially Fortran)
 
 ## Resources
-- Full hierarchy explanation: `docs/DISCRIMINATION_HIERARCHY.md`
-- Sub-LSB deep-dive: `docs/SUB_LSB_DETECTION.md`
-- Architecture details: `docs/IMPLEMENTATION_SUMMARY.md`
+- Full hierarchy explanation: `docs/guide/discrimination-hierarchy.md`
+- Sub-LSB deep-dive: `docs/guide/sub-lsb-detection.md`
+- Architecture details: `docs/implementation-summary.md`
 - Makefile patterns: `docs/MAKEFILE_BEST_PRACTICES.md`
-- Precision test suite: `docs/PI_PRECISION_TEST_SUITE.md`
+- Precision test suite: `docs/guide/pi-precision-test-suite.md`
