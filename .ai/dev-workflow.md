@@ -25,6 +25,30 @@ gfortran --version
 which make
 ```
 
+### VS Code Configuration Notes
+
+**Fortran .f90 Files:**
+- Set editor ruler to 80 characters (not default 72)
+- Set `max_line_length` and `max_comment_line_length` to 80 in linter settings
+- Add to `.vscode/settings.json`:
+```json
+{
+  "[fortran]": {
+    "editor.rulers": [80]
+  },
+  "fortran.linter.maxLineLength": 80,
+  "fortran.linter.maxCommentLineLength": 80
+}
+```
+
+**Fortran .mod Files:**
+- If VS Code reports "cannot open module file..." errors, add include path to settings:
+```json
+{
+  "fortran.includePaths": ["${workspaceFolder}/build/mod"]
+}
+```
+
 ## Build Process
 
 ### Quick Start

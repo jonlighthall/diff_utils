@@ -28,12 +28,15 @@
 ### Documentation (By Purpose)
 | File | Use When |
 |------|----------|
-| [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md) | Understanding six-level system |
+| [docs/UBAND_DIFF_MEMO.tex](../../docs/UBAND_DIFF_MEMO.tex) | **Primary paper** (complete, self-contained) |
+| [docs/DISCRIMINATION_HIERARCHY.md](../../docs/DISCRIMINATION_HIERARCHY.md) | Understanding six-level system (author's novel organizing principle) |
 | [docs/SUB_LSB_DETECTION.md](../../docs/SUB_LSB_DETECTION.md) | Precision handling, cross-platform issues |
+| [docs/TL_METRICS_IMPLEMENTATION.md](../../docs/TL_METRICS_IMPLEMENTATION.md) | Fabre's IEEE peer-reviewed TL comparison method (authoritative) |
+| [docs/FUTURE_WORK.md](../../docs/FUTURE_WORK.md) | Experimental diagnostics and research roadmap (phase/stretch, paradigm investigation) |
 | [docs/IMPLEMENTATION_SUMMARY.md](../../docs/IMPLEMENTATION_SUMMARY.md) | Recent changes and fixes |
 | [docs/DIFF_LEVEL_OPTION.md](../../docs/DIFF_LEVEL_OPTION.md) | CLI option reference |
-| [docs/TL_METRICS_IMPLEMENTATION.md](../../docs/TL_METRICS_IMPLEMENTATION.md) | IEEE peer-reviewed TL comparison method (authoritative) |
-| [docs/FUTURE_WORK.md](../../docs/FUTURE_WORK.md) | Experimental diagnostics and research roadmap (phase/stretch, uncertainty) |
+
+**Note:** `UBAND_DIFF_TECHNICAL_REPORT.tex` is a legacy shell structure (not maintained). Use the MEMO for all paper work.
 
 ## Command Quick Reference
 
