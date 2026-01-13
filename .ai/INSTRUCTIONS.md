@@ -109,6 +109,20 @@ Any quantitative TL curve comparison MUST use Fabre et al.'s peer-reviewed algor
 - Validate new methods independently before integration
 - Document research ideas in `docs/future-work.md`
 
+### Range Data Detection
+
+Column 0 is automatically analyzed for range-like characteristics. When detected, TL-specific thresholds are bypassed for that column.
+
+**Detection criteria (all must be true):**
+1. Monotonically increasing values
+2. Fixed delta between consecutive values (±1% tolerance)
+3. Starting value < 100 (typical for range in meters/kilometers)
+4. Non-zero delta (excludes constant sequences)
+
+**Implementation:** `FileReader::is_first_column_fixed_delta()` and `is_first_column_monotonic()`
+
+**Effect:** When range data is detected, the 138.47 dB ignore threshold and 110 dB marginal threshold are NOT applied to column 0. This prevents spurious threshold application to distance measurements.
+
 ---
 
 ## Code Quality Standards
@@ -472,6 +486,43 @@ TEST(SubLSB, CrossPrecision) {
     analyzer.analyze(30.8, 30.85);   // 1dp vs 2dp - should be TRIVIAL
     analyzer.analyze(50.12, 50.123); // 2dp vs 3dp - should be TRIVIAL
 }
+```
+
+### ❌ Mistake 5: Single-column test files
+
+```cpp
+// WRONG: Single column gets treated as column 0 (range) and skipped
+write_file(f1, "100.5");
+write_file(f2, "100.0");
+// No comparison happens! Column 0 is always skipped as range column
+```
+
+✅ **Fix:** Include range column so data becomes column 1
+
+```cpp
+// CORRECT: Range column + data column
+write_file(f1, "101.5 100.5");  // Column 0 (range) skipped, column 1 compared
+write_file(f2, "101.5 100.0");
+```
+
+### ❌ Mistake 6: FileComparator constructor parameter order
+
+```cpp
+// WRONG: Missing debug_level parameter
+FileComparator comp(0.0, 10.0, 1.0, 0,
+                    /*significant_is_percent*/ true,
+                    /*significant_percent*/ 0.01);
+// "true" becomes debug_level, 0.01 becomes significant_is_percent (truncated to 0)!
+```
+
+✅ **Fix:** Include all positional parameters
+
+```cpp
+// CORRECT: Include both verbosity and debug_level
+FileComparator comp(/*user_thresh*/ 0.0, /*critical*/ 10.0, /*print*/ 1.0,
+                    /*verbosity*/ 0, /*debug*/ 0,
+                    /*significant_is_percent*/ true,
+                    /*significant_percent*/ 0.01);
 ```
 
 ---

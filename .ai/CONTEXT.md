@@ -137,6 +137,31 @@ int max_decimal_places = 17;
 - Parse numeric values
 - Validate format before processing
 
+**Critical Behavior: Column 0 is Always Skipped**
+
+Column index 0 is unconditionally treated as the **range column** (e.g., distance, time) and is excluded from numerical comparison. Data columns start at index 1.
+
+**Implication for Test Files:**
+- Single-column test files will have their only value skipped (column 0)
+- Test files must have at least 2 columns: `range_value data_value`
+- Example: `"100.5"` → column 0 skipped, no comparison happens
+- Correct: `"101.5 100.5"` → column 0 (101.5) skipped, column 1 (100.5) compared
+
+**Constructor Parameters:**
+```cpp
+FileComparator(
+    double user_thresh,           // User significance threshold
+    double hard_thresh,           // Critical threshold  
+    double table_thresh,          // Print threshold for table output
+    int verbosity_level = 0,      // Verbosity (0=quiet, 1=normal, 2=verbose)
+    int debug_level = 0,          // Debug level (0=none, 1-3=increasing)
+    bool significant_is_percent = false,  // Use percent mode
+    double significant_percent = 0.0      // Percent threshold (e.g., 0.01 = 1%)
+);
+```
+
+**Common Mistake:** Omitting `debug_level` causes `significant_is_percent` and `significant_percent` to be misinterpreted as positional arguments.
+
 ### LineParser
 
 **Purpose:** Parse individual lines, track precision
@@ -280,6 +305,59 @@ The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only p
 **Previously:** Modular structure with 11 separate section files in `docs/report/sections/`
 **Why changed:** Merged for self-contained paper suitable for distribution
 **Source:** Session 2026-01-13
+
+### Documentation Restructure
+**Current:** Three clean, purpose-specific documentation files:
+- `docs/DISCRIMINATION_HIERARCHY.md` — Standalone technical reference (no external dependencies)
+- `data/README.md` — Test case descriptions for data directory (NEW)
+- `data/notes.md` — Development history and algorithmic insights only
+
+**Previously:** 
+- DISCRIMINATION_HIERARCHY.md referenced notes.md extensively
+- notes.md mixed test descriptions, hierarchy definitions, and development notes
+- No README in data directory
+
+**Why changed:** Clean separation of concerns:
+- DISCRIMINATION_HIERARCHY.md now works as standalone technical reference
+- Test case info moved to data/README.md where it belongs
+- notes.md cleaned to contain only unique algorithmic/historical content
+
+**Backup files:** `DISCRIMINATION_HIERARCHY_OLD.md`, `notes_old.md` preserved
+**Source:** Session 2026-01-13
+
+### Range Data Detection for Column 0
+**Current:** Column 0 detected as range data bypasses TL-specific thresholds (110 dB marginal, 138.47 dB ignore)
+
+**Detection criteria:**
+1. Monotonically increasing values
+2. Fixed delta between consecutive values (±1% tolerance)
+3. Starting value < 100 (typical for range in meters/kilometers)
+4. Non-zero delta (excludes constant sequences)
+
+**Implementation:** `FileReader::is_first_column_fixed_delta()` and `is_first_column_monotonic()` in `src/cpp/src/file_reader.cpp`, wired through `FileComparator` to `DifferenceAnalyzer`
+
+**Rationale:** TL thresholds are meaningless for distance/range measurements. Automatically detecting range data prevents spurious threshold application.
+**Source:** Session 2026-01-13
+
+### Maximum Difference Display Enhancement
+**Current:** All testing scenarios print maximum difference underlined in purple, followed immediately by maximum percent error
+
+**Locations updated:**
+- `print_maximum_difference_analysis()` — raw differences
+- `print_rounded_summary()` — rounded differences
+- `print_maximum_significant_difference_details()` — significant differences
+- Special case for trivial-only scenario
+
+**Format:** `Maximum [type] difference: [value]` followed by `Maximum percent error: [percentage]%`
+**Source:** Session 2026-01-13
+
+### PercentThresholdTest Fix
+**Current:** Test files use two columns (range + data)
+**Previously:** Single-column test files (e.g., `write_file(f1, "100.5")`)
+**Why changed:** Column 0 is always skipped as range column, so single-column files had no comparison happening. Tests appeared to fail but were actually not executing any comparison logic.
+**Solution:** Add range column so data becomes column 1: `write_file(f1, "101.5 100.5")`
+**Also fixed:** Missing `debug_level` parameter in FileComparator constructor calls
+**Source:** Session 2025-11-20
 
 ---
 
