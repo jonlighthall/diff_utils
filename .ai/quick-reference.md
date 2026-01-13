@@ -36,8 +36,6 @@
 | [docs/implementation-summary.md](../../docs/implementation-summary.md) | Recent changes and fixes |
 | [docs/guide/diff-level-option.md](../../docs/guide/diff-level-option.md) | CLI option reference |
 
-**Note:** `docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex` is a legacy shell structure (not maintained). Use the MEMO for all paper work.
-
 ## Command Quick Reference
 
 ### Build

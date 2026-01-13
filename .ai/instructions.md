@@ -170,9 +170,9 @@ cd build && make test       # Runs C++ unit test suite
 
 ### Documentation Hierarchy
 - **Quick Start**: `README.md`, `docs/guide/diff-level-option.md`
-- **Theory**: `docs/guide/discrimination-hierarchy.md`, `docs/ERROR_ACCUMULATION_ANALYSIS.md`
+- **Theory**: `docs/guide/discrimination-hierarchy.md`, `docs/error-accumulation-analysis.md`
 - **Implementation**: `docs/implementation-summary.md`, `docs/guide/sub-lsb-detection.md`
-- **Technical Reports**: `docs/docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex`
+- **Paper**: `docs/report/UBAND_DIFF_MEMO.tex` (primary, complete)
 
 ## When to Ask for Clarification
 

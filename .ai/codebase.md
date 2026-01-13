@@ -60,13 +60,19 @@ diff_utils/
 │   ├── IMPLEMENTATION_SUMMARY.md     # Core fix documentation
 │   ├── DISCRIMINATION_HIERARCHY.md   # Six-level system
 │   ├── SUB_LSB_DETECTION.md          # Precision handling
-│   ├── DIFF_LEVEL_OPTION.md          # CLI option reference
-│   ├── ERROR_ACCUMULATION_ANALYSIS.md
-│   ├── TL_METRICS_IMPLEMENTATION.md
-│   ├── PI_PRECISION_TEST_SUITE.md
-│   ├── RAW_DIFF_FIX_SUMMARY.md
-│   ├── docs/report/UBAND_DIFF_TECHNICAL_REPORT.tex  # Formal documentation
-│   └── (other technical reports)
+│   ├── guide/                        # End-user markdown guides
+│   │   ├── diff-level-option.md
+│   │   ├── discrimination-hierarchy.md
+│   │   ├── pi-precision-test-suite.md
+│   │   ├── sub-lsb-detection.md
+│   │   └── tl-metrics-implementation.md
+│   ├── report/                       # LaTeX paper
+│   │   ├── UBAND_DIFF_MEMO.tex       # Primary paper (complete)
+│   │   ├── IMPLEMENTATION_SUMMARY.tex
+│   │   └── references.bib
+│   ├── future-work.md                # Research roadmap
+│   ├── error-accumulation-analysis.md
+│   └── (other notes)
 │
 ├── scripts/                          # Utility scripts
 │   ├── pi_gen_python.py              # Pi precision generator
