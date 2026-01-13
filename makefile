@@ -386,6 +386,48 @@ clean-tests:
 	@echo "Delegating clean-tests command to cpp subdirectory..."
 	@$(MAKE) clean-tests --no-print-directory -C src/cpp
 
+# =============================================================================
+# Pi Precision Test Suite
+# =============================================================================
+# Validation utilities for sub-LSB detection
+# Source files are in scripts/pi_gen/
+
+PI_GEN_DIR := scripts/pi_gen
+PI_GEN_BIN := $(BINDIR)/pi_gen
+
+.PHONY: pi_gen pi_gen_cpp pi_gen_fortran pi_gen_java pi_gen_python pi_gen_data
+
+pi_gen: pi_gen_cpp pi_gen_fortran pi_gen_java
+	@echo "Pi generators built successfully"
+
+pi_gen_cpp: | $(BINDIR)
+	@echo "Building C++ pi generator..."
+	$(CXX) -std=c++17 -o $(BINDIR)/pi_gen_cpp $(PI_GEN_DIR)/pi_gen_cpp.cpp
+
+pi_gen_fortran: | $(BINDIR)
+	@echo "Building Fortran pi generator..."
+	gfortran -o $(BINDIR)/pi_gen_fortran $(PI_GEN_DIR)/pi_gen_fortran.f90
+
+pi_gen_java: | $(BINDIR)
+	@echo "Building Java pi generator..."
+	@mkdir -p build/classes
+	javac -d build/classes $(PI_GEN_DIR)/pi_gen_java.java
+	@echo '#!/bin/bash' > $(BINDIR)/pi_gen_java
+	@echo 'java -cp "$$(dirname "$$0")/../classes" pi_gen_java "$$@"' >> $(BINDIR)/pi_gen_java
+	@chmod +x $(BINDIR)/pi_gen_java
+
+pi_gen_data: pi_gen
+	@echo "Generating pi precision test data..."
+	$(BINDIR)/pi_gen_cpp > data/pi_cpp_asc.txt
+	$(BINDIR)/pi_gen_cpp desc > data/pi_cpp_desc.txt
+	$(BINDIR)/pi_gen_fortran > data/pi_fortran_asc.txt
+	$(BINDIR)/pi_gen_fortran desc > data/pi_fortran_desc.txt
+	$(BINDIR)/pi_gen_java > data/pi_java_asc.txt
+	$(BINDIR)/pi_gen_java desc > data/pi_java_desc.txt
+	python3 $(PI_GEN_DIR)/pi_gen_python.py > data/pi_python_asc.txt
+	python3 $(PI_GEN_DIR)/pi_gen_python.py desc > data/pi_python_desc.txt
+	@echo "Pi test data generated in data/"
+
 # Note: test cleanup is handled by cpp/makefile
 clean: mostlyclean
 
@@ -396,14 +438,16 @@ clean: mostlyclean
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all       - build all executables (default)"
-	@echo "  clean     - remove all generated files"
-	@echo "  remake    - clean then build all"
-	@echo "  run       - build and run the first executable"
-	@echo "  test      - build and run all unit tests (requires libgtest-dev)"
-	@echo "  tests     - build unit tests only (requires libgtest-dev)"
+	@echo "  all         - build all executables (default)"
+	@echo "  clean       - remove all generated files"
+	@echo "  remake      - clean then build all"
+	@echo "  run         - build and run the first executable"
+	@echo "  test        - build and run all unit tests (requires libgtest-dev)"
+	@echo "  tests       - build unit tests only (requires libgtest-dev)"
 	@echo "  clean-tests - remove test files only"
-	@echo "  help      - show this help message"
+	@echo "  pi_gen      - build pi precision test generators (C++, Fortran, Java)"
+	@echo "  pi_gen_data - generate pi test data files in data/"
+	@echo "  help        - show this help message"
 
 # =============================================================================
 case1: diff
