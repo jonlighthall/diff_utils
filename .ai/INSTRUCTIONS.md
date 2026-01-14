@@ -216,6 +216,169 @@ When harvesting context from multiple chats or notes:
 
 ---
 
+## process_nspe_in_files.sh — Working with the Script
+
+### Quick Start
+
+```bash
+# Generate reference outputs
+./process_nspe_in_files.sh make /path/to/input/files
+
+# Copy outputs to reference directory
+./process_nspe_in_files.sh copy /path/to/input/files /path/to/reference
+
+# Run and compare
+./process_nspe_in_files.sh test /path/to/input/files /path/to/reference
+
+# Compare existing files (no execution)
+./process_nspe_in_files.sh diff /path/to/input/files /path/to/reference
+```
+
+### Common Options
+
+| Option | Effect |
+|--------|--------|
+| `--exe <path>` | Use custom executable (default: auto-detected from repo) |
+| `--pattern <glob>` | Process only files matching glob (multiple `--pattern` allowed) |
+| `--exclude <glob>` | Skip files matching glob (multiple `--exclude` allowed) |
+| `--skip-existing` | Skip files that already have reference outputs |
+| `--skip-newer` | Skip files newer than reference |
+| `--keep-bin` | Keep binary files (default: remove) |
+| `--dry-run` | Preview what would happen without modifying files |
+| `--debug` | Verbose output for troubleshooting |
+
+### Examples
+
+```bash
+# Process all .in files with 'tl' marker
+./process_nspe_in_files.sh test input/ reference/ --pattern '*.in'
+
+# Process specific subset, skip some files
+./process_nspe_in_files.sh test input/ reference/ \
+    --pattern 'case*.in' \
+    --exclude 'case_skip_*.in'
+
+# Keep binary files for debugging
+./process_nspe_in_files.sh make input/ --keep-bin
+
+# Dry run to see what would be processed
+./process_nspe_in_files.sh test input/ reference/ --dry-run
+
+# Debug a specific file
+./process_nspe_in_files.sh test input/single_file.in reference/ --debug
+```
+
+### Understanding the Output
+
+**Execution Results Section:**
+```
+Files that executed successfully: N
+Files that failed to execute: N
+Files that produced no output: N
+```
+
+**Diff Results Section (appears FIRST for emphasis):**
+```
+Diff Details:
+  Files that passed with tldiff or uband_diff (simple diff failed): N
+  Files that passed with uband_diff (tldiff failed): N
+  Files that failed all diff tools: N
+Passed files: N
+Failed files: N
+Skipped files: N
+```
+
+**Key insight:** A file in "Passed files" may have required tldiff or uband_diff instead of exact match. Check "Diff Details" to see which tool passed it.
+
+**Binary File Cleanup:**
+```
+Removing binary/extra files:
+  /path/to/for042.dat
+  /path/to/for003.dat
+  [etc.]
+```
+
+### Interpreting Results
+
+**Example 1: Perfect Match**
+```
+File: case1.in
+  [Pass listed in first section]
+  [Not listed in Diff Details]
+→ Exact match (all diff tools passed)
+```
+
+**Example 2: Sub-LSB Differences**
+```
+File: case2.in
+  [Pass listed in first section]
+  [Listed under "simple diff failed"]
+→ Passed tldiff/uband_diff because differences are sub-LSB (trivial)
+```
+
+**Example 3: Genuine Difference**
+```
+File: case3.in
+  [Failed listed in first section]
+  [Listed under "failed all diff tools"]
+→ All tools failed; differences are real
+```
+
+### Troubleshooting
+
+**Problem: "No input files found"**
+- Check directory contains `.in` files with required markers (tl, rtl, etc.)
+- Use `--pattern` to be explicit about which files to process
+- Check for columns 76–80 override: if present, script skips marker check
+
+**Problem: "Reference files not found" (in test mode)**
+- Ensure reference directory exists and contains `.tl`, `.rtl`, or `.ftl` files
+- Use `copy` mode first to generate references
+- Check filename format matches (script expects `basename.tl`, not `basename_tl`)
+
+**Problem: Binary files taking up space**
+- Default behavior: removes binary files (only keeps ASCII)
+- If binary files needed: use `--keep-bin` flag
+- Check `Removing binary/extra files:` section in output to confirm what's deleted
+
+**Problem: Script exits abruptly with "arithmetic error"**
+- This was fixed in Jan 2026 (changed `((count++))` to `count=$((count + 1))`)
+- Update to latest script version
+
+**Problem: Diff shows files as failed but should be identical**
+- Common cause: floating-point rounding across platforms
+- `uband_diff` applies sub-LSB detection; check "Diff Details" section
+- Run with `--debug` to see exact diff output
+
+**Problem: Files being skipped with --skip-existing**
+- `--skip-existing` skips if reference file exists
+- Use `--force` to override (if available) or re-generate references with `copy` mode
+
+### Script Maintenance
+
+**When modifying the script:**
+1. Test with sample input files before running on production data
+2. Use `--dry-run` first to preview changes
+3. Update `.ai/CONTEXT.md` if changing major behaviors
+4. Verify cleanup messages match actual file deletions
+5. Test all four modes (make, copy, test, diff)
+
+**Key invariants (do not break):**
+- `nspe.in` must be cleaned up after execution
+- All output files must be renamed before comparison
+- Binary file cleanup should only run if `--keep-bin` not set
+- Diff failure categorization must work for both passing and failing files
+- Empty files must NOT be reclassified as execution failures
+
+### Performance Notes
+
+- Script processes files sequentially (no parallelization)
+- Reference detection only checks file existence (fast)
+- Binary file detection uses `file` command (slightly slow, ~100ms per file)
+- Typical throughput: 10-50 files per minute depending on executable speed
+
+---
+
 ## Build & Test Procedures
 
 ### Building

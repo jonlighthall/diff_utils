@@ -408,6 +408,141 @@ Different languages/libraries may implement different rounding strategies when f
 
 ---
 
+## process_nspe_in_files.sh — NSPE Input Processing Script
+
+### Overview
+
+Bash script for batch processing NSPE input files: copies `.in` files to `nspe.in`, executes the NSPE executable, renames all output files, compares against references, and produces categorized diff results.
+
+**Location:** `/home/jlighthall/utils/diff_utils/process_nspe_in_files.sh` (1242+ lines)
+
+**Modes:**
+- `make` — Generate reference outputs (no comparison)
+- `copy` — Copy generated outputs to reference directory
+- `test` — Execute + compare against references
+- `diff` — Compare existing files without execution
+
+### Key Features (Jan 2026)
+
+**1. nspe.in Compatibility**
+- Copies input file to `nspe.in` (executables expect this default name)
+- Passes `nspe.in` as argument to executable: `(cd "$dir" && "$prog_path" nspe.in)`
+- Cleans up `nspe.in` after execution
+
+**2. Comprehensive Output File Renaming**
+- Main outputs: `nspe01.asc` → `basename_01.asc`, `nspe_01.asc` → `basename_01.asc`
+- Binary files: `nspe09.bin` → `basename_09.bin` (zero-padded)
+- Special files: `nspe.prs` → `basename.prs`, `nspe.pulse` → `basename.pulse`
+- Fortran unit files: `for[0-9][0-9][0-9].*` → `basename_##.ext`
+  - Special case: `for003.dat` → `basename.003` (not `_003.dat`)
+  - Leading zero handling: `for042.dat` → `basename_42.dat`, `for009.bin` → `basename_09.bin`
+- Extra files: `angles.asc` → `basename_angles.asc`, `ram.in` → `basename_ram.in` (copied, not moved)
+
+**3. Binary File Management**
+- Default: Only keeps ASCII files with corresponding `.tl` reference
+- Option: `--keep-bin` flag preserves binary files (for042.dat, for003.dat, for009.bin, for045.bin, etc.)
+- Detection: Uses `file` command with regex to identify ASCII vs binary
+- Cleanup: Lists files being removed, distinguishing binary from other temporary files
+
+**4. Diff Failure Categorization**
+- Tracks which diff tool failed for each file (hierarchical: diff → tldiff → uband_diff)
+- Files categorized even when passing (identifies "pass with advanced tool" vs "exact match")
+- Arrays:
+  - `simple_diff_fail_files` — Passed tldiff/uband_diff but failed diff
+  - `tldiff_fail_files` — Passed uband_diff but failed tldiff
+  - `uband_diff_fail_files` — Failed all diff tools
+- **Diff Details section appears FIRST in output** (before pass/fail lists) to emphasize tool hierarchy
+
+**5. Summary Output Structure**
+```
+Diff Results:
+=============
+Diff Details:
+  [Shows which tool failed for each file]
+Passed files: N
+Failed files: N
+Skipped files: N
+[Additional status sections]
+```
+
+### Implementation Details
+
+**Arithmetic Handling (set -e safe):**
+```bash
+count=$((count + 1))  # Safe with set -e
+# Avoid: ((count++)) which exits when count=0
+```
+
+**Exit Code Capture from Pipes (PIPESTATUS):**
+```bash
+"$prog_path" nspe.in | tee "$diff_output" > /dev/null
+diff_exit=${PIPESTATUS[0]}  # Capture pipe exit code, not tee's
+```
+
+**File Type Detection:**
+```bash
+if file "$file" | grep -qi "ASCII text"; then
+    # ASCII file — keep if has reference
+else
+    # Binary file — remove if --keep-bin not set
+fi
+```
+
+**Fortran Unit File Extraction:**
+```bash
+for unit_file in for[0-9][0-9][0-9].*; do
+    unit_num="${unit_file:3:3}"  # Extract 003, 042, 009, etc.
+    # Special handling for 003
+    # Leading zero removal: 042→42, 009→09
+done
+```
+
+### Empty Files and Missing Outputs
+
+**Empty File Handling:**
+- Empty files are NOT reclassified as execution failures
+- Tracked separately: `empty_output_files` array
+- Counted in output summary for visibility
+- Allows execution to succeed even if output is empty
+
+**Missing Output Handling (test mode):**
+- Files that produce no output are skipped (not failed)
+- Tracked: `missing_exec_output_files` array
+- Reported in summary
+
+### Performance Considerations
+
+**Optimizations:**
+- Binary file detection only runs if `--keep-bin` not set
+- Reference checking only for files with references
+- Cleanup skips files that don't exist
+- File operations ordered by size (largest first)
+
+### Dependencies
+
+- `lib_diff_utils.sh` — Provides `diff_files()` function (returns 0 if any diff tool succeeds)
+- `diff`, `tldiff`, `uband_diff` — Diff tools in hierarchy
+- Standard utilities: `find`, `grep`, `cp`, `rm`, `file`, `tee`
+
+### Known Limitations
+
+- `--keep-bin` is a boolean flag (no granular per-file control)
+- Reference detection based on file extension (`.tl`, `.rtl`, `.ftl`)
+- No support for custom diff tool chains
+- Cleanup list printed to stdout (can't be easily captured)
+
+### Testing Locations
+
+Current reference data:
+- `v6.1.2` — 8 files fail simple diff but pass with tldiff
+- `v6.2-b2` — Additional test suite
+
+### Source
+
+Session 2026-01-14 — Consolidated nspe.in processing, output renaming, binary file management, and diff failure categorization.
+
+---
+
 ## Scripting Utilities: Batch Processing Drivers
 
 ### Overview
