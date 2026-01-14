@@ -393,9 +393,26 @@ Different languages/libraries may implement different rounding strategies when f
 4. Document any discovered rounding behavior differences
 
 **Output Requirements:**
-- Files contain **only numbers** (no headers, no indices)
-- Console output can show metadata (filenames, counts, progress)
-- Clean format for `uband_diff` processing
+- Files contain line number + value (e.g., `1  3`, `2  3.1`)
+- Console output shows metadata (filenames, counts, progress)
+- Format compatible with `uband_diff` column parsing
+
+### Unit Test Integration (Added Jan 2026)
+
+**Test File:** `src/cpp/tests/test_cross_language_precision.cpp`
+
+**Tests:**
+- `PiCppVsFortranIdentical` — C++ vs Fortran pi output
+- `PiCppVsPythonIdentical` — C++ vs Python pi output
+- `PiCppVsJavaIdentical` — C++ vs Java pi output
+- `PiFortranVsPythonIdentical` — Fortran vs Python pi output
+- `AllLanguagesProduceIdenticalPi` — All 6 pairwise comparisons
+
+**Key Assertion:** All four languages produce IDENTICAL pi output. Any difference = 0 (not just "within tolerance").
+
+**Data Location:** `data/pi_<language>_asc.txt` (accessed via `../../data/` from test directory)
+
+**Regeneration:** `make pi_gen_data` to regenerate test files from source generators.
 
 **Historical Context:**
 - Original Fortran version used complex Machin's formula implementation
@@ -403,6 +420,7 @@ Different languages/libraries may implement different rounding strategies when f
 - Removed headers and index numbers from output at user request (Jan 2026)
 - Evolved from `.asc`/`.desc` suffixes to descriptive `.txt` naming (Jan 2026)
 - **Status Update (Jan 2026):** All four language implementations exist and are documented in `scripts/pi_gen/README.md`
+- **Unit Tests Added (Jan 2026):** 5 new tests validating cross-language equivalence
 
 **Source:** Session 2026-01-14
 

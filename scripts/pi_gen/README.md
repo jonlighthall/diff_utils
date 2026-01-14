@@ -1,15 +1,61 @@
 # Pi Precision Test Suite
 
 ## Overview
-This test suite validates `uband_diff`'s sub-LSB (Least Significant Bit) detection capability using π calculated at different precisions.
+This test suite validates `uband_diff`'s sub-LSB (Least Significant Bit) detection capability using π calculated at different precisions across multiple programming languages.
 
 ## Test Philosophy
 When comparing numerical values at different precisions, values that differ by less than half the LSB of the coarser precision should be considered equivalent. This is critical for:
 - Cross-platform validation (different systems may output different precisions)
+- Cross-language validation (different languages may use different rounding)
 - Scientific computing (comparing reference vs test data at varying precision)
 - Robustness against formatting differences
 
-## Program: `pi_precision_test.f90`
+## Multi-Language Generators
+
+Four implementations generate identical π output to validate cross-language robustness:
+
+| Language | File | Rounding Behavior |
+|----------|------|-------------------|
+| C++ | `pi_gen_cpp.cpp` | `std::fixed`, banker's rounding |
+| Fortran | `pi_gen_fortran.f90` | Machin's formula, format specifiers |
+| Python | `pi_gen_python.py` | f-strings, banker's rounding |
+| Java | `pi_gen_java.java` | DecimalFormat, half-up rounding |
+
+### Build & Generate Data
+```bash
+# Build all generators
+make pi_gen
+
+# Generate test data files in data/
+make pi_gen_data
+```
+
+### Output Files
+Generated in `data/`:
+- `pi_cpp_asc.txt`, `pi_cpp_desc.txt`
+- `pi_fortran_asc.txt`, `pi_fortran_desc.txt`
+- `pi_python_asc.txt`, `pi_python_desc.txt`
+- `pi_java_asc.txt`, `pi_java_desc.txt`
+
+## Unit Test Integration
+
+**Test file:** `src/cpp/tests/test_cross_language_precision.cpp`
+
+**Tests (5 total):**
+- `PiCppVsFortranIdentical` — C++ vs Fortran
+- `PiCppVsPythonIdentical` — C++ vs Python
+- `PiCppVsJavaIdentical` — C++ vs Java
+- `PiFortranVsPythonIdentical` — Fortran vs Python
+- `AllLanguagesProduceIdenticalPi` — All 6 pairwise comparisons
+
+**Run tests:**
+```bash
+make test
+```
+
+**Key assertion:** All four languages produce IDENTICAL output (zero differences, not just "within tolerance").
+
+## Program Details: `pi_gen_fortran.f90`
 
 ### What It Does
 1. Calculates π using Machin's formula: π/4 = 4·arctan(1/5) - arctan(1/239)

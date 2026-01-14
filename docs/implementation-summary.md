@@ -78,19 +78,34 @@ Created comprehensive test suite with 6 test cases:
 **Status:** ✅ All 43 tests pass (6 sub-LSB tests + 37 existing tests)
 
 ### 2. Pi Precision Test Suite
-Created Fortran program (`pi_precision_test.f90`) that:
-- Calculates π using Machin's formula
-- Outputs π with increasing precision (0dp to 14dp)
-- Validates that ANY two precision levels are considered equivalent
+Created multi-language π generators in `scripts/pi_gen/`:
+- **C++** (`pi_gen_cpp.cpp`) — `std::fixed`, banker's rounding
+- **Fortran** (`pi_gen_fortran.f90`) — Machin's formula
+- **Python** (`pi_gen_python.py`) — f-strings, banker's rounding
+- **Java** (`pi_gen_java.java`) — DecimalFormat
 
 **Test Results:**
 - ✅ Identical files recognized correctly
 - ✅ Cross-precision (3.1 vs 3.14) recognized as equivalent
-- ✅ Multiple cross-precision comparisons pass
+- ✅ Cross-language comparisons all pass (C++ vs Fortran vs Python vs Java)
 - ✅ High precision (17 decimal places) handled correctly
 
-### 3. Test Automation
-Created `test_pi_precision.sh` script for automated validation.
+### 3. Cross-Language Unit Tests (Added Jan 2026)
+**File:** `src/cpp/tests/test_cross_language_precision.cpp`
+
+5 new unit tests validating that all four languages produce **identical** π output:
+- `PiCppVsFortranIdentical`
+- `PiCppVsPythonIdentical`
+- `PiCppVsJavaIdentical`
+- `PiFortranVsPythonIdentical`
+- `AllLanguagesProduceIdenticalPi` (all 6 pairwise comparisons)
+
+**Status:** ✅ All 55 tests pass (5 cross-language + 6 sub-LSB + 44 other)
+
+### 4. Test Automation
+- `make pi_gen` — Build all π generators
+- `make pi_gen_data` — Generate test data files
+- `make test` — Run all unit tests
 
 ## Files Modified
 
@@ -109,24 +124,26 @@ Created `test_pi_precision.sh` script for automated validation.
    - 6 comprehensive test cases
    - Validates edge cases and floating-point handling
 
+4. **tests/test_cross_language_precision.cpp** (NEW, ~180 lines)
+   - 5 cross-language validation tests
+   - Validates C++, Fortran, Python, Java produce identical π output
+
 ### Documentation
-4. **docs/SUB_LSB_DETECTION.md** (NEW)
+5. **docs/SUB_LSB_DETECTION.md** (NEW)
    - Complete technical explanation
    - Information-theoretic justification
    - Mathematical formulation
 
-5. **docs/PI_PRECISION_TEST_SUITE.md** (NEW)
+6. **docs/PI_PRECISION_TEST_SUITE.md** (NEW)
    - π-based validation strategy
    - Test methodology and results
 
-### Test Programs
-6. **pi_precision_test.f90** (NEW, 126 lines)
-   - Fortran 90 program to calculate π
-   - Generates test files at varying precision
-
-7. **test_pi_precision.sh** (NEW)
-   - Automated test script
-   - Validates all cross-precision scenarios
+### Test Programs (scripts/pi_gen/)
+7. **pi_gen_cpp.cpp** — C++ π generator
+8. **pi_gen_fortran.f90** — Fortran π generator
+9. **pi_gen_python.py** — Python π generator
+10. **pi_gen_java.java** — Java π generator
+11. **run_all.sh** — Batch runner for all generators
 
 ## Mathematical Foundation
 
