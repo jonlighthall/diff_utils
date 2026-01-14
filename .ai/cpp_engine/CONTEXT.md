@@ -147,6 +147,29 @@ Key Tests:
 - Rounding to shared minimum precision works correctly
 - FP tolerance handles binary representation edge cases
 
+**Historical Context:**
+- Original bug: Checked `rounded_diff` instead of `raw_diff` against `big_zero`
+- Edge case discovered: `raw_diff = 0.05000000000000071054` vs `big_zero = 0.05000000000000000278`
+- Without FP_TOLERANCE: Would fail (raw_diff > big_zero by ~7e-16)
+- With FP_TOLERANCE: Correctly classified as equivalent (sub-LSB difference)
+
+**Implementation (src/difference_analyzer.cpp, lines 98-113):**
+```cpp
+constexpr double FP_TOLERANCE = 1e-12;
+bool sub_lsb_diff = (raw_diff < big_zero) ||
+                   (std::abs(raw_diff - big_zero) < FP_TOLERANCE * std::max(raw_diff, big_zero));
+bool trivial_after_rounding = (rounded_diff == 0.0 || sub_lsb_diff);
+```
+
+**Test Suite Status:** 43/43 tests passing (37 original + 6 sub-LSB boundary tests)
+
+**Pi Precision Validation:**
+- Automated test script: `scripts/pi_gen/test_pi_precision.sh`
+- Tests ascending vs descending π files (all cross-precision comparisons)
+- Validates sub-LSB detection across precision boundaries
+
+**Source:** Session 2025-10-27 (bug fix), Session 2026-01-14 (pi validation)
+
 ### Trivial Exclusion Tests (test_trivial_exclusion.cpp)
 
 Purpose: Ensure Level 2 filtering persists through pipeline
