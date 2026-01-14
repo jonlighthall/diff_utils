@@ -580,6 +580,14 @@ Two batch-processing drivers exist for running executables over collections of i
 - Default executable: `PROG=bin/ram1.5.x` (or `RAM_EXE` override)
 - Exit codes reflect success/failure state
 
+**Generalization (Session 2026-01-14):**
+- Documentation generalized from "NSPE executable" to "executable" for broader applicability
+- Function renamed: `detect_nspe_program()` → `detect_program()`
+- Executable detection now searches for both `executable.x/exe` and `nspe.x/exe` (backward compatible)
+- Environment variable `NSPE_EXE` preserved for backward compatibility (marked as legacy)
+- Comments and examples updated to use generic executable terminology
+- Makefile target detection updated to search for both "nspe" and "executable" patterns
+
 **Use case:** Comprehensive test workflows (generate outputs → create references → run + compare), with fine-grained filtering and detailed reporting.
 
 ### Feature Comparison
@@ -612,7 +620,32 @@ Two batch-processing drivers exist for running executables over collections of i
 - Output renaming that preserves exe-tag (prevents file collision when running multiple executables)
 - Quick dry-run previews
 
-**Future direction:** If exe-tag output renaming is needed in `process_ram_in_files.sh`, add a `--tag-outputs` flag or derive the tag from the `--exe` argument. For now, use `run_pf_ram_batch.sh` if exe-tag renaming is required.
+### `process_in_files.sh`
+
+**Purpose:** Sibling script to `process_ram_in_files.sh`, designed for a different executable workflow but with similar operational philosophy.
+
+**Key differences from `process_ram_in_files.sh`:**
+- Designed for processing `.in` files with different executable (originally NSPE, now generalized)
+- Requires files to contain specific strings (`tl`, `rtl`, or `hrfa/hfra/hari`) to be processed
+- Handles different output file types (`.tl`, `.rtl`, `.ftl`)
+- Different default executable detection (searches for `nspe.x/exe` patterns)
+
+**Generalization (Session 2026-01-14):**
+- All documentation references to "NSPE" changed to "executable" or "specified executable"
+- Function renamed: `detect_nspe_program()` → `detect_program()`
+- Executable detection searches for `executable.x/exe` and `nspe.x/exe` (backward compatible)
+- Usage examples updated to use generic executable names
+- Environment variable `NSPE_EXE` preserved for backward compatibility (marked as legacy)
+- Comments indicate legacy support for `nspe` pattern matching
+
+**Shared features with `process_ram_in_files.sh`:**
+- Four modes (make/copy/test/diff)
+- `--pattern`, `--exclude`, `--skip-existing`, `--skip-newer`, `--force`, `--dry-run`, `--debug`
+- `--exe` option to specify executable path
+- Colored output and detailed summaries
+- Sources `lib_diff_utils.sh`
+
+**Use case:** Same workflow philosophy as `process_ram_in_files.sh` but for different executable/file types.
 
 ---
 
@@ -720,3 +753,88 @@ Two batch-processing drivers exist for running executables over collections of i
 ---
 
 *Version history is tracked by git, not by timestamps in this file.*
+
+## 6-Level Hierarchy Implementation (January 2026 Session)
+
+### Current Status: DEBUGGING IN PROGRESS
+
+**Critical Discovery:** The DifferenceAnalyzer's hierarchy logic (`process_rounded_values` function implementing the 6-level hierarchy) is **not being called during tests**. The counting system that produces the test output is a **completely different code path** not yet identified.
+
+**Evidence:**
+- Added debug output to `DifferenceAnalyzer::process_difference` → never executed
+- Added debug output to `DifferenceAnalyzer::process_rounded_values` → never executed
+- Added debug output to `FileComparator::process_column` → never executed
+- Added debug output to `FileComparator::compare_files` → never executed
+- Yet the test still produces hierarchy counts (Critical: 2, Marginal: 4, Error: 4, etc.)
+
+**Implication:** There is a **legacy or parallel counting system** that is populating CountStats independent of the DifferenceAnalyzer hierarchy implementation.
+
+### What Was Implemented
+
+**6-Level Hierarchy Structure (LEVEL 1-5 verified correct):**
+1. **LEVEL 1:** zero vs non-zero (calculated from `elem_number` and `diff_non_zero`)
+2. **LEVEL 2:** trivial vs non-trivial (based on format precision `big_zero`)
+3. **LEVEL 3:** insignificant vs significant (based on ignore threshold ~138.47)
+4. **LEVEL 4:** marginal vs non-marginal (based on marginal threshold 110)
+5. **LEVEL 5:** critical vs non-critical (based on critical threshold argument)
+6. **LEVEL 6:** error vs non_error (based on user threshold argument 3)
+
+**Code Changes Made:**
+- Updated `CountStats` struct with `diff_error` and `diff_non_error` counters
+- Updated `Flags` struct with `has_error_diff` and `has_non_error_diff` flags
+- Implemented complete hierarchy logic in `DifferenceAnalyzer::process_rounded_values()`
+- Updated unit test `SixLevelHierarchyValidation` to validate all 6 levels
+- Added utility script `test_hierarchy.py` for mathematical verification of expected counts
+
+**Test Data Analysis (Python verification):**
+```
+Total differences: 9 (4 from line 1, 4 from line 2, 1 from line 4)
+Critical differences: 1 (only the 4.0 difference, which exceeds 2.0 threshold)
+Marginal differences: 4 (the 4 line-2 differences with values in [110, 138])
+Non-critical differences: 4 (the line-1 differences)
+Error differences (>0.2 user threshold): All 4 non-critical should be errors
+```
+
+**Test Expected Results:**
+- Total: 14 elements
+- Zero: 5, Non-zero: 9
+- Trivial: 0, Non-trivial: 9
+- Insignificant: 0, Significant: 9
+- Marginal: 4, Non-marginal: 5
+- Critical: **1** (not 2), Non-critical: 4 (not 3)
+- Error: 4, Non-error: 0
+
+**Test Currently Shows:**
+- Error: 4, Non-error: 0 ✓ (correct count but for wrong subset)
+- Critical: 2 (should be 1) ❌
+- Non-critical: 3 (should be 4) ❌
+
+### Next Steps Required
+
+1. **Find the actual counting system** that produces hierarchy counts in tests
+   - May be in `FileComparator`, `FileReader`, or a completely separate analysis module
+   - Could be legacy Fortran-based, could be cache/pre-computation system
+   - Should map all entry points to `CountStats` population
+
+2. **Determine if DifferenceAnalyzer is used at all**
+   - Debug output shows it's not being called via normal test paths
+   - May need to check if there's a different initialization or execution flow
+   - Verify which code path is actually responsible for the test output
+
+3. **Either:**
+   - Implement 6-level hierarchy in the actual counting system being used, OR
+   - Refactor to make DifferenceAnalyzer the authoritative source
+
+### Productivity Note
+
+This session involved extensive debugging that ultimately discovered the wrong code path was being modified. **Future work should:**
+- **Map all code paths that populate `CountStats` counters before implementing logic**
+- Use comprehensive trace logging to verify execution paths
+- Document which counting system is authoritative (likely NOT DifferenceAnalyzer based on evidence)
+- Avoid implementing in DifferenceAnalyzer until it can be verified that DifferenceAnalyzer is actually called during comparison
+
+**Lessons:**
+- Debug file creation (`/tmp/debug_*.txt`) is effective for verifying code path execution
+- Don't assume a subsystem is used just because it exists in the architecture
+- Early comprehensive path mapping saves extensive debugging time
+

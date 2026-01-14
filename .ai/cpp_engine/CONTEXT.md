@@ -43,6 +43,8 @@ Responsibilities:
 - Detect decimal places per column
 - Parse numeric values
 - Validate format before processing
+- Error handling for file access failures
+- Summary output generation
 
 Critical Behavior: Column 0 is Always Skipped
 - Column index 0 is unconditionally treated as the range column (e.g., distance, time) and is excluded from numerical comparison. Data columns start at index 1.
@@ -128,6 +130,38 @@ Why it matters: This distinction affects interpretation of all subsequent phase-
 
 ## Test Categories
 
+### Output Message Quality Tests
+
+**Purpose:** Ensure summary output messages are accurate and non-misleading
+
+**Key Tests & Fixes (Session 2026-01-14):**
+
+1. **Print Threshold Confusion (Fixed)**
+   - **Problem:** When significant differences existed but all were below print threshold, output showed "Files are identical within print threshold" in green, which was misleading
+   - **Example:** 1211 significant differences (20.18%) but message said "identical"
+   - **Solution:**
+     - Removed misleading "identical" message when significant differences exist
+     - Added warning: "All significant differences are below the print threshold" (yellow)
+     - Only show "identical within print threshold" when truly no significant differences
+   - **Location:** `src/file_comparator.cpp`, `print_additional_diff_info()`
+
+2. **File Access Error Handling (Fixed)**
+   - **Problem:** When input files couldn't be opened, program still printed:
+     - Misleading SETTINGS section (thresholds irrelevant if no comparison happened)
+     - Misleading STATISTICS section (0 lines compared)
+     - **Dangerous:** "Files are identical" in green when files didn't exist
+   - **Solution:**
+     - Check `flag.error_found` early in summary output
+     - Skip SETTINGS and STATISTICS when file access fails
+     - Print clear error message: "Cannot perform comparison due to file access errors" (red)
+     - No misleading "identical" claim
+   - **Location:** `src/file_comparator.cpp`, `print_summary()` and `print_diff_like_summary()`
+   - **Rationale:** Prevents dangerous misinterpretation where missing files appear to pass validation
+
+**Test Status:** Manual testing confirms correct behavior
+
+**Source:** Session 2026-01-14 (output quality improvements)
+
 ### Semantic Invariant Tests (test_semantic_invariants.cpp)
 
 Purpose: Verify zero-threshold contracts and domain rules
@@ -178,6 +212,78 @@ Key Tests:
 - Trivial differences never counted as significant
 - Trivial differences never counted as insignificant
 - Total = trivial + nontrivial
+
+---
+
+## Recent Work (Session 2026-01-14: 6-Level Hierarchy Implementation)
+
+### Problem Context
+User implementing and validating 6-level difference classification hierarchy:
+- Level 0: zero vs non-zero
+- Level 1: non-zero = trivial + non_trivial
+- Level 2: non_trivial = insignificant + significant
+- Level 3: significant = marginal + non_marginal
+- Level 4: non_marginal = critical + non_critical
+- Level 5: non_critical = error + non_error
+
+### Fixes Completed
+
+**1. Trivial Difference Counting (Fixed)**
+- **Problem:** diff_trivial always 0; raw differences that rounded to zero weren't being counted
+- **Solution:** Modified process_rounded_values() to compute raw_diff, lsb, big_zero; check if raw_non_zero && trivial_after_rounding → increment diff_trivial
+- **Location:** difference_analyzer.cpp
+- **Result:** Verified with example data: diff_trivial=9, diff_non_trivial=39, diff_non_zero=48 (identity holds)
+
+**2. Critical Differences Causing Premature Abort (Fixed)**
+- **Problem:** Critical differences triggered early return, truncating table and preventing full processing
+- **Solution:** Changed process_difference to always return true; added flag.has_critical_diff guard in print_table to suppress printing but continue processing
+- **Location:** file_comparator.cpp, difference_analyzer.cpp
+
+**3. Summary Suppressed When Errors Found (Fixed)**
+- **Problem:** print_summary had early return when error_found=true, hiding counter consistency checks
+- **Solution:** Removed "if (flag.error_found) return;" early exit
+- **Location:** file_comparator.cpp
+
+**4. FileReader Debug Print Access (Fixed)**
+- **Problem:** FileReader::compare_column_structures couldn't access print.debug2 (incomplete type error)
+- **Solution:**
+  - Added PrintLevel& parameter to compare_column_structures
+  - Forward-declared PrintLevel in file_reader.h
+  - Included uband_diff.h in file_reader.cpp for full definition
+  - Gated all std::cout on if(print_level.debug2)
+  - Added backward-compatible overload creating silent PrintLevel{0,false,false,false,false}
+- **Location:** file_reader.h, file_reader.cpp
+
+**5. Hierarchy Invariant Validation (Added)**
+- **Solution:** Added print_consistency_checks() function validating all 17 level sum identities
+- **Location:** file_comparator.cpp
+- **Output:** CONSISTENCY CHECKS section in summary showing all level equations
+
+### Open Issues
+
+**CompareDifferentFilesWithinTolerance Test Failing**
+- **Test:** Creates "1.000 2.000" vs "1.001 2.001", expects no significant diff with user_thresh=0.05
+- **Symptom:** has_significant_diff=true when expected false
+- **Hypothesis:** FormatTracker::calculate_threshold may return dp_threshold (0.001 for 3 decimal places) instead of user_thresh (0.05)
+- **Status:** Needs diagnostic logging to verify threshold calculation
+- **Location:** test_file_comparator.cpp lines 110-140
+
+### Recommended Additional Tests
+
+User asked "are there any additional unit tests to add for checking the file hierarchy?"
+
+**Priority Tests to Implement:**
+1. OnlyTrivialDifferences - verify raw non-zero that rounds to zero counted correctly
+2. NonTrivialButInsignificant - both_above_ignore || !exceeds_significance cases
+3. NonMarginalNonCriticalSplit_ErrorAndNonError - Level 6 partition
+4. CriticalDifferenceCounts - only count if both values <= ignore threshold
+5. MixedComprehensiveCase - all levels present in single test
+6. Column structure tests - SingleHeaderThenDataGroups, StructureMismatchBetweenFiles
+7. Hierarchy invariants in ALL tests - validateCounterInvariants() helper asserting all 17 identities
+
+**Test Suite Helper:**
+- Existing: validateCounterInvariants() in FileComparatorSummationTest checks 10 invariants
+- Needed: Expand to all 17 level sum identities, apply to all tests
 
 ## Links
 - Project-wide context: ../../CONTEXT.md

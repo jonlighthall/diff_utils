@@ -94,6 +94,43 @@ if (user_significant > 0.0) {
 
 ---
 
+## Code Path Debugging (January 2026)
+
+### Critical: Map Execution Paths Before Implementing Logic
+
+When implementing features (especially hierarchy counters), **verify the code path is actually executed** before investing in implementation. Multiple counting systems may exist; don't assume a subsystem is used just because it exists in the architecture.
+
+**Effective debug technique:**
+```cpp
+std::ofstream debug_file("/tmp/debug_<function>.txt", std::ios::app);
+debug_file << "Function called: v1=" << value1 << " v2=" << value2 << std::endl;
+debug_file.close();
+```
+
+**Advantages:**
+- Survives process termination and output redirection
+- Proves function execution without interfering with stdout/stderr
+- Leaves audit trail for verification
+
+**Verification process:**
+1. Add file-based debug to the function you're testing
+2. Run test or comparison
+3. Check for file creation: `ls /tmp/debug_<function>.txt`
+4. If file exists: path confirmed, proceed with implementation
+5. If file doesn't exist: function is NOT called; find the actual path being used
+
+### Known Architecture Issues
+
+**DifferenceAnalyzer status:** Currently not verified to be called during test comparisons. The `process_rounded_values()` function containing the 6-level hierarchy logic may not be executed during tests; actual counting may happen in a different code path (FileComparator, FileReader, or legacy system).
+
+**Before implementing in DifferenceAnalyzer:**
+- Trace the full path: `FileComparator::compare_files()` → `process_line()` → `process_column()` → `process_difference()` → `DifferenceAnalyzer::process_difference()` → `DifferenceAnalyzer::process_rounded_values()`
+- Verify each step with debug file output
+- If any step fails to execute, the hierarchy logic won't run
+- Document which path is actually responsible for populating `CountStats` counters
+
+---
+
 ## Links
 - Project-wide context: ../../CONTEXT.md
 - Project-wide instructions: ../../INSTRUCTIONS.md
