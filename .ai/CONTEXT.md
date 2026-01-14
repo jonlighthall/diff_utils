@@ -185,7 +185,7 @@ sudo apt-get install libgtest-dev
 
 **Makefile Behavior (Conditional Compilation):**
 - **If gtest available:** Tests are compiled and `make test` runs all tests
-- **If gtest NOT available:** 
+- **If gtest NOT available:**
   - `make all` succeeds (builds only non-test targets)
   - `make test` fails with clear error message and installation instructions
   - `make tests` shows warning but doesn't fail the build
@@ -200,11 +200,11 @@ GTEST_AVAILABLE := $(shell echo '\#include <gtest/gtest.h>' | $(CXX) -x c++ -E -
 1. **Catch2** — Header-only (no installation required), very similar syntax
    - Pro: Can be bundled with project, no system dependency
    - Con: Would require converting ~1,400 lines of existing tests
-   
+
 2. **Bundled Google Test** — Include gtest source in repository
    - Pro: Works everywhere (no sudo required), keeps existing tests
    - Con: Adds ~5MB to repository, needs makefile modifications to build from source
-   
+
 3. **Boost.Test** — Part of Boost library
 4. **doctest** — Lightweight, similar to Catch2
 5. **Custom framework** — Simple but limited
@@ -298,6 +298,34 @@ GTEST_AVAILABLE := $(shell echo '\#include <gtest/gtest.h>' | $(CXX) -x c++ -E -
 - `print_maximum_difference_analysis()` — raw differences
 - `print_rounded_summary()` — rounded differences
 - `print_maximum_significant_difference_details()` — significant differences
+
+### Output File Naming Convention (Jan 2026)
+
+**Current:** Pi precision test generators output files with descriptive .txt names:
+- Pattern: `<base>-<program>-<order>.txt`
+- Example: `pi_output-pi-precision-test-ascending.txt`, `nspe01-pi-precision-test-descending.txt`
+
+**What changed:**
+- Old naming (`.asc` / `.desc` suffixes) replaced with descriptive `.txt` filenames
+- Generators updated: C++ (`pi_precision_test.cpp`), Python (`pi_precision_test.py`), Fortran (`pi_precision_test.f90`), Java (`PiPrecisionTest.java`)
+- All four languages now produce identical naming scheme
+- Output .txt files created to preserve legacy .asc/.desc content; old files deleted
+- Example docs updated: `example_data/notes.md`, `example_data/plot_bbpp_freq.m`
+
+**Program Name Unification (Hyphenated Wrappers):**
+- Added wrapper scripts in `bin/` using hyphenated names: `uband-diff`, `pi-precision-test`, `pi-comparison`
+- Wrappers exec the original underscore binaries (non-destructive; originals unchanged)
+- Wrappers require `chmod +x` locally (use `bin/uband-diff` or `./bin/pi-precision-test`)
+
+**Remaining Legacy References:**
+- `process_nspe_in_files.sh` still references `.asc` in code (lines 448–450, 555–562, 622–625, 682–683)
+- `prsdiff.f90` and `tldiff_refactored.f90` hardcode `nspe02.asc`
+- These are safe to leave (legacy code for backward compatibility with existing workflows)
+- New workflows can emit descriptive .txt names directly from generators
+
+**Rationale:** Descriptive filenames make it obvious which tool generated the file and in what order (ascending vs descending precision). Hyphenated wrappers unify bin naming without destructive renames.
+
+**Source:** Session 2026-01-14
 - Special case for trivial-only scenario
 
 **Format:** `Maximum [type] difference: [value]` followed by `Maximum percent error: [percentage]%`

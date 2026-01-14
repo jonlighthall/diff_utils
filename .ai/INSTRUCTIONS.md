@@ -124,6 +124,35 @@ See engine conventions in [cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.m
 - Add a concise, user-facing summary to the root `README.md` when a change materially affects usage or behavior (3–8 lines) and link to the detailed doc.
 - Avoid duplicating full technical content in the root `README.md`; prefer a short summary + link.
 
+### Program Name Conventions
+
+**Hyphenated Names in bin/:**
+Programs in `bin/` are callable via hyphenated names (wrappers):
+- `./bin/uband-diff` → runs `./bin/uband_diff`
+- `./bin/pi-precision-test` → runs `./bin/pi_precision_test`
+- `./bin/pi-comparison` → runs `./bin/pi_comparison`
+
+Wrappers are lightweight bash scripts. They require executable permission:
+```bash
+chmod +x bin/uband-diff bin/pi-precision-test bin/pi-comparison
+```
+
+Use in scripts and documentation; they're more discoverable than underscored names.
+
+### Output File Naming Convention
+
+**Pi Precision Test Generators:**
+All generators (C++, Python, Fortran, Java) emit descriptive output filenames:
+```
+<base>-<program>-<order>.txt
+```
+
+Example outputs:
+- `pi_output-pi-precision-test-ascending.txt` (1–15 decimal places)
+- `pi_output-pi-precision-test-descending.txt` (15–1 decimal places)
+
+**Why:** Immediately visible which tool created the file and the precision order (ascending vs descending). Enables cross-precision validation tests.
+
 ### Scripting Best Practices
 
 For batch processing drivers (`process_ram_in_files.sh`, `process_nspe_in_files.sh`):
@@ -134,7 +163,7 @@ For batch processing drivers (`process_ram_in_files.sh`, `process_nspe_in_files.
 - This provides visibility into why files are accepted or skipped
 
 **File Filtering:**
-- When implementing override logic (e.g., columns 76–80), print the decision 
+- When implementing override logic (e.g., columns 76–80), print the decision
 - Include relevant column/marker values in output
 - Default to requiring markers unless explicitly overridden (fail-safe approach)
 
