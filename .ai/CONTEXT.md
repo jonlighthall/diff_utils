@@ -4,6 +4,24 @@
 
 ---
 
+## Topics
+
+- C++ Engine: [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md) and [cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.md)
+
+## Table of Contents
+
+- [Author](#author)
+- [Project Overview](#project-overview)
+- [Directory Structure](#directory-structure)
+- [Key Components](#key-components)
+- [Data Flow](#data-flow)
+- [Key Decisions](#key-decisions)
+- [Critical Paradigm Question (PENDING)](#critical-paradigm-question-pending)
+- [Test Categories](#test-categories)
+- [Testing Infrastructure](#testing-infrastructure)
+- [Superseded Decisions](#superseded-decisions)
+- [Scripting Utilities: Batch Processing Drivers](#scripting-utilities-batch-processing-drivers)
+
 ## Author
 
 **Name:** J. Lighthall
@@ -107,69 +125,7 @@ diff_utils/
 ---
 
 ## Key Components
-
-### DifferenceAnalyzer
-
-**Purpose:** Core numeric comparison logic
-
-**Key Responsibilities:**
-- Classify differences across 6 levels
-- Apply sub-LSB detection with floating-point tolerance
-- Enforce immutable Level 2 filtering (trivial differences)
-- Maintain semantic invariants (especially zero-threshold behavior)
-- Track marginal, critical, error counts
-
-**Critical Fields:**
-```cpp
-const double FP_TOLERANCE = 1e-12;
-const double MARGINAL_TL = 110.0;
-const double IGNORE_TL = 138.47;
-int max_decimal_places = 17;
-```
-
-### FileComparator
-
-**Purpose:** File I/O and validation
-
-**Responsibilities:**
-- Check column count consistency
-- Detect decimal places per column
-- Parse numeric values
-- Validate format before processing
-
-**Critical Behavior: Column 0 is Always Skipped**
-
-Column index 0 is unconditionally treated as the **range column** (e.g., distance, time) and is excluded from numerical comparison. Data columns start at index 1.
-
-**Implication for Test Files:**
-- Single-column test files will have their only value skipped (column 0)
-- Test files must have at least 2 columns: `range_value data_value`
-- Example: `"100.5"` → column 0 skipped, no comparison happens
-- Correct: `"101.5 100.5"` → column 0 (101.5) skipped, column 1 (100.5) compared
-
-**Constructor Parameters:**
-```cpp
-FileComparator(
-    double user_thresh,           // User significance threshold
-    double hard_thresh,           // Critical threshold
-    double table_thresh,          // Print threshold for table output
-    int verbosity_level = 0,      // Verbosity (0=quiet, 1=normal, 2=verbose)
-    int debug_level = 0,          // Debug level (0=none, 1-3=increasing)
-    bool significant_is_percent = false,  // Use percent mode
-    double significant_percent = 0.0      // Percent threshold (e.g., 0.01 = 1%)
-);
-```
-
-**Common Mistake:** Omitting `debug_level` causes `significant_is_percent` and `significant_percent` to be misinterpreted as positional arguments.
-
-### LineParser
-
-**Purpose:** Parse individual lines, track precision
-
-**Responsibilities:**
-- Extract numbers from lines
-- Track decimal places per value
-- Compute shared minimum precision
+Engine details moved to topic file: see [.ai/cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md).
 
 ### ErrorAccumulationAnalyzer (Experimental)
 
@@ -187,102 +143,79 @@ See `docs/future-work.md` for research roadmap.
 ---
 
 ## Data Flow
-
-```
-Input File
-    ↓
-FileComparator::validate()
-    ├─ Check column count consistency
-    ├─ Detect decimal places per column
-    └─ Parse numeric values
-    ↓
-LineParser::analyze_line()
-    ├─ Extract numbers
-    ├─ Track precision (decimal places)
-    └─ Compute shared minimum precision
-    ↓
-DifferenceAnalyzer::classify_difference()
-    ├─ Level 1: Check if raw_diff != 0
-    ├─ Level 2: Sub-LSB detection (with FP tolerance)
-    ├─ Level 3: Significance threshold
-    ├─ Level 4: Marginal band (110 dB TL)
-    ├─ Level 5: Critical threshold check
-    └─ Level 6: Error classification
-    ↓
-Output
-    ├─ Difference table
-    ├─ Summary report
-    └─ Consistency checks (invariants)
-```
+See engine data flow in topic file: [.ai/cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md).
 
 ---
 
 ## Key Decisions
-
-### Level 2 Filtering is Immutable
-
-Differences classified as trivial at Level 2 are **permanently excluded** from later semantic buckets. This is intentional—formatting artifacts cannot be reintroduced by threshold tuning.
-
-**Rationale:** Prevents the "zero-threshold paradox" where asking for maximum sensitivity could accidentally promote formatting differences to significant.
-
-### FP_TOLERANCE = 1e-12
-
-Chosen to be well below double-precision epsilon (~2.2e-16) while allowing for accumulated floating-point error in calculations.
-
-### Maximum Decimal Places = 17
-
-Increased from 15 to fully support double-precision representation. Beyond 17 digits, all precision is noise.
-
-### Fabre's Method is Authoritative
-
-The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only peer-reviewed quantitative comparison method. This tool *enables* that method by pre-filtering formatting artifacts.
-
-**Citation:** Fabre & Zingarelli, "A synthesis of transmission loss comparison methods," IEEE OCEANS 2009, doi:10.23919/OCEANS.2009.5422312
+Engine decisions moved to: [.ai/cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md).
 
 ---
 
 ## Critical Paradigm Question (PENDING)
-
-**Fabre's Method Optimization Paradigm:** Requires careful reading of Fabre et al. to determine:
-
-1. **Tactical Equivalence:** Curves sufficiently similar for operational decision-making
-2. **Theoretical/Computational Equivalence:** Curves match at numerical/phase error analysis level
-
-**Observations from Fabre Figures 2–6:** Curves with similar gross structure but apparent range-offset differences (possible accumulated phase error). Whether these score high or low in Fabre's method determines the paradigm.
-
-**Why it matters:** This distinction affects interpretation of all subsequent phase-error and horizontal-stretch comparison work. See `docs/future-work.md` for investigation plan.
+Moved to topic: [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md)
 
 ---
 
 ## Test Categories
+Moved to topic: [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md)
 
-### Semantic Invariant Tests (`test_semantic_invariants.cpp`)
+---
 
-**Purpose:** Verify zero-threshold contracts and domain rules
+## Testing Infrastructure
 
-**Key Tests:**
-- Zero-threshold mode enables maximum sensitivity
-- Trivial filtering is immutable (Level 2 cannot be revisited)
-- Ignore TL region filters correctly
-- Non-trivial count = significant + insignificant (in normal mode)
+### Unit Testing Framework: Google Test
 
-### Sub-LSB Boundary Tests (`test_sub_lsb_boundary.cpp`)
+**Framework:** Google Test (gtest) — industry standard for C++ unit testing
 
-**Purpose:** Edge cases in floating-point precision
+**Current Status:** ~1,400 lines of unit tests across 7 test files
 
-**Key Tests:**
-- `30.8` vs `30.85` classified as TRIVIAL (not SIGNIFICANT)
-- Rounding to shared minimum precision works correctly
-- FP tolerance handles binary representation edge cases
+**Why Google Test:**
+- Industry standard — nearly universal in C++ projects
+- Well-documented with extensive examples
+- Feature-rich: assertions, fixtures, parameterized tests, death tests
+- Active development and maintenance by Google
+- Cross-platform (Linux, Windows, macOS)
+- Good IDE support
 
-### Trivial Exclusion Tests (`test_trivial_exclusion.cpp`)
+**Installation Requirement:**
+```bash
+sudo apt-get install libgtest-dev
+```
 
-**Purpose:** Ensure Level 2 filtering persists through pipeline
+**Makefile Behavior (Conditional Compilation):**
+- **If gtest available:** Tests are compiled and `make test` runs all tests
+- **If gtest NOT available:** 
+  - `make all` succeeds (builds only non-test targets)
+  - `make test` fails with clear error message and installation instructions
+  - `make tests` shows warning but doesn't fail the build
 
-**Key Tests:**
-- Trivial differences never counted as significant
-- Trivial differences never counted as insignificant
-- Total = trivial + nontrivial
+**Detection:** The makefile automatically detects gtest availability at build time:
+```makefile
+GTEST_AVAILABLE := $(shell echo '\#include <gtest/gtest.h>' | $(CXX) -x c++ -E - > /dev/null 2>&1 && echo yes || echo no)
+```
+
+**Alternative Frameworks (Not Currently Used):**
+
+1. **Catch2** — Header-only (no installation required), very similar syntax
+   - Pro: Can be bundled with project, no system dependency
+   - Con: Would require converting ~1,400 lines of existing tests
+   
+2. **Bundled Google Test** — Include gtest source in repository
+   - Pro: Works everywhere (no sudo required), keeps existing tests
+   - Con: Adds ~5MB to repository, needs makefile modifications to build from source
+   
+3. **Boost.Test** — Part of Boost library
+4. **doctest** — Lightweight, similar to Catch2
+5. **Custom framework** — Simple but limited
+
+**Decision Rationale:** Keeping Google Test with conditional compilation provides:
+- Industry-standard testing framework
+- No code changes required (keep existing 1,400 lines of tests)
+- Graceful degradation on systems without gtest
+- Clear error messages guide users on how to install
+
+**Future Options:** If cross-platform portability without installation becomes critical, consider bundling gtest source or switching to Catch2 (header-only).
 
 ---
 
@@ -334,9 +267,28 @@ The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only p
 3. Starting value < 100 (typical for range in meters/kilometers)
 4. Non-zero delta (excludes constant sequences)
 
-**Implementation:** `FileReader::is_first_column_fixed_delta()` and `is_first_column_monotonic()` in `src/cpp/src/file_reader.cpp`, wired through `FileComparator` to `DifferenceAnalyzer`
+**Implementation details:** See engine topic: [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md)
 
 **Rationale:** TL thresholds are meaningless for distance/range measurements. Automatically detecting range data prevents spurious threshold application.
+**Source:** Session 2026-01-13
+
+### Columns 76–80 Override Mechanism (process_nspe_in_files.sh)
+
+**Current:** process_nspe_in_files.sh (Jan 2026) supports optional override of required-marker checks by examining columns 76–80 of the first line.
+
+**Previously:** Always required one of: tl, rtl, hrfa, hfra, hari in the file's first few lines.
+
+**Why changed:** Some workflows may use column 76–80 as a metadata/label field (e.g., case ID). When blank, the file should be processable without content markers. When non-blank, assume it's metadata and enforce normal marker checks.
+
+**Behavior:**
+- Columns 76–80 blank → Skip marker checks, proceed with processing
+- Columns 76–80 contain text → Apply normal marker checks (require tl/rtl/etc.)
+- Prints message for each file indicating which case applied
+
+**Implementation:** Checks `${first_line:75:5}` (bash substring extraction, 0-based). If empty after trimming whitespace, overrides marker checks. Otherwise applies normal checks.
+
+**Rationale:** Enables flexibility for files using fixed-column metadata while maintaining safety checks for unmarked files. Provides visibility into decision logic via printed messages.
+
 **Source:** Session 2026-01-13
 
 ### Maximum Difference Display Enhancement
@@ -364,6 +316,147 @@ The IEEE weighted TL difference algorithm from Fabre et al. (2009) is the only p
 **Previously:** Detailed implementation notes were only in `docs/IMPLEMENTATION_SUMMARY.md` and `docs/SUB_LSB_DETECTION.md` without a high-visibility summary in the root README.
 **Why changed:** Provide user-facing visibility in the root README while keeping long-form technical details in `docs/` to avoid clutter.
 **Source:** Session 2025-10-27
+
+---
+
+## Scripting Utilities: Batch Processing Drivers
+
+### Overview
+
+Two batch-processing drivers exist for running executables over collections of input files. They have similar goals but different design philosophies and feature sets.
+
+### `run_pf_ram_batch.sh` (Simpler, Focused)
+
+**Purpose:** Simple batch runner for invoking a single executable (pf_ram) across input files with automatic output renaming/relocation.
+
+**Key features:**
+- `--dry-run`, `--force`, `--rebuild`, `--skip-existing`, `--exe`, `--pattern`, `--max-depth`, `--input-dir`, `--debug`
+- Derives `exe_tag` from executable basename (e.g., `pf_ram.exe` → `pf_ram`)
+- **Exe-tagged output renaming**: renames produced files to `<inputbase>_<exe_tag>_<originalname>` (e.g., `case1_pf_ram_tl.line`)
+- Per-run stdout/stderr capture with exe-tag in filename
+- Moves renamed outputs into the input file's directory
+- Default executable: `PF_RAM_EXE=./bin/pf_ram.exe`
+- Expects outputs: `tl.grid`, `tl.line`, `p.vert`
+
+**Use case:** Quick, repeatable batch runs of a single executable; output naming avoids collisions when running multiple executable versions.
+
+### `process_ram_in_files.sh` (Complex, Feature-Rich)
+
+**Purpose:** Advanced driver supporting multiple operational modes (make, copy, test, diff) with rich filtering, skip logic, and reporting.
+
+**Key features:**
+- **Four modes**: `make` (execute only), `copy` (copy outputs to reference), `test` (execute + compare), `diff` (compare existing files)
+- Multiple `--pattern` and `--exclude` glob filters with ordered application
+- `--skip-existing`, `--skip-newer`, `--force` with fine-grained control
+- Project root auto-detection (searches for `bin/` directory)
+- Ordered input file collection (sorted by size)
+- Colored console output with detailed categorized summaries
+- Structured logging with support for multiple output file types (`.line`, `.grid`, `.vert`, `.check`)
+- Sources `lib_diff_utils.sh` for shared utilities
+- Default executable: `PROG=bin/ram1.5.x` (or `RAM_EXE` override)
+- Exit codes reflect success/failure state
+
+**Use case:** Comprehensive test workflows (generate outputs → create references → run + compare), with fine-grained filtering and detailed reporting.
+
+### Feature Comparison
+
+| Feature | `run_pf_ram_batch.sh` | `process_ram_in_files.sh` |
+|---------|----------------------|--------------------------|
+| Modes (make/copy/test/diff) | No (execute only) | Yes |
+| Multiple `--pattern` filters | No (single `--pattern`) | Yes (`--pattern` × N) |
+| `--exclude` filtering | No | Yes |
+| `--max-depth` for recursive depth | Yes | No (uses directory arg only) |
+| Exe-tag output renaming | Yes (default) | No (fixed names) |
+| Per-run stdout/stderr capture | Yes (with exe-tag) | Yes (via `LOG_FILE`) |
+| Skip-newer logic | No | Yes |
+| Colored summary output | No | Yes |
+| Project root detection | No | Yes |
+| `--rebuild` flag | Yes (explicit) | No (tries build if missing) |
+| Source library dependencies | No | Yes (`lib_diff_utils.sh`) |
+| File ordering | No | Yes (sorted by size) |
+| Detailed categorized reporting | No | Yes (exec/diff/copy/file status) |
+
+### Recommendation
+
+**`process_ram_in_files.sh` is the canonical modern driver** for multi-stage test workflows and validation. Use it for:
+- Reference generation + testing
+- Filtered batch runs with precise control
+- Comprehensive reporting and audit trails
+
+**`run_pf_ram_batch.sh` remains useful for:**
+- Simple one-off batch execution
+- Output renaming that preserves exe-tag (prevents file collision when running multiple executables)
+- Quick dry-run previews
+
+**Future direction:** If exe-tag output renaming is needed in `process_ram_in_files.sh`, add a `--tag-outputs` flag or derive the tag from the `--exe` argument. For now, use `run_pf_ram_batch.sh` if exe-tag renaming is required.
+
+---
+
+## Acoustic Propagation Utilities
+
+### earth_acoustic — Spherical Earth Ray Calculator
+
+**Location:** `earth_acoustic.f90`, executable in `bin/earth_acoustic`
+
+**Purpose:** Calculate where an acoustic beam intersects with Earth's surface accounting for spherical curvature. Tests spherical Earth corrections for underwater acoustic propagation models.
+
+**Problem addressed:** Flat-Earth acoustic propagation models assume a beam shot horizontally continues parallel to the surface forever. In reality, Earth's curvature causes the beam to eventually intersect the surface. This tool provides ballpark estimates of where this occurs.
+
+**Key Parameters:**
+- Earth radius: 6,371 km (hard-coded)
+- Source depth: positive downward (meters)
+- Beam angle: from horizontal (0° = horizontal, positive = upward, -90° to +90°)
+
+**Theory:**
+- Geometric ray theory (straight-line propagation)
+- Law of sines solution for triangle: Earth center → Source → Surface intersection
+- Assumes constant sound speed (range/depth-independent)
+
+**Usage:**
+```bash
+./earth_acoustic [depth_m] [angle_deg]
+# Or interactive mode: ./earth_acoustic
+```
+
+**Key Findings from Testing:**
+- **Horizontal beams** (0°) from 100m depth: ~10,000 km range (1/4 Earth circumference)
+- **Small upward angles dramatically reduce range**: 1000m/1° → 9,849 km vs 57.3 km flat-Earth
+- **Curvature effects are enormous**: flat-Earth models underestimate by factors of 100-1000×
+- **Practical steep angles**: 100m/89° → 111 km vs 0.002 km flat-Earth
+
+**Output:**
+- Horizontal range to surface intersection (km and m)
+- Central angle subtended by ray path (degrees and radians)
+- Context classification (local/coastal/regional/basin/global scale)
+- Flat-Earth comparison showing curvature effects
+
+**Limitations:**
+- Straight-line propagation (no ray bending due to sound speed gradients)
+- Perfect spherical Earth (no topography)
+- No absorption or scattering effects
+
+**Documentation:** `EARTH_ACOUSTIC_README.md`, test script: `test_earth_acoustic.sh`
+
+**Related tools:**
+- Python version with visualization: `scripts/spherical_earth_acoustic.py` (plots ray paths and generates figures)
+
+**Source:** Created January 2026 for validating spherical Earth corrections in acoustic propagation codes
+
+---
+
+## Visualization Tools
+
+### Python Plotting Scripts
+
+**Location:** `scripts/sphere/`, `scripts/genpi/`
+
+**Key Constraint (Linux/GUI):**
+- **Cannot use `os.fork()` to detach matplotlib windows** — GUI toolkits are multi-threaded and fork causes deadlocks/crashes
+- **Current approach:** Blocking `plt.show()` — script waits until window is closed before returning to CLI
+- **Alternative attempted:** Double-fork daemonization → X connection breaks due to threading issues
+- **Workaround if needed:** Use subprocess to launch a separate Python interpreter (not yet implemented)
+
+**Implication:** Python plotting scripts must either block (current) or require more complex subprocess architecture to achieve non-blocking behavior.
 
 ---
 

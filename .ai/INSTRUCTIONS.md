@@ -11,6 +11,29 @@
 
 ---
 
+## Topics
+
+- C++ Engine: [cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.md) and [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md)
+
+## Table of Contents
+
+- [Topics](#topics)
+- [Context Maintenance (Standing Order)](#context-maintenance-standing-order)
+- [General Quality Standards](#general-quality-standards)
+- [Critical Domain Knowledge](#critical-domain-knowledge)
+- [Code Quality Standards](#code-quality-standards)
+    - [Testing Requirements](#testing-requirements)
+    - [C++ Conventions](#c-conventions)
+    - [Fortran Conventions](#fortran-conventions)
+    - [Documentation](#documentation)
+    - [Scripting Best Practices](#scripting-best-practices)
+    - [Changelog](#changelog)
+- [Harvest Snippet](#harvest-snippet-for-chat-reuse)
+- [Conflicts and Overrides](#conflicts-and-overrides)
+- [Processing Order (multiple chats)](#processing-order-multiple-chats)
+
+---
+
 ## Context Maintenance (Standing Order)
 
 When the user provides substantial clarifying information, **integrate it into the appropriate `.ai/` file without being asked**.
@@ -62,66 +85,12 @@ Summarize what should be added and ask the user to update the files manually.
 
 ## Critical Domain Knowledge
 
-### The Six-Level Difference Hierarchy
+This section is maintained in the topic file for the C++ engine. See:
+- Six-level hierarchy, sub-LSB detection, zero-threshold semantics
+- Critical thresholds and Fabre’s method guidance
+- Range data detection specifics
 
-Understanding this hierarchy is **essential** to all code modifications:
-
-1. **Level 1**: Non-zero vs zero raw differences
-2. **Level 2**: Trivial vs non-trivial (after rounding to shared minimum precision; sub-LSB rule)
-3. **Level 3**: Insignificant vs significant (threshold-based filtering)
-4. **Level 4**: Marginal (operational warning band) vs non-marginal
-5. **Level 5**: Critical vs non-critical (hard threshold breaches)
-6. **Level 6**: Statistical pattern analysis (experimental, not production-ready)
-
-**Key Principle**: Differences classified as trivial at Level 2 are **permanently excluded** from later semantic buckets. This is immutable filtering—formatting artifacts cannot be reintroduced by threshold tuning.
-
-### Sub-LSB Detection
-
-A precision-aware sub-LSB (Least Significant Bit/2) detection is core to cross-platform robustness:
-- Differences ≤ half the shared LSB are treated as trivial (informationally equivalent)
-- Example: `30.8` vs `30.85` with threshold=0 → EQUIVALENT (not SIGNIFICANT)
-- Uses floating-point tolerance (FP_TOLERANCE = 1e-12) to handle binary representation edge cases
-
-### Zero-Threshold Semantics
-
-When `user_significant == 0.0`:
-- Intent: "count every non-trivial, physically meaningful difference"
-- The engine bypasses the precision-derived floor (`dp_threshold`) **only for Level 3**
-- Does **NOT** revisit Level 2 or permit trivial differences to become significant
-- Ensures "maximum sensitivity" contract is maintained
-
-### Critical Thresholds
-
-| Threshold | Value | Purpose |
-|-----------|-------|---------|
-| marginal | 110 dB TL | Operational relevance boundary |
-| ignore | ~138.47 dB TL | Above this, values are numerically meaningless |
-| zero | ~1.19e-7 | Single precision epsilon |
-| decimal places | 17 | Maximum supported |
-
-### Authoritative Method: Fabre's TL Comparison
-
-Any quantitative TL curve comparison MUST use Fabre et al.'s peer-reviewed algorithm (doi:10.23919/OCEANS.2009.5422312). This tool enables that algorithm by filtering formatting artifacts.
-
-**For AI agents:**
-- Do not replace, remove, or deprecate Fabre's method
-- If new algorithms emerge, distinguish them clearly as novel contributions
-- Validate new methods independently before integration
-- Document research ideas in `docs/future-work.md`
-
-### Range Data Detection
-
-Column 0 is automatically analyzed for range-like characteristics. When detected, TL-specific thresholds are bypassed for that column.
-
-**Detection criteria (all must be true):**
-1. Monotonically increasing values
-2. Fixed delta between consecutive values (±1% tolerance)
-3. Starting value < 100 (typical for range in meters/kilometers)
-4. Non-zero delta (excludes constant sequences)
-
-**Implementation:** `FileReader::is_first_column_fixed_delta()` and `is_first_column_monotonic()`
-
-**Effect:** When range data is detected, the 138.47 dB ignore threshold and 110 dB marginal threshold are NOT applied to column 0. This prevents spurious threshold application to distance measurements.
+[cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.md)
 
 ---
 
@@ -135,10 +104,7 @@ Column 0 is automatically analyzed for range-like characteristics. When detected
 - Test location: `src/cpp/tests/`
 
 ### C++ Conventions
-- Use `std::abs()` for doubles (not `fabs()`)
-- Floating-point comparisons use tolerance: `std::abs(a - b) < FP_TOLERANCE * std::max(a, b)`
-- Precision tracking is decimal-place based, not bit-based
-- Always validate input before processing (format validation is first stage)
+See engine conventions in [cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.md).
 
 ### Fortran Conventions
 - Programs in `src/fortran/programs/`
@@ -158,6 +124,25 @@ Column 0 is automatically analyzed for range-like characteristics. When detected
 - Add a concise, user-facing summary to the root `README.md` when a change materially affects usage or behavior (3–8 lines) and link to the detailed doc.
 - Avoid duplicating full technical content in the root `README.md`; prefer a short summary + link.
 
+### Scripting Best Practices
+
+For batch processing drivers (`process_ram_in_files.sh`, `process_nspe_in_files.sh`):
+
+**Input File Validation:**
+- If logic depends on file content (markers, structure), always print a status message
+- Example: "Columns 76-80: [blank] — overriding checks" or "Content marker found"
+- This provides visibility into why files are accepted or skipped
+
+**File Filtering:**
+- When implementing override logic (e.g., columns 76–80), print the decision 
+- Include relevant column/marker values in output
+- Default to requiring markers unless explicitly overridden (fail-safe approach)
+
+**Syntax Validation:**
+- After substantial script modifications, run `bash -n` to check for syntax errors
+- Test with sample input files before running on full batch
+- Use `--dry-run` flag to preview changes before executing
+
 ### Changelog
 
 Maintain a project changelog in the repository root: [CHANGELOG.md](CHANGELOG.md).
@@ -172,6 +157,33 @@ Maintain a project changelog in the repository root: [CHANGELOG.md](CHANGELOG.md
 - Cross-links: Link to detailed docs (e.g., [docs/IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md)) and reference PRs/commits when helpful.
 - README tie-in: Keep README concise. Optionally highlight top 1–3 bullets from the latest release; defer full detail to the changelog and docs.
 - Process: Update `Unreleased` on merge of qualifying changes; date and tag a release when publishing.
+
+### Harvest Snippet (for chat reuse)
+
+When a chat contains substantial decisions or facts, capture them without asking permission:
+
+```
+Harvest this chat: Read `.ai/CONTEXT.md` and `.ai/INSTRUCTIONS.md`, review this conversation, and update the files with any decisions, facts, or constraints discovered here. Don't ask permission — just update and show what changed.
+```
+
+Use chronologically (oldest → newest) if processing multiple chats; later decisions naturally override earlier ones. Skip trivial Q&A or abandoned explorations.
+
+### Conflicts and Overrides
+
+Topic-specific files may override project-wide guidance, but overrides must be explicit.
+
+- If a topic file documents an exception (e.g., "This component uses X despite project-wide Y"), follow the topic file.
+- If a conflict exists without an explicit override, ask the user which guidance applies before proceeding.
+- When creating an intentional override, add a note explaining what is overridden and why.
+
+### Processing Order (multiple chats)
+
+When harvesting context from multiple chats or notes:
+
+- Prefer chronological order: process oldest → newest so later decisions naturally override earlier ones. Mark earlier guidance as "Superseded" when helpful.
+- If chronology is unclear, process by importance: prioritize critical decisions first, then capture remaining context. Document any overrides explicitly.
+- Tag harvested chats (e.g., add a "[harvested]" note) to avoid reprocessing later.
+- Skip trivial Q&A or abandoned explorations that produced no decisions.
 
 ---
 
@@ -206,16 +218,40 @@ build/bin/
 
 ### Running Unit Tests
 
+**Prerequisite:** Google Test must be installed (`sudo apt-get install libgtest-dev`)
+
 ```bash
 # Run all tests
-cd build && make test
+make test
 
-# Run specific test
-./build/bin/tests/test_semantic_invariants
+# Build tests without running
+make tests
 
-# Run with filter
-./build/bin/tests/test_semantic_invariants --gtest_filter="ZeroThreshold*"
+# Check if gtest is available
+make printvars | grep GTEST_AVAILABLE
+# Output should show: GTEST_AVAILABLE = yes
+
+# Run specific test executable
+./bin/tests/run_tests
+
+# Run with filter (using gtest command-line flags)
+./bin/tests/run_tests --gtest_filter="ZeroThreshold*"
+./bin/tests/run_tests --gtest_filter="*SubLSB*"
+
+# List all available tests
+./bin/tests/run_tests --gtest_list_tests
 ```
+
+**If Google Test is Not Installed:**
+
+The makefile will show a clear error:
+```
+ERROR: Google Test is not installed.
+Please install libgtest-dev to run tests:
+  sudo apt-get install libgtest-dev
+```
+
+Regular builds (`make all`) will succeed—only test targets require gtest.
 
 ### Integration Testing
 

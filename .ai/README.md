@@ -12,10 +12,16 @@ It contains context and instructions for AI-assisted development of this project
 |------|---------|
 | `CONTEXT.md` | Project-wide facts, decisions, history |
 | `INSTRUCTIONS.md` | Procedures and standing orders |
+| `cpp_engine/CONTEXT.md` | Topic: C++ engine facts & decisions (authoritative) |
+| `cpp_engine/INSTRUCTIONS.md` | Topic: C++ engine procedures (authoritative) |
 
-**Start here:** Read `INSTRUCTIONS.md`, then `CONTEXT.md`.
+**Start here:**
+- Read `INSTRUCTIONS.md`, then `CONTEXT.md`.
+- If working on the C++ comparison engine, jump to `cpp_engine/INSTRUCTIONS.md` and `cpp_engine/CONTEXT.md`.
 
-**Standing order:** When the user provides substantial context, integrate it into the appropriate file. See `INSTRUCTIONS.md` for details.
+**Standing order:**
+- When the user provides substantial context, integrate it into the appropriate file. See `INSTRUCTIONS.md` for details.
+- Single Source of Truth: Topic folders (e.g., `cpp_engine/`) are authoritative for their subjects. Project-wide files should link to topics rather than duplicate content.
 
 ---
 
