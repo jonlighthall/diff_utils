@@ -21,6 +21,38 @@
    | [`install_packages`](install_packages.sh) | install dependencies      |
    | [`make_links`](make_links.sh)             | link executables to ~/bin |
 
+## Quick Start
+
+### Build
+```bash
+make              # Build all executables
+make test         # Build and run all unit tests (requires libgtest-dev)
+make pi_gen       # Build pi precision test generators
+```
+
+### Run
+```bash
+# Compare two files
+./build/bin/uband_diff <ref_file> <test_file> <threshold> <critical> <print>
+
+# Example: maximum sensitivity comparison
+./build/bin/uband_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0
+```
+
+### Test Suite (55 tests)
+```bash
+make test                           # Run all tests
+./build/bin/tests/run_tests         # Run tests directly
+./build/bin/tests/run_tests --gtest_filter="SemanticInvariants.*"  # Run specific suite
+```
+
+### Generate Pi Test Data
+```bash
+make pi_gen_data   # Regenerate pi precision test files in data/
+```
+
+For detailed instructions, prerequisites, and troubleshooting, see [docs/guide/getting-started.md](docs/guide/getting-started.md).
+
 # cpp
 
 ## Overview (C++ diff utilities)
@@ -129,29 +161,36 @@ This locks in the corrected semantics for future refactors.
 
 ### Rationale For Additional (Proposed) Tests
 
-1. Zero-Threshold Semantic Invariant Test
+> **Status (Jan 2026):** Tests 1-5 have been implemented. Test 6 awaits the `--sensitive` flag.
+
+1. ✅ Zero-Threshold Semantic Invariant Test → `SemanticInvariants.ZeroThresholdInvariant`
    - Assert: if user_significant == 0 then diff_significant == diff_non_trivial − diff_high_ignore.
    - Catches regression if future precision logic reintroduces dp-floor inflation.
 
-2. High Ignore Band Isolation Test
+2. ✅ High Ignore Band Isolation Test → `SemanticInvariants.HighIgnoreIsolation`
    - Feed only TL values > ignore; assert diff_significant == 0 but diff_non_trivial > 0. Guards the separation between physical insignificance and formatting.
 
-3. Mixed Band Distribution Test
+3. ✅ Mixed Band Distribution Test → `FileComparatorSummationTest.MixedTLRanges`
    - Construct synthetic lines with values intentionally straddling marginal & ignore thresholds to assert marginal vs non-marginal partition counts.
    - Ensures no off-by-one inequality drift (>, >=) in threshold boundary logic.
 
-4. Critical Suppression Behavior Test
+4. ✅ Critical Suppression Behavior Test → `SemanticInvariants.CriticalSuppressionStopsPrinting`
    - Introduce one row exceeding critical threshold early, followed by additional would-be printable differences.
    - Assert: truncation notice present once, diff_significant counts include post-critical rows, diff_print stops at the triggering row.
 
-5. Print Threshold Interaction Test
+5. ✅ Print Threshold Interaction Test → `SemanticInvariants.PrintThresholdDecouplesCounting`
    - Use print > 0 with small user threshold to ensure internal counting (diff_significant) continues while table emission drops some rows.
    - Prevent silent coupling errors between diff_print and diff_significant.
 
-6. Sensitive vs Non-Sensitive (Future Flag) A/B Test (if a --sensitive flag is added)
+6. ⏳ Sensitive vs Non-Sensitive (Future Flag) A/B Test (if a --sensitive flag is added)
    - Compare runs with (user_significant=small_nonzero) vs (user_significant=0 & sensitive mode) to document and guard intended differential behavior.
 
-Each proposed test targets a semantic dimension not covered by current additive invariants. Collectively they reduce the risk of subtle classification regressions that still “add up” numerically.
+**Test Coverage Summary (Jan 2026):** 55 unit tests across 15 test suites, including:
+- 5 cross-language precision tests (C++, Fortran, Python, Java π output comparison)
+- 6 sub-LSB boundary tests
+- 4 semantic invariant tests
+- 8 file comparator summation tests
+- Full hierarchy validation (`SixLevelHierarchyValidation`)
 
 ### Future Enhancement: Explicit Sensitive Mode
 
