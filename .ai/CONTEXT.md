@@ -684,4 +684,39 @@ Two batch-processing drivers exist for running executables over collections of i
 
 ---
 
+## Scripting: RAM Processing Pipeline
+
+### Empty Output File Detection
+
+**Added:** January 2026
+
+**Problem:** Execution could return success (exit code 0) but produce an empty output file, leading to false positives in test results.
+
+**Solution implemented in `process_ram_in_files.sh`:**
+- Check output files with `[[ ! -s "$file" ]]` after moving from parent directory
+- Track empty outputs in `empty_output_files=()` array
+- Print warnings with yellow color (`\e[33m`)
+- Reclassify execution from success to failure when empty output detected
+- Prevent double-counting: Check if file is already in `exec_fail_files` before reclassifying (execution can fail AND produce empty output)
+- Report empty output counts in summary for all modes (make, test, copy, diff)
+- Exit with code 1 if empty outputs detected
+
+**Why this matters:** An empty output file indicates the program ran but produced no results—a silent failure that should be caught and reported, not counted as success.
+
+### Color Reset Robustness
+
+**Added:** January 2026
+
+**Problem:** `PROG_OUTPUT_COLOR` (light green highlighting for executable output) sometimes wasn't reset after program execution, leaving terminal in colored state.
+
+**Solution:**
+- Added `trap 'echo -en "\x1B[0m"' EXIT ERR` before setting color
+- Trap ensures color reset even if program is interrupted, fails, or script exits unexpectedly
+- Color reset happens immediately after program execution
+- Trap is cleared after successful reset with `trap - EXIT ERR`
+
+**Guarantees color reset in all scenarios:** normal completion, program failure, script interruption (Ctrl+C), unexpected errors.
+
+---
+
 *Version history is tracked by git, not by timestamps in this file.*
