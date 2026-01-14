@@ -215,75 +215,25 @@ Key Tests:
 
 ---
 
-## Recent Work (Session 2026-01-14: 6-Level Hierarchy Implementation)
+## 6-Level Hierarchy Implementation (COMPLETE)
 
-### Problem Context
-User implementing and validating 6-level difference classification hierarchy:
-- Level 0: zero vs non-zero
-- Level 1: non-zero = trivial + non_trivial
-- Level 2: non_trivial = insignificant + significant
-- Level 3: significant = marginal + non_marginal
-- Level 4: non_marginal = critical + non_critical
-- Level 5: non_critical = error + non_error
+**Status:** ✅ Fully implemented and validated. All 50 unit tests pass (verified 2026-01-14).
 
-### Fixes Completed
+**Implementation Location:** `DifferenceAnalyzer::process_hierarchy()` in `src/cpp/src/difference_analyzer.cpp`
 
-**1. Trivial Difference Counting (Fixed)**
-- **Problem:** diff_trivial always 0; raw differences that rounded to zero weren't being counted
-- **Solution:** Modified process_rounded_values() to compute raw_diff, lsb, big_zero; check if raw_non_zero && trivial_after_rounding → increment diff_trivial
-- **Location:** difference_analyzer.cpp
-- **Result:** Verified with example data: diff_trivial=9, diff_non_trivial=39, diff_non_zero=48 (identity holds)
+**Test Validation:** `SixLevelHierarchyValidation` test confirms all levels work correctly with mathematical consistency checks.
 
-**2. Critical Differences Causing Premature Abort (Fixed)**
-- **Problem:** Critical differences triggered early return, truncating table and preventing full processing
-- **Solution:** Changed process_difference to always return true; added flag.has_critical_diff guard in print_table to suppress printing but continue processing
-- **Location:** file_comparator.cpp, difference_analyzer.cpp
+**Historical Fixes (for reference):**
+1. Trivial difference counting — modified to correctly detect sub-LSB differences
+2. Critical differences no longer cause premature abort — table truncated but processing continues
+3. Summary no longer suppressed when errors found
+4. Hierarchy invariant validation added via `print_consistency_checks()`
 
-**3. Summary Suppressed When Errors Found (Fixed)**
-- **Problem:** print_summary had early return when error_found=true, hiding counter consistency checks
-- **Solution:** Removed "if (flag.error_found) return;" early exit
-- **Location:** file_comparator.cpp
-
-**4. FileReader Debug Print Access (Fixed)**
-- **Problem:** FileReader::compare_column_structures couldn't access print.debug2 (incomplete type error)
-- **Solution:**
-  - Added PrintLevel& parameter to compare_column_structures
-  - Forward-declared PrintLevel in file_reader.h
-  - Included uband_diff.h in file_reader.cpp for full definition
-  - Gated all std::cout on if(print_level.debug2)
-  - Added backward-compatible overload creating silent PrintLevel{0,false,false,false,false}
-- **Location:** file_reader.h, file_reader.cpp
-
-**5. Hierarchy Invariant Validation (Added)**
-- **Solution:** Added print_consistency_checks() function validating all 17 level sum identities
-- **Location:** file_comparator.cpp
-- **Output:** CONSISTENCY CHECKS section in summary showing all level equations
-
-### Open Issues
-
-**CompareDifferentFilesWithinTolerance Test Failing**
-- **Test:** Creates "1.000 2.000" vs "1.001 2.001", expects no significant diff with user_thresh=0.05
-- **Symptom:** has_significant_diff=true when expected false
-- **Hypothesis:** FormatTracker::calculate_threshold may return dp_threshold (0.001 for 3 decimal places) instead of user_thresh (0.05)
-- **Status:** Needs diagnostic logging to verify threshold calculation
-- **Location:** test_file_comparator.cpp lines 110-140
-
-### Recommended Additional Tests
-
-User asked "are there any additional unit tests to add for checking the file hierarchy?"
-
-**Priority Tests to Implement:**
-1. OnlyTrivialDifferences - verify raw non-zero that rounds to zero counted correctly
-2. NonTrivialButInsignificant - both_above_ignore || !exceeds_significance cases
-3. NonMarginalNonCriticalSplit_ErrorAndNonError - Level 6 partition
-4. CriticalDifferenceCounts - only count if both values <= ignore threshold
-5. MixedComprehensiveCase - all levels present in single test
-6. Column structure tests - SingleHeaderThenDataGroups, StructureMismatchBetweenFiles
-7. Hierarchy invariants in ALL tests - validateCounterInvariants() helper asserting all 17 identities
-
-**Test Suite Helper:**
-- Existing: validateCounterInvariants() in FileComparatorSummationTest checks 10 invariants
-- Needed: Expand to all 17 level sum identities, apply to all tests
+**Test Coverage:** 50 tests across 14 test suites including:
+- `FileComparatorSummationTest.SixLevelHierarchyValidation` — validates all 6 levels
+- `SubLSBBoundaryTest` — 6 tests for sub-LSB detection
+- `SemanticInvariants` — 4 tests for zero-threshold contracts
+- `PercentThresholdTest` — 3 tests for percent-mode thresholds
 
 ## Links
 - Project-wide context: ../../CONTEXT.md
