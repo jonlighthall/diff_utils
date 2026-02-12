@@ -152,8 +152,63 @@ Engine decisions moved to: [.ai/cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md).
 
 ---
 
-## Critical Paradigm Question (PENDING)
-Moved to topic: [cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md)
+## Critical Paradigm Question (RESOLVED)
+
+### The Three Questions
+
+Comparing numerical output from scientific codes raises three distinct questions
+that early versions of this tool conflated into a single algorithm:
+
+1. **Installation Verification (Q1):** *Is the difference simply due to trivial
+   differences in computing, or is it a failure of the installation?*
+   Identical algorithms on different machines should produce nearly identical
+   output. Differences arise from compiler flags (fast math, uninitialized
+   variables), CPU architectures, language reimplementations, and floating-point
+   rounding. The question is whether observed differences are computing noise
+   or indicate a real problem.
+
+2. **Tactical Equivalence (Q2):** *Would different battlefield decisions be made
+   based on the difference between two curves?* This goes beyond checking if an
+   installation is correct. Two curves may differ computationally but be
+   operationally indistinguishable for decision-making purposes.
+
+3. **Computational Equivalence (Q3):** *Did these two models produce the same
+   output? Are they computationally "close enough"?* Examples in Fabre's paper
+   show TL curves with similar gross structure but apparent range-offset
+   differences (possible accumulated phase error). This may point to real
+   modeling differences but might have less tactical effect.
+
+### Program Architecture (Trio Separation)
+
+| Question | Program | Scope |
+|----------|---------|-------|
+| Q1 | **tl_diff** | Element-by-element, precision-aware comparison. Evaluates differences based on printed precision, single-precision limits, and operational domain thresholds. Stops there. |
+| Q2 | **tl_metric** | Curve-level metrics per Fabre et al. (2009). M1/M2/M3/M_curve/M_total. Nothing beyond the paper. |
+| Q3 | **tl_analysis** | Exploratory diagnostics — error accumulation, autocorrelation, regression, phase stretch. All ad hoc attempts at quantifying "close enough." May be further subdivided. |
+
+**Decision:** One repository, three programs. Shared infrastructure (file
+parsing, line parsing) supports all three. Each program has its own validation
+standard appropriate to the question it answers.
+
+### The 2% Threshold (Historical)
+
+The current `tl_diff` failure threshold (2% of non-marginal, non-critical
+significant differences) is an ad hoc value derived from visual inspection of
+real output file differences during early development. It is a magic number in
+the classic sense — empirically derived from limited observation, not from
+theory or peer-reviewed standards. This value motivated the development of more
+rigorous curve-level metrics (Fabre's method), and may be revised or replaced
+as the program architecture matures.
+
+### TRANSIENT_SPIKES Override (Removed)
+
+The TRANSIENT_SPIKES pass relaxation (allowing PASS up to 10% when transient
+spike pattern detected) has been removed from `tl_diff`'s pass/fail logic.
+This was experimental code that contaminated the core pass/fail decision with
+exploratory diagnostics. Error pattern analysis belongs in `tl_analysis`, not
+in the installation verification tool.
+
+**Source:** Session 2026-02-12
 
 ---
 

@@ -75,9 +75,17 @@ classified at one level, it cannot be reclassified at a later level.
 | 5 | Does it exceed the critical threshold? | critical vs non-critical |
 | 6 | Does it exceed the user threshold? | error vs non-error |
 
-**Pass/fail:** If fewer than 2% of elements show non-marginal, non-critical
-significant differences, the comparison passes. Critical threshold
-exceedances always cause failure.
+**Pass/fail:** Critical threshold exceedances always cause failure.
+Otherwise, the pass/fail determination is based on the proportion of
+non-marginal, non-critical significant differences.
+
+> **Note on the 2% threshold.** The current failure threshold (2% of
+> elements) is an ad hoc value derived from visual inspection of real
+> output file differences during early development. It is not based on
+> theory, peer-reviewed standards, or statistical analysis. This value
+> motivated development of more rigorous curve-level metrics (see
+> [TL Metrics](docs/guide/tl-metrics-implementation.md)), and may be
+> revised or replaced as the program architecture matures.
 
 ### Threshold reference
 
@@ -94,6 +102,30 @@ For the full technical description of the discrimination hierarchy, see
 
 For the sub-LSB detection algorithm, see
 [docs/guide/sub-lsb-detection.md](docs/guide/sub-lsb-detection.md).
+
+## Scope and Related Programs
+
+Comparing numerical output from scientific codes raises several distinct
+questions that early versions of this tool attempted to answer with a
+single algorithm. The current architecture separates them:
+
+| Question | Scope | Program |
+|----------|-------|---------|
+| Are these outputs identical within computing noise? | Element-by-element precision-aware comparison with physics-based thresholds | **tl_diff** |
+| How do these TL curves compare quantitatively? | Peer-reviewed curve-level metrics (Fabre et al. 2009) | **tl_metric** (planned) |
+| Are observed differences systematic or random? | Exploratory diagnostics — error accumulation, autocorrelation, regression | **tl_analysis** (planned) |
+
+**tl_diff** answers the installation verification question: *is the
+difference simply due to trivial differences in computing, or does it
+indicate a real problem?* It evaluates differences based on printed
+precision, single-precision arithmetic limits, and operational domain
+thresholds — and stops there.
+
+The broader questions — tactical equivalence (*would different decisions
+be made?*) and computational equivalence (*are these models producing the
+same physics?*) — require curve-level analysis that goes beyond
+element-by-element comparison. These are deferred to separate programs
+with their own validation standards.
 
 ## Version History
 

@@ -1719,72 +1719,26 @@ void FileComparator::print_significant_percentage() const {
       100.0 * static_cast<double>(non_marginal_non_critical_significant) /
       static_cast<double>(counter.elem_number);
 
-  // Run accumulation analysis to get error pattern (if enough data and not
-  // already computed)
-  bool has_transient_spikes = false;
-  if (!accumulation_metrics_.has_value() && accumulation_data_.n_points >= 5) {
-    ErrorAccumulationAnalyzer analyzer;
-    accumulation_metrics_ = analyzer.analyze(accumulation_data_);
-    has_transient_spikes =
-        (accumulation_metrics_->pattern ==
-         AccumulationMetrics::ErrorPattern::TRANSIENT_SPIKES);
-  } else if (accumulation_metrics_.has_value()) {
-    // Use cached result
-    has_transient_spikes =
-        (accumulation_metrics_->pattern ==
-         AccumulationMetrics::ErrorPattern::TRANSIENT_SPIKES);
-  }
-
-  // Check the 2% failure threshold for non-marginal, non-critical, significant
-  // differences, with special handling for TRANSIENT_SPIKES pattern
+  // NOTE: The 2% failure threshold is an ad hoc value derived from visual
+  // inspection of real output file differences during early development. It is
+  // not based on theory, peer-reviewed standards, or statistical analysis. It
+  // motivated development of Fabre's curve-level metrics (tl_metric) and may
+  // be revised or replaced as the program architecture matures.
   constexpr double failure_threshold_percent = 2.0;
-  constexpr double transient_spikes_relaxed_threshold =
-      10.0;  // More lenient for isolated spikes
 
   if (critical_percent > failure_threshold_percent) {
-    // Check if TRANSIENT_SPIKES pattern justifies a pass with caveat
-    if (has_transient_spikes &&
-        critical_percent <= transient_spikes_relaxed_threshold) {
-      std::cout
-          << "   \033[1;33mPASS (with caveat): Non-marginal, non-critical "
-             "significant "
-             "differences ("
-          << non_marginal_non_critical_significant << ", " << std::fixed
-          << std::setprecision(2) << critical_percent << "%) exceed "
-          << failure_threshold_percent << "% threshold,\n"
-          << "   but TRANSIENT_SPIKES pattern detected (isolated outliers, "
-          << "not systematic error)\033[0m" << std::endl;
-      flag.files_are_close_enough = true;
-    } else {
-      std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
-                   "differences ("
-                << non_marginal_non_critical_significant << ", " << std::fixed
-                << std::setprecision(2) << critical_percent << "%) exceed "
-                << failure_threshold_percent << "% threshold\033[0m"
-                << std::endl;
-      flag.files_are_close_enough = false;
-      // Do not mark error_found here; reserve for true criticals or structural
-      // errors
-    }
+    std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
+                 "differences ("
+              << non_marginal_non_critical_significant << ", " << std::fixed
+              << std::setprecision(2) << critical_percent << "%) exceed "
+              << failure_threshold_percent << "% threshold\033[0m" << std::endl;
+    flag.files_are_close_enough = false;
   } else if (critical_percent > 0) {
-    // Add pattern-aware messaging even for passing cases
-    if (has_transient_spikes) {
-      std::cout << "   \033[1;32mPASS: Non-zero-weighted, non-critical "
-                   "differences ("
-                << non_marginal_non_critical_significant << ", " << std::fixed
-                << std::setprecision(2) << critical_percent << "%) within "
-                << failure_threshold_percent << "% tolerance\n"
-                << "   (TRANSIENT_SPIKES pattern: isolated outliers, not "
-                   "systematic)\033[0m"
-                << std::endl;
-    } else {
-      std::cout << "   \033[1;33mPASS: Non-zero-weighted, non-critical "
-                   "differences ("
-                << non_marginal_non_critical_significant << ", " << std::fixed
-                << std::setprecision(2) << critical_percent << "%) within "
-                << failure_threshold_percent << "% tolerance\033[0m"
-                << std::endl;
-    }
+    std::cout << "   \033[1;33mPASS: Non-zero-weighted, non-critical "
+                 "differences ("
+              << non_marginal_non_critical_significant << ", " << std::fixed
+              << std::setprecision(2) << critical_percent << "%) within "
+              << failure_threshold_percent << "% tolerance\033[0m" << std::endl;
     flag.files_are_close_enough = true;
   } else {
     std::cout << "   \033[1;32mPASS: No non-zero-weighted, non-critical "

@@ -115,16 +115,20 @@ Citation: Fabre & Zingarelli, "A synthesis of transmission loss comparison metho
 
 ---
 
-## Critical Paradigm Question (PENDING)
+## Critical Paradigm Question (RESOLVED)
 
-Fabre's Method Optimization Paradigm: Requires careful reading of Fabre et al. to determine:
+Resolved in parent context: see [../../CONTEXT.md](../../CONTEXT.md#critical-paradigm-question-resolved).
 
-1. Tactical Equivalence: Curves sufficiently similar for operational decision-making
-2. Theoretical/Computational Equivalence: Curves match at numerical/phase error analysis level
+**Summary:** Three distinct questions identified — installation verification
+(Q1, tl_diff), tactical equivalence (Q2, tl_metric), computational equivalence
+(Q3, tl_analysis). The paradigm question is answered by separating the programs
+rather than trying to optimize one algorithm for all three purposes.
 
-Observations from Fabre Figures 2–6: Curves with similar gross structure but apparent range-offset differences (possible accumulated phase error). Whether these score high or low in Fabre's method determines the paradigm.
+**tl_diff scope:** Element-by-element precision-aware comparison with
+physics-based thresholds. Answers Q1 only. No curve-level metrics, no
+exploratory diagnostics, no TRANSIENT_SPIKES pattern analysis in pass/fail.
 
-Why it matters: This distinction affects interpretation of all subsequent phase-error and horizontal-stretch comparison work. See docs/future-work.md for investigation plan.
+**Source:** Session 2026-02-12
 
 ---
 

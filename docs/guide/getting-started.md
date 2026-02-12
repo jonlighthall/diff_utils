@@ -44,14 +44,38 @@ sub-interval differences as **trivial**.
    correlation, combined score) based on the methodology of
    [Fabre et al. (2009)](https://doi.org/10.23919/OCEANS.2009.5422312).
    These metrics are displayed for reference but **do not affect the
-   pass/fail determination**.
+   pass/fail determination**. Full curve-level analysis will move to a
+   dedicated `tl_metric` program.
 
 ### Pass/fail decision
 
-The default pass/fail is based entirely on layers 1 and 2. If fewer than
-2% of compared elements show non-marginal, non-critical significant
-differences, the files are considered to agree. Critical threshold
-exceedances cause immediate failure regardless of percentage.
+The default pass/fail is based entirely on layers 1 and 2. Critical
+threshold exceedances cause immediate failure. Otherwise, the pass/fail
+determination is based on the proportion of non-marginal, non-critical
+significant differences.
+
+> **Historical note.** The current 2% failure threshold is an ad hoc
+> value based on visual inspection of real output file differences during
+> early development. It predates the implementation of Fabre's
+> curve-level metrics and is not derived from theory or peer review. It
+> may be revised or replaced as the architecture matures.
+
+### What tl_diff does *not* do
+
+`tl_diff` answers one question: *are these outputs identical within
+computing noise?* It does **not** answer:
+
+- **Tactical equivalence** — Would different operational decisions be made
+  based on the difference between two curves? (Requires curve-level
+  metrics: planned `tl_metric`)
+- **Computational equivalence** — Do two models produce the same physics?
+  Are observed differences from accumulated phase error, algorithmic
+  divergence, or genuine modeling differences? (Requires exploratory
+  diagnostics: planned `tl_analysis`)
+
+Early versions of this tool conflated these questions. The current
+architecture separates them into distinct programs with appropriate
+validation standards.
 
 ## Prerequisites
 

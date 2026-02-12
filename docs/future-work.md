@@ -4,17 +4,24 @@
 
 ---
 
-## PREREQUISITE: Critical Paradigm Investigation
+## PREREQUISITE: Critical Paradigm Investigation (RESOLVED)
 
-**Issue:** Fabre's paper (Figures 2--6) shows curves with similar gross structure but apparent range-offset differences (possible accumulated phase error). **Pending determination:** Does Fabre's method score these as high (tactical equivalence) or low (different computation)?
+**Resolution (February 2026):** The paradigm question is resolved by
+separating comparison into three distinct programs rather than optimizing
+a single algorithm for all purposes:
 
-**Action Required:**
-1. Read Fabre et al. (2009) carefully to determine optimization paradigm
-2. Distinguish: tactical equivalence (sufficient for decision-making) vs. theoretical equivalence (numerical/phase error analysis)
-3. Document findings in context files
-4. This determination affects all subsequent phase/stretch research
+1. **Installation Verification (tl_diff):** Element-by-element,
+   precision-aware comparison — *is the difference computing noise or a
+   real problem?*
+2. **Tactical Equivalence (tl_metric):** Curve-level metrics per Fabre
+   et al. (2009) — *would different operational decisions be made?*
+3. **Computational Equivalence (tl_analysis):** Exploratory diagnostics
+   — *are observed differences systematic or random? Do two models
+   produce the same physics?*
 
-**Implication:** If Fabre optimizes for tactical equivalence, phase error compensation may be unnecessary. If theoretical equivalence, phase-aware comparison becomes critical.
+Early versions conflated these questions. The refactoring separates them
+into programs with validation standards appropriate to each question.
+See `.ai/CONTEXT.md` for the full three-question framework.
 
 ---
 
