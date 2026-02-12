@@ -1,5 +1,10 @@
 # Comparison Utilities for NSPE Output Validation
 
+> **Note:** These Fortran programs are superseded by the C++ `uband_diff`
+> engine, which provides expanded functionality and more mathematically
+> rigorous comparison. These programs remain in working order for use
+> with the current NSPE Fortran distribution.
+
 Three Fortran programs are provided to aid in comparing outputs between
 different NSPE runs using the same input file. These programs scan through
 files and compare outputs element-by-element against a specified error

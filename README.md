@@ -1,11 +1,34 @@
 # diff_utils
 
-**Numerical and text-based comparison utilities for NSPE and related acoustics data.**
+**Numerical comparison utilities for validating acoustics model output.**
 
-> **Note:** For plotting and visualization tools, see the separate repository at `~/utils/nspe_python_plot_utils`.
-> This repository focuses on numerical comparison, difference calculations, and text-based analysis only.
+Standard text tools like `diff` can tell you that two files are different,
+but not whether the differences *matter*. When comparing numerical output
+from scientific codes — especially across platforms, compilers, or
+precision levels — many reported "differences" are artifacts of
+floating-point formatting, not real physical disagreements.
 
-## programs - .f90 files
+`uband_diff` (C++) solves this by treating each printed number as
+representing an interval of values (determined by its displayed decimal
+precision) rather than an exact point. Differences that fall within that
+representational interval are classified as trivial and excluded from
+consideration. The remaining differences are then filtered through
+physics-based thresholds — ignoring values below the noise floor of
+single-precision arithmetic — before a pass/fail determination is made.
+
+The result: a clear, defensible answer to "do these two output files
+agree?" with far fewer false positives than a naive comparison.
+
+> **Note:** For plotting and visualization tools, see the separate
+> repository at `~/utils/nspe_python_plot_utils`. This repository focuses
+> on numerical comparison and difference analysis only.
+
+## programs - .f90 files (legacy)
+
+The original Fortran comparison utilities are preserved in `src/fortran/`.
+These programs are superseded by `uband_diff` (C++), which provides a
+mathematically rigorous, precision-aware comparison engine with a six-level
+difference classification hierarchy. See the [C++ overview](#overview-c-diff-utilities) below.
 
    | file                     | program | ext     | description                                                |
    | ------------------------ | ------- | ------- | ---------------------------------------------------------- |
@@ -63,7 +86,9 @@ Note: For recent updates and version history, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Executable of interest
 
-`uband_diff` (C++) — refactored comparison engine replacing / augmenting several earlier Fortran utilities. It performs:
+`uband_diff` (C++) — precision-aware comparison engine that supersedes the
+earlier Fortran utilities (`tldiff`, `prsdiff`, `tsdiff`, `cpddiff`) with
+expanded functionality and more mathematically rigorous analysis. It performs:
 
 1. Format & structural validation (column count & decimal precision tracking)
 2. Multi-threshold numeric comparison

@@ -2,6 +2,57 @@
 
 This guide covers building, running, and testing the diff_utils suite.
 
+## What `uband_diff` Does
+
+When validating scientific software, you often need to compare two output
+files and answer: *do these results agree?* A simple `diff` is useless
+here — formatting differences, compiler variations, and floating-point
+rounding produce thousands of textual changes that have no physical
+meaning. `uband_diff` eliminates that noise by understanding what
+numerical differences actually signify.
+
+### The core idea
+
+A printed value like `30.8` doesn't mean exactly 30.8 — it means "some
+value that rounds to 30.8 at one decimal place," i.e., the interval
+[30.75, 30.85). If another file prints `30.85` (two decimal places), that
+value falls within the first value's representational interval. The two
+numbers are informationally equivalent — you can't distinguish them from
+the printed output alone. `uband_diff` detects this automatically by
+examining the decimal precision of each value and classifying
+sub-interval differences as **trivial**.
+
+### Three layers of analysis
+
+`uband_diff` processes differences through three distinct layers:
+
+1. **Point-by-point comparison** — Each pair of corresponding values is
+   classified through a six-level hierarchy: zero vs non-zero, trivial vs
+   non-trivial, significant vs insignificant, marginal vs non-marginal,
+   critical vs non-critical, and error vs non-error. The trivial filter
+   (sub-LSB detection) is the key innovation — it permanently removes
+   formatting artifacts before any threshold logic runs.
+
+2. **Physics-based filtering** — Values above 138.47 dB (the noise floor
+   of IEEE 754 single-precision floating point) are ignored, since
+   differences there have no physical meaning. An operational marginal
+   band flags differences that are technically significant but outside the
+   range of practical interest.
+
+3. **Curve-level metrics** (informational) — When enabled with `-v 1`,
+   the program reports TL curve comparison metrics (weighted RMSE,
+   correlation, combined score) based on the methodology of
+   [Fabre et al. (2009)](https://doi.org/10.23919/OCEANS.2009.5422312).
+   These metrics are displayed for reference but **do not affect the
+   pass/fail determination**.
+
+### Pass/fail decision
+
+The default pass/fail is based entirely on layers 1 and 2. If fewer than
+2% of compared elements show non-marginal, non-critical significant
+differences, the files are considered to agree. Critical threshold
+exceedances cause immediate failure regardless of percentage.
+
 ## Prerequisites
 
 ### Required
