@@ -173,4 +173,13 @@ program prsdiff
   enddo
   print '(/a,f6.5,a,i0)',' number of errors found (>',pdiff,'): ',nerr
   print '(a,f6.4)',' maximum error : ',dp_max
+
+  print *, 'p1 = ',trim(fname1)
+  print *, 'p2 = ',trim(fname2)
+  if (nerr.gt.0) then
+     print *, ''//achar(27)//'[31mERROR'//achar(27)//'[0m'
+     stop 1
+  else
+     print *, ''//achar(27)//'[32mOK'//achar(27)//'[0m'
+  endif
 end program prsdiff
