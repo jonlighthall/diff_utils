@@ -97,7 +97,7 @@ TARGET =
 # EXES = $(addprefix $(BINDIR)/,$(FORTRAN_OBJS.o:.o=))
 #
 # sub-programs
-SUBDIRS := src/cpp src/fortran src/java
+SUBDIRS := src/cpp src/fortran
 
 # dependency files
 DEPS := $(OBJS:.o=.d)
