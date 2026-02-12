@@ -15,7 +15,7 @@
 #
 # Dependencies:
 #   - Standard POSIX utilities (head, tail, wc, diff)
-#   - Optional: tldiff, uband_diff (for advanced numerical comparisons)
+#   - Optional: tldiff, tl_diff (for advanced numerical comparisons)
 #
 # Author: Refactored from process_in_files.sh
 # Version: 1.0
@@ -95,27 +95,27 @@ headtail_truncate() {
 # Arguments:
 #   test_file  - Path to test/output file
 #   ref_file   - Path to reference file
-#   threshold1 - Significant error threshold for tldiff/uband_diff (optional)
-#   threshold2 - Critical error threshold for uband_diff (optional)
-#   diff_level - Force specific diff level: 1=diff only, 2=tldiff max, 3=uband_diff (optional)
+#   threshold1 - Significant error threshold for tldiff/tl_diff (optional)
+#   threshold2 - Critical error threshold for tl_diff (optional)
+#   diff_level - Force specific diff level: 1=diff only, 2=tldiff max, 3=tl_diff (optional)
 # Returns: 0 if files match (within thresholds), 1 if they differ
 # Description:
 #   This function performs a cascading comparison:
 #   Default behavior (no diff_level):
 #     1. Standard diff with color output
 #     2. If diff fails, tries tldiff (if available) with threshold1
-#     3. If tldiff fails, tries uband_diff (if available) with threshold1 and threshold2
+#     3. If tldiff fails, tries tl_diff (if available) with threshold1 and threshold2
 #   With diff_level:
 #     1: Only run standard diff (no fallback)
-#     2: Run up to tldiff (skip uband_diff even if tldiff fails)
-#     3: Run all the way to uband_diff (always run all three, report last result)
+#     2: Run up to tldiff (skip tl_diff even if tldiff fails)
+#     3: Run all the way to tl_diff (always run all three, report last result)
 #   4. Reports results with colored output
 diff_files() {
     local test="$1"  # test file
     local ref="$2"   # reference file
-    local opt1="${3:-}" # significant error threshold for tldiff, uband_diff
-    local opt2="${4:-}" # critical error threshold for uband_diff
-    local diff_level="${5:-0}"  # diff level override: 0=auto (default), 1=diff only, 2=max tldiff, 3=force uband_diff
+    local opt1="${3:-}" # significant error threshold for tldiff, tl_diff
+    local opt2="${4:-}" # critical error threshold for tl_diff
+    local diff_level="${5:-0}"  # diff level override: 0=auto (default), 1=diff only, 2=max tldiff, 3=force tl_diff
 
     # Configuration
     local SHOW_LINES=20
@@ -131,7 +131,7 @@ diff_files() {
 
     # Validate diff_level
     if [[ -n "$diff_level" && ! "$diff_level" =~ ^[0-3]$ ]]; then
-        echo "Error: diff_level must be 0 (auto), 1 (diff only), 2 (max tldiff), or 3 (force uband_diff)" >&2
+        echo "Error: diff_level must be 0 (auto), 1 (diff only), 2 (max tldiff), or 3 (force tl_diff)" >&2
         return 1
     fi
 
@@ -164,7 +164,7 @@ diff_files() {
     elif [[ $diff_level -eq 2 ]]; then
         echo "  (Level 2: max tldiff - stop at tldiff)"
     elif [[ $diff_level -eq 3 ]]; then
-        echo "  (Level 3: force uband_diff - run all comparisons)"
+        echo "  (Level 3: force tl_diff - run all comparisons)"
     fi
 
     # Check if errexit (set -e) is currently enabled and save the state
@@ -225,9 +225,9 @@ diff_files() {
                 echo -e "\e[32mtldiff OK\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
                 # If diff_level is 2, stop here even if tldiff passed
-                # If diff_level is 3, continue to uband_diff regardless
+                # If diff_level is 3, continue to tl_diff regardless
                 if [[ $diff_level -eq 3 ]]; then
-                    echo "Continuing to level 3 (force uband_diff)..."
+                    echo "Continuing to level 3 (force tl_diff)..."
                 else
                     restore_errexit
                     return 0
@@ -244,29 +244,29 @@ diff_files() {
                 fi
             fi
 
-            # Step 3: Try uband_diff if available (only if not stopped by level 2)
+            # Step 3: Try tl_diff if available (only if not stopped by level 2)
             if [[ $diff_level -ne 2 ]]; then
-                echo "Trying uband_diff..."
-                if command -v uband_diff >/dev/null 2>&1; then
+                echo "Trying tl_diff..."
+                if command -v tl_diff >/dev/null 2>&1; then
                     local tmpfile_uband=$(mktemp)
-                    uband_diff "$test" "$ref" $opt1 $opt2 > "$tmpfile_uband" 2>&1
+                    tl_diff "$test" "$ref" $opt1 $opt2 > "$tmpfile_uband" 2>&1
                     local uband_status=$?
                     headtail_truncate "$tmpfile_uband" "$SHOW_LINES"
                     rm "$tmpfile_uband"
 
                     if [[ $uband_status -eq 0 ]]; then
-                        echo -e "\e[32muband_diff OK\e[0m"
+                        echo -e "\e[32mtl_diff OK\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
                         restore_errexit
                         return 0
                     else
-                        echo -e "\e[31muband_diff FAILED\e[0m"
+                        echo -e "\e[31mtl_diff FAILED\e[0m"
                         printf '%*s\n' "$line_len" '' | tr ' ' '-'
                         restore_errexit
                         return 1
                     fi
                 else
-                    echo "Error: uband_diff not found and files differ." >&2
+                    echo "Error: tl_diff not found and files differ." >&2
                     restore_errexit
                     return 1
                 fi

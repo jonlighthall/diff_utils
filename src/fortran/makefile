@@ -303,7 +303,7 @@ endif
 # keep all intermediate object files
 .SECONDARY:
 
-diff: $(BINDIR)/uband_diff
+diff: $(BINDIR)/tl_diff
 
 #
 # recipes without outputs

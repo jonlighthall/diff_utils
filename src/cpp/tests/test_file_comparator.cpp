@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "uband_diff.h"
+#include "tl_diff.h"
 
 class FileComparatorTest : public ::testing::Test {
  protected:

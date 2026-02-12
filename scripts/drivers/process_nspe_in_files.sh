@@ -27,7 +27,7 @@
 #   --skip-newer        Skip files where outputs are newer than input
 #   --force             Override skip options and process all matched files
 #   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
-#   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
+#   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
 #   --dry-run           Show what would be processed without running
 #   --debug             Show detailed file filtering information
 #   -h, --help          Show this help message
@@ -35,7 +35,7 @@
 # Dependencies:
 #   - lib_diff_utils.sh (must be in same directory or PATH)
 #   - Executable (auto-detected or specified via --exe)
-#   - Optional: tldiff, uband_diff for advanced comparisons
+#   - Optional: tldiff, tl_diff for advanced comparisons
 #
 # Replaces functionality of:
 #
@@ -67,7 +67,7 @@ Options:
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
-  --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force uband_diff (default: auto hierarchy)
+  --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
   --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
@@ -97,7 +97,7 @@ dry_run=false
 debug=false
 keep_bin=false
 cli_exe=""
-diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force uband_diff
+diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force tl_diff
 no_make=false
 input_filename="nspe.in"  # Default input filename
 stop_on_error=false
@@ -174,9 +174,9 @@ if [[ ! "$diff_level" =~ ^[0-3]$ ]]; then
     echo -e "\e[31mError: Invalid diff level '$diff_level'.\e[0m"
     echo "Valid diff levels are:"
     echo "  0 - Auto (default hierarchical behavior)"
-    echo "  1 - diff only (no fallback to tldiff or uband_diff)"
-    echo "  2 - max tldiff (stop at tldiff, don't try uband_diff)"
-    echo "  3 - force uband_diff (always run all three diff tools)"
+    echo "  1 - diff only (no fallback to tldiff or tl_diff)"
+    echo "  2 - max tldiff (stop at tldiff, don't try tl_diff)"
+    echo "  3 - force tl_diff (always run all three diff tools)"
     exit 1
 fi
 
@@ -425,7 +425,7 @@ exec_fail_files=()
 missing_exec_output_files=()
 simple_diff_fail_files=()
 tldiff_fail_files=()
-uband_diff_fail_files=()
+tl_diff_fail_files=()
 
 # Helper function to add file to array only if not already present
 add_to_array_if_not_present() {
@@ -466,7 +466,7 @@ if [[ $diff_level -ne 0 && ("$mode" == "test" || "$mode" == "diff") ]]; then
     case $diff_level in
         1) echo "Diff level: 1 (diff only - no fallback)" ;;
         2) echo "Diff level: 2 (max tldiff - stop at tldiff)" ;;
-        3) echo "Diff level: 3 (force uband_diff - always run all tools)" ;;
+        3) echo "Diff level: 3 (force tl_diff - always run all tools)" ;;
     esac
 fi
 printf '%*s\n' "$line_len" '' | tr '  ' '='
@@ -976,8 +976,8 @@ for infile in "${infiles[@]}"; do
                                     if tail -100 "$LOG_FILE" | grep -q "tldiff OK"; then
                                         # Simple diff failed but tldiff passed
                                         simple_diff_fail_files+=("$infile")
-                                    elif tail -100 "$LOG_FILE" | grep -q "uband_diff OK"; then
-                                        # tldiff also failed but uband_diff passed
+                                    elif tail -100 "$LOG_FILE" | grep -q "tl_diff OK"; then
+                                        # tldiff also failed but tl_diff passed
                                         tldiff_fail_files+=("$infile")
                                     fi
                                 fi
@@ -988,16 +988,16 @@ for infile in "${infiles[@]}"; do
 
                                 # Determine which diff tool failed by checking the log
                                 if tail -100 "$LOG_FILE" | grep -q "diff FAILED"; then
-                                    if tail -100 "$LOG_FILE" | grep -q "tldiff OK\|uband_diff OK"; then
+                                    if tail -100 "$LOG_FILE" | grep -q "tldiff OK\|tl_diff OK"; then
                                         # Simple diff failed but advanced tools passed (shouldn't reach here)
                                         simple_diff_fail_files+=("$infile")
                                     elif tail -100 "$LOG_FILE" | grep -q "tldiff FAILED"; then
-                                        if tail -100 "$LOG_FILE" | grep -q "uband_diff OK"; then
-                                            # tldiff failed but uband_diff passed (shouldn't reach here)
+                                        if tail -100 "$LOG_FILE" | grep -q "tl_diff OK"; then
+                                            # tldiff failed but tl_diff passed (shouldn't reach here)
                                             tldiff_fail_files+=("$infile")
-                                        elif tail -100 "$LOG_FILE" | grep -q "uband_diff FAILED"; then
+                                        elif tail -100 "$LOG_FILE" | grep -q "tl_diff FAILED"; then
                                             # All diffs failed
-                                            uband_diff_fail_files+=("$infile")
+                                            tl_diff_fail_files+=("$infile")
                                         else
                                             tldiff_fail_files+=("$infile")
                                         fi
@@ -1022,8 +1022,8 @@ for infile in "${infiles[@]}"; do
                                     if grep -q "tldiff OK" "$diff_output_file"; then
                                         # Simple diff failed but tldiff passed
                                         simple_diff_fail_files+=("$infile")
-                                    elif grep -q "uband_diff OK" "$diff_output_file"; then
-                                        # tldiff also failed but uband_diff passed
+                                    elif grep -q "tl_diff OK" "$diff_output_file"; then
+                                        # tldiff also failed but tl_diff passed
                                         tldiff_fail_files+=("$infile")
                                     fi
                                 fi
@@ -1033,16 +1033,16 @@ for infile in "${infiles[@]}"; do
 
                                 # Determine which diff tool failed by checking the output
                                 if grep -q "diff FAILED" "$diff_output_file"; then
-                                    if grep -q "tldiff OK\|uband_diff OK" "$diff_output_file"; then
+                                    if grep -q "tldiff OK\|tl_diff OK" "$diff_output_file"; then
                                         # Simple diff failed but advanced tools passed
                                         simple_diff_fail_files+=("$infile")
                                     elif grep -q "tldiff FAILED" "$diff_output_file"; then
-                                        if grep -q "uband_diff OK" "$diff_output_file"; then
-                                            # tldiff failed but uband_diff passed
+                                        if grep -q "tl_diff OK" "$diff_output_file"; then
+                                            # tldiff failed but tl_diff passed
                                             tldiff_fail_files+=("$infile")
-                                        elif grep -q "uband_diff FAILED" "$diff_output_file"; then
+                                        elif grep -q "tl_diff FAILED" "$diff_output_file"; then
                                             # All diffs failed
-                                            uband_diff_fail_files+=("$infile")
+                                            tl_diff_fail_files+=("$infile")
                                         else
                                             tldiff_fail_files+=("$infile")
                                         fi
@@ -1262,27 +1262,27 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
     # Diff Results Section (for modes that compare files)
     if [[ "$mode" == "test" || "$mode" == "diff" ]]; then
         # Diff Details Section (show which diff tool failed) - FIRST
-        if [[ ${#simple_diff_fail_files[@]} -gt 0 || ${#tldiff_fail_files[@]} -gt 0 || ${#uband_diff_fail_files[@]} -gt 0 ]]; then
+        if [[ ${#simple_diff_fail_files[@]} -gt 0 || ${#tldiff_fail_files[@]} -gt 0 || ${#tl_diff_fail_files[@]} -gt 0 ]]; then
             echo "Diff Details:"
             echo "-------------"
 
             if [[ ${#simple_diff_fail_files[@]} -gt 0 ]]; then
-                echo "Files that passed with tldiff or uband_diff (simple diff failed): ${#simple_diff_fail_files[@]}"
+                echo "Files that passed with tldiff or tl_diff (simple diff failed): ${#simple_diff_fail_files[@]}"
                 for f in "${simple_diff_fail_files[@]}"; do
                     echo -e "   \e[33mDIFF_FAIL\e[0m $f"
                 done
             fi
 
             if [[ ${#tldiff_fail_files[@]} -gt 0 ]]; then
-                echo "Files that passed with uband_diff (tldiff failed): ${#tldiff_fail_files[@]}"
+                echo "Files that passed with tl_diff (tldiff failed): ${#tldiff_fail_files[@]}"
                 for f in "${tldiff_fail_files[@]}"; do
                     echo -e "   \e[33mTLDIFF_FAIL\e[0m $f"
                 done
             fi
 
-            if [[ ${#uband_diff_fail_files[@]} -gt 0 ]]; then
-                echo "Files that failed all diff tools: ${#uband_diff_fail_files[@]}"
-                for f in "${uband_diff_fail_files[@]}"; do
+            if [[ ${#tl_diff_fail_files[@]} -gt 0 ]]; then
+                echo "Files that failed all diff tools: ${#tl_diff_fail_files[@]}"
+                for f in "${tl_diff_fail_files[@]}"; do
                     echo -e "   \e[31mUBAND_DIFF_FAIL\e[0m $f"
                 done
             fi

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the enhancement to `uband_diff` pass/fail logic that incorporates the **TRANSIENT_SPIKES** error pattern analysis into the decision-making process.
+This document describes the enhancement to `tl_diff` pass/fail logic that incorporates the **TRANSIENT_SPIKES** error pattern analysis into the decision-making process.
 
 ## Problem Statement
 
@@ -53,7 +53,7 @@ These are **NOT indicative of algorithmic failure** — the models fundamentally
 
 ### Changes Made
 
-**File**: `src/cpp/include/uband_diff.h`
+**File**: `src/cpp/include/tl_diff.h`
 - Added `#include <optional>` and `#include "error_accumulation_analyzer.h"`
 - Added member variable: `mutable std::optional<AccumulationMetrics> accumulation_metrics_`
 

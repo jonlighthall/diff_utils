@@ -8,7 +8,7 @@ from scientific codes — especially across platforms, compilers, or
 precision levels — many reported "differences" are artifacts of
 floating-point formatting, not real physical disagreements.
 
-`uband_diff` (C++) solves this by treating each printed number as
+`tl_diff` (C++) solves this by treating each printed number as
 representing an interval of values (determined by its displayed decimal
 precision) rather than an exact point. Differences that fall within that
 representational interval are classified as trivial and excluded from
@@ -24,7 +24,7 @@ agree?" with far fewer false positives than a naive comparison.
 ### Build
 
 ```bash
-make         # Build uband_diff
+make         # Build tl_diff
 ```
 
 Requires GCC 7+ (or Clang 5+) with C++17 support and GNU Make.
@@ -32,12 +32,12 @@ Requires GCC 7+ (or Clang 5+) with C++17 support and GNU Make.
 ### Run
 
 ```bash
-uband_diff <ref_file> <test_file> [threshold] [critical] [print]
+tl_diff <ref_file> <test_file> [threshold] [critical] [print]
 ```
 
 **Example — compare two PE output files:**
 ```bash
-./build/bin/uband_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0
+./build/bin/tl_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0
 ```
 
 ### Arguments
@@ -62,7 +62,7 @@ For detailed build instructions, prerequisites, and troubleshooting, see
 
 ## How It Works
 
-`uband_diff` classifies every element-by-element difference through a
+`tl_diff` classifies every element-by-element difference through a
 six-level hierarchy. Each level is a filter — once a difference is
 classified at one level, it cannot be reclassified at a later level.
 
@@ -104,12 +104,12 @@ See [CHANGELOG.md](CHANGELOG.md) for recent updates.
 ## Development
 
 The sections below are for developers working on or maintaining this
-codebase. They are not needed to build or run `uband_diff`.
+codebase. They are not needed to build or run `tl_diff`.
 
 ### Legacy Fortran programs
 
 The original Fortran comparison utilities are preserved in `src/fortran/`.
-These programs are superseded by `uband_diff` but remain in working order
+These programs are superseded by `tl_diff` but remain in working order
 for use with the current NSPE Fortran distribution.
 
 | Program | Description |
@@ -137,7 +137,7 @@ for test prerequisites and details.
 ### Project structure
 
 ```
-src/cpp/           C++ comparison engine (uband_diff)
+src/cpp/           C++ comparison engine (tl_diff)
 src/fortran/       Legacy Fortran utilities
 scripts/           Shell scripts (batch processing)
 data/              Test data files

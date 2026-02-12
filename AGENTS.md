@@ -28,7 +28,7 @@ All AI agents should prioritize the following files for project-specific guidanc
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/cpp/` | C++ comparison engine (uband_diff) |
+| `src/cpp/` | C++ comparison engine (tl_diff) |
 | `src/fortran/` | Legacy Fortran utilities |
 | `scripts/pi_gen/` | Cross-language π precision test generators |
 | `data/` | Test data files |

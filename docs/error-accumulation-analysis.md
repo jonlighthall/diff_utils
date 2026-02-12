@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes a proposed enhancement to `uband_diff` that analyzes the **spatial coherence** of errors as a function of range. This addresses the operational need to distinguish between:
+This document describes a proposed enhancement to `tl_diff` that analyzes the **spatial coherence** of errors as a function of range. This addresses the operational need to distinguish between:
 
 1. **Transient/spurious errors** - Random noise that can be ignored
 2. **Systematic errors** - Meaningful differences that indicate model problems

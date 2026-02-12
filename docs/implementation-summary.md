@@ -4,7 +4,7 @@
 October 16, 2025
 
 ## Overview
-Successfully implemented and validated sub-LSB (Least Significant Bit) detection in `uband_diff` to correctly handle cross-precision numerical comparisons.
+Successfully implemented and validated sub-LSB (Least Significant Bit) detection in `tl_diff` to correctly handle cross-precision numerical comparisons.
 
 ## The Problem
 

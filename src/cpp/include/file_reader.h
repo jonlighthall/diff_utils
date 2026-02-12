@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-// Forward declaration to avoid circular include with uband_diff.h
+// Forward declaration to avoid circular include with tl_diff.h
 struct PrintLevel;
 
 /**

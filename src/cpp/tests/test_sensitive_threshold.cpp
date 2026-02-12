@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 
-#include "uband_diff.h"
+#include "tl_diff.h"
 
 // This test validates the special behavior when the user-specified
 // significant threshold is zero. At zero user threshold the implementation

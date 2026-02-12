@@ -2,7 +2,7 @@ edge_case
    FIX fail comparison when set to zero
 
 nspe.std3
-   considering the ouptut of ./bin/uband-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
+   considering the ouptut of ./bin/tl-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
 
    this is a realistic example of data being compared.
 
@@ -13,7 +13,7 @@ nspe.std3
    I think it's showing no significant differences because it may be failing at the point where different structures are identified. in this case the "ranges" appear to be different because in file nspe.std3.refe.nspe01.asc, the precision of the printed range is too small to capture the step size. in both files the range step size is 0.0122, however in the reference file, the printed precision of the first column is too small to capture the step size at every step, so it fails the monotonically increasing test, which is actually incorrect because monotonically increasing should allow for the range to be unchanged.
 
 
-   make && ./bin/uband-diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 .6
+   make && ./bin/tl-diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 .6
 
    I need to fix the output so that if we're just going by an absolute difference, this file should fail. it still stays equivalent within tolerance and it still says the files pass the significant difference test.
 
@@ -27,14 +27,14 @@ nspe.std3
 
 case 1
 
-   $ ./bin/uband-diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
+   $ ./bin/tl-diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
 
       however, in this case, the file should pass because the percentage of number of errors is small. also, if I set the print threshold to zero, all of the zero differences are printed. we should update this so that anything greater than the printed threshold gets printed, not equal to. we need to check the tallies and make sure everything is self consistent.
 
     I want to check the logic related to the difference tallies which are printed at the end of the program in the summary.
 
     Let's look at the following command for example
-   $ ./bin/uband-diff data/case1r.tl data/case1r_01.txt 0 1 0 1
+   $ ./bin/tl-diff data/case1r.tl data/case1r_01.txt 0 1 0 1
 
     the number of elements is obvious, that should be the total number of elements compared. in this case the file has 353 lines with 11 columns per line (1 range with 10 data columns), so the total number of elements is 3883
 
@@ -171,7 +171,7 @@ could it be because the critical error exits the analysis? we should change that
 
 
 Let's use the following command as an example
-./bin/uband_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0 1
+./bin/tl_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0 1
 
 Since writing this program, I have revised the logic that I would like the algorithm to use. I need help checking the logic and update the algorithm to use the new hierarchy of binary divisions, outlined below.
 

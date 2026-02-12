@@ -2,13 +2,13 @@
 
 This guide covers building, running, and testing the diff_utils suite.
 
-## What `uband_diff` Does
+## What `tl_diff` Does
 
 When validating scientific software, you often need to compare two output
 files and answer: *do these results agree?* A simple `diff` is useless
 here — formatting differences, compiler variations, and floating-point
 rounding produce thousands of textual changes that have no physical
-meaning. `uband_diff` eliminates that noise by understanding what
+meaning. `tl_diff` eliminates that noise by understanding what
 numerical differences actually signify.
 
 ### The core idea
@@ -18,13 +18,13 @@ value that rounds to 30.8 at one decimal place," i.e., the interval
 [30.75, 30.85). If another file prints `30.85` (two decimal places), that
 value falls within the first value's representational interval. The two
 numbers are informationally equivalent — you can't distinguish them from
-the printed output alone. `uband_diff` detects this automatically by
+the printed output alone. `tl_diff` detects this automatically by
 examining the decimal precision of each value and classifying
 sub-interval differences as **trivial**.
 
 ### Three layers of analysis
 
-`uband_diff` processes differences through three distinct layers:
+`tl_diff` processes differences through three distinct layers:
 
 1. **Point-by-point comparison** — Each pair of corresponding values is
    classified through a six-level hierarchy: zero vs non-zero, trivial vs
@@ -74,7 +74,7 @@ make              # Build all executables
 
 ### Build Specific Targets
 ```bash
-make diff         # Build uband_diff only
+make diff         # Build tl_diff only
 make test         # Build and run unit tests
 make pi_gen       # Build pi precision generators (C++, Fortran, Java)
 ```
@@ -85,11 +85,11 @@ make clean        # Remove all build artifacts
 make remake       # Clean + rebuild
 ```
 
-## Running uband_diff
+## Running tl_diff
 
 ### Basic Usage
 ```bash
-./build/bin/uband_diff <ref_file> <test_file> <threshold> <critical> <print>
+./build/bin/tl_diff <ref_file> <test_file> <threshold> <critical> <print>
 ```
 
 ### Arguments
@@ -105,17 +105,17 @@ make remake       # Clean + rebuild
 
 **Maximum sensitivity comparison:**
 ```bash
-./build/bin/uband_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0
+./build/bin/tl_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0
 ```
 
 **Standard comparison with thresholds:**
 ```bash
-./build/bin/uband_diff ref.txt test.txt 0.1 2.0 0.05
+./build/bin/tl_diff ref.txt test.txt 0.1 2.0 0.05
 ```
 
 **Cross-language pi validation:**
 ```bash
-./build/bin/uband_diff data/pi_cpp_asc.txt data/pi_fortran_asc.txt 0 1 0
+./build/bin/tl_diff data/pi_cpp_asc.txt data/pi_fortran_asc.txt 0 1 0
 ```
 
 ## Running Tests
@@ -216,7 +216,7 @@ python3 scripts/pi_gen/pi_gen_python.py > my_pi_python.txt
 diff_utils/
 ├── build/
 │   ├── bin/           # Executables
-│   │   ├── uband_diff
+│   │   ├── tl_diff
 │   │   ├── pi_gen_cpp
 │   │   ├── pi_gen_fortran
 │   │   ├── pi_gen_java

@@ -16,7 +16,7 @@ By default, the diff process uses a **hierarchical fallback system**:
    - If files match within threshold → **PASS**
    - If files differ → Try next level
 
-3. **uband_diff** (Universal band diff) - Advanced numerical comparison
+3. **tl_diff** (Universal band diff) - Advanced numerical comparison
    - If files match within threshold → **PASS**
    - If files differ → **FAIL**
 
@@ -44,7 +44,7 @@ By default, the diff process uses a **hierarchical fallback system**:
 
 **Behavior**:
 - Only runs standard `diff`
-- No fallback to tldiff or uband_diff
+- No fallback to tldiff or tl_diff
 - Files must match exactly to pass
 
 **Use Case**:
@@ -72,11 +72,11 @@ Stopping at level 1 (diff only)
 **Behavior**:
 - Runs `diff` first
 - If diff fails, tries `tldiff`
-- **Stops at tldiff** - does NOT try uband_diff even if tldiff fails
+- **Stops at tldiff** - does NOT try tl_diff even if tldiff fails
 
 **Use Case**:
-- When you want TL-aware comparison but don't want the full analysis from uband_diff
-- Faster execution when uband_diff is not needed
+- When you want TL-aware comparison but don't want the full analysis from tl_diff
+- Faster execution when tl_diff is not needed
 - Testing tldiff thresholds specifically
 
 **Example Output** (tldiff passes):
@@ -104,7 +104,7 @@ Stopping at level 2 (max tldiff)
 
 ---
 
-### Level 3 (force uband_diff)
+### Level 3 (force tl_diff)
 ```bash
 ./process_nspe_in_files.sh diff std --diff-level 3
 ```
@@ -112,11 +112,11 @@ Stopping at level 2 (max tldiff)
 **Behavior**:
 - Runs `diff` first
 - Always continues to `tldiff` even if diff passes
-- Always continues to `uband_diff` even if tldiff passes
-- Final result is based on uband_diff
+- Always continues to `tl_diff` even if tldiff passes
+- Final result is based on tl_diff
 
 **Use Case**:
-- When you always want the full uband_diff analysis with RMSE, TL metrics, etc.
+- When you always want the full tl_diff analysis with RMSE, TL metrics, etc.
 - Generating comprehensive comparison reports
 - Benchmarking all diff tools
 - Collecting statistics even when files match closely
@@ -124,15 +124,15 @@ Stopping at level 2 (max tldiff)
 **Example Output** (all pass):
 ```
 Diffing file1.asc and file1.tl:
-  (Level 3: force uband_diff - run all comparisons)
+  (Level 3: force tl_diff - run all comparisons)
 diff done with return code 0
 diff OK
-Continuing to level 3 (force uband_diff)...
+Continuing to level 3 (force tl_diff)...
 Trying tldiff...
 tldiff OK
-Trying uband_diff...
-[Full uband_diff output with RMSE, TL metrics, etc.]
-uband_diff OK
+Trying tl_diff...
+[Full tl_diff output with RMSE, TL metrics, etc.]
+tl_diff OK
 ```
 
 ## Usage Examples
@@ -145,13 +145,13 @@ uband_diff OK
 
 ### Example 2: TL-Aware Without Advanced Analysis
 ```bash
-# Use tldiff but skip uband_diff for faster processing
+# Use tldiff but skip tl_diff for faster processing
 ./process_nspe_in_files.sh test std --diff-level 2
 ```
 
 ### Example 3: Force Full Analysis
 ```bash
-# Always get comprehensive uband_diff output
+# Always get comprehensive tl_diff output
 ./process_nspe_in_files.sh diff std --diff-level 3 --pattern "pe.std*"
 ```
 
@@ -167,12 +167,12 @@ uband_diff OK
 
 ## Comparison Table
 
-| Level | diff | tldiff | uband_diff | Stop Condition | Use Case |
+| Level | diff | tldiff | tl_diff | Stop Condition | Use Case |
 |-------|------|--------|------------|----------------|----------|
 | 0 (Auto) | ✓ | If diff fails | If tldiff fails | First PASS | Normal operation |
 | 1 | ✓ | ✗ | ✗ | After diff | Strict validation |
 | 2 | ✓ | ✓ | ✗ | After tldiff | TL-aware only |
-| 3 | ✓ | ✓ | ✓ | After uband_diff | Full analysis |
+| 3 | ✓ | ✓ | ✓ | After tl_diff | Full analysis |
 
 ## Technical Details
 
@@ -196,9 +196,9 @@ The diff_level must be 0, 1, 2, or 3. Invalid values will cause the script to ex
 Error: Invalid diff level '5'.
 Valid diff levels are:
   0 - Auto (default hierarchical behavior)
-  1 - diff only (no fallback to tldiff or uband_diff)
-  2 - max tldiff (stop at tldiff, don't try uband_diff)
-  3 - force uband_diff (always run all three diff tools)
+  1 - diff only (no fallback to tldiff or tl_diff)
+  2 - max tldiff (stop at tldiff, don't try tl_diff)
+  3 - force tl_diff (always run all three diff tools)
 ```
 
 ## Summary Reports
@@ -221,8 +221,8 @@ Failed files: 3
 ```
 Diff Details:
 -------------
-Files that passed with tldiff or uband_diff (simple diff failed): 2
-Files that passed with uband_diff (tldiff failed): 1
+Files that passed with tldiff or tl_diff (simple diff failed): 2
+Files that passed with tl_diff (tldiff failed): 1
 
 Diff Results:
 =============
@@ -250,4 +250,4 @@ Failed files: 0
 - **Diff Tools**:
   - `diff` (system command)
   - `tldiff` (custom TL comparison tool)
-  - `uband_diff` (universal numerical comparison tool)
+  - `tl_diff` (universal numerical comparison tool)

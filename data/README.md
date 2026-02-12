@@ -1,6 +1,6 @@
 # Test Data Files
 
-This directory contains reference and test files used for validating the `uband_diff` numerical file comparison utility.
+This directory contains reference and test files used for validating the `tl_diff` numerical file comparison utility.
 
 ## Test File Pairs
 
@@ -165,7 +165,7 @@ level 7
 
 history
 
-$ ./bin/uband-diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
+$ ./bin/tl-diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
 
 with a threshold of zero, there are 39 differences (correctly tallied). there are 12 differences where the corresponding values are above the ignore threshold of 138.47; these are trivial and should be ignored. there are 24 differences where the corresponding values exceed the marginal threshold. these should be counted, but not cause a error or failure in the difference (by themselves). there are 3 differences where the values are less than the marginal threshold and should therefore be counted as significant differences.
 
@@ -256,13 +256,13 @@ test of transient spikes
 
 **Command example**:
 ```bash
-./bin/uband_diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 0.6
+./bin/tl_diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 0.6
 ```
 
 **Expected behavior**: Should fail due to >2% significant differences (905/3554 = 25%)
 
 history
-   considering the ouptut of ./bin/uband-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
+   considering the ouptut of ./bin/tl-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
 
    this is a realistic example of data being compared.
    in this example, the two files should "fail" a simple diff
@@ -297,7 +297,7 @@ unit scaling error
 
 **Command example**:
 ```bash
-./bin/uband_diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
+./bin/tl_diff data/case1r.tl data/case1r_01.txt 0 1 0.01 1
 ```
 
 **Breakdown by discrimination level**:
@@ -344,19 +344,19 @@ unit scaling error
 
 ### Standard Comparison
 ```bash
-./bin/uband_diff <file1> <file2> <significant_threshold> <group_size> <critical_threshold> <print_threshold>
+./bin/tl_diff <file1> <file2> <significant_threshold> <group_size> <critical_threshold> <print_threshold>
 ```
 
 ### Example Commands
 ```bash
 # Basic comparison with 0.05 significant threshold
-./bin/uband_diff data/bbpp.freq.ref.txt data/bbpp.freq.test.txt 0.05 3 0.6 1
+./bin/tl_diff data/bbpp.freq.ref.txt data/bbpp.freq.test.txt 0.05 3 0.6 1
 
 # Zero threshold (sensitive mode)
-./bin/uband_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0 1
+./bin/tl_diff data/pe.std1.pe01.ref.txt data/pe.std1.pe01.test.txt 0 1 0 1
 
 # Percent mode (10% threshold)
-./bin/uband_diff data/pe.std2.pe02.ref.txt data/pe.std2.pe02.test.txt -10 3 0.6 1
+./bin/tl_diff data/pe.std2.pe02.ref.txt data/pe.std2.pe02.test.txt -10 3 0.6 1
 ```
 
 ## File Naming Conventions

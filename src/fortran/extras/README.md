@@ -1,6 +1,6 @@
 # Comparison Utilities for NSPE Output Validation
 
-> **Note:** These Fortran programs are superseded by the C++ `uband_diff`
+> **Note:** These Fortran programs are superseded by the C++ `tl_diff`
 > engine, which provides expanded functionality and more mathematically
 > rigorous comparison. These programs remain in working order for use
 > with the current NSPE Fortran distribution.

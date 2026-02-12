@@ -1,6 +1,6 @@
 # Future Work and Research Extensions
 
-**Status:** All items listed below are EXPERIMENTAL and distinct from production-ready functionality. These are research directions that may inform future papers, standalone analysis tools, or extensions. Each requires independent validation before integration into uband_diff.
+**Status:** All items listed below are EXPERIMENTAL and distinct from production-ready functionality. These are research directions that may inform future papers, standalone analysis tools, or extensions. Each requires independent validation before integration into tl_diff.
 
 ---
 

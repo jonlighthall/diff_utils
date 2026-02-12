@@ -46,10 +46,10 @@ Absolute thresholds fail to capture this scale dependence. Percentage thresholds
 **Example**:
 ```bash
 # Absolute threshold: 0.05
-./bin/uband_diff file1.txt file2.txt 0.05 3 0.6 1
+./bin/tl_diff file1.txt file2.txt 0.05 3 0.6 1
 
 # Relative threshold: 10%
-./bin/uband_diff file1.txt file2.txt -10 3 0.6 1
+./bin/tl_diff file1.txt file2.txt -10 3 0.6 1
 ```
 
 ### Reference Value Selection for Percent Mode
@@ -179,7 +179,7 @@ adaptive_threshold = scale × EPSILON × 100  // 100 ULP threshold
 
 **Proposed syntax**:
 ```bash
-./bin/uband_diff file1.txt file2.txt 0.05:0.1:0.02 ...
+./bin/tl_diff file1.txt file2.txt 0.05:0.1:0.02 ...
 # Column 1: 0.05, Column 2: 0.1, Column 3: 0.02
 ```
 

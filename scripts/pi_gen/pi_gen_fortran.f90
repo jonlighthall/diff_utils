@@ -1,6 +1,6 @@
 program pi_precision_test
  ! Program to calculate pi and output with increasing precision
- ! Purpose: Test uband_diff's ability to recognize that values
+ ! Purpose: Test tl_diff's ability to recognize that values
  ! at different precisions (3.1 vs 3.14) are equivalent when
  ! their raw difference is within the sub-LSB tolerance
 

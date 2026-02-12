@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 
-#include "uband_diff.h"
+#include "tl_diff.h"
 
 // Directory for temporary test files
 static constexpr const char* TEST_DIR = "../../build/test/";

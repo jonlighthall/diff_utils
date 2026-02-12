@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the six-level hierarchical discrimination algorithm used for numerical file comparison in `uband_diff`. **This hierarchy is the author's novel organizing principle** for progressive refinement pipeline that classifies numeric differences into hierarchical categories, enabling domain-specific and precision-aware comparison.
+This document describes the six-level hierarchical discrimination algorithm used for numerical file comparison in `tl_diff`. **This hierarchy is the author's novel organizing principle** for progressive refinement pipeline that classifies numeric differences into hierarchical categories, enabling domain-specific and precision-aware comparison.
 
 The program implements **early-exit logic**: it continues through subsequent levels only when a match is found or critical failure occurs, not as a mere taxonomy but as an operational decision-making framework.
 
@@ -19,11 +19,11 @@ The algorithm implements a six-level hierarchy where each level applies specific
 ## Implementation Architecture
 
 **Key source files:**
-- `src/cpp/include/uband_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
+- `src/cpp/include/tl_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
 - `src/cpp/include/difference_analyzer.h` — Core analyzer interface
 - `src/cpp/src/difference_analyzer.cpp` — Discrimination logic implementation (early-exit control flow)
 - `src/cpp/src/file_comparator.cpp` — File parsing, orchestration, summary generation
-- `src/cpp/main/uband_diff.cpp` — Command-line interface
+- `src/cpp/main/tl_diff.cpp` — Command-line interface
 
 **Runtime data structures:**
 - **`ColumnValues`**: Per-element structure containing `value1`, `value2`, `min_dp` (minimum decimal places), `max_dp`, range information
@@ -454,11 +454,11 @@ The comparison fails (non-zero exit code) under these conditions:
 For developers working on the discrimination algorithm:
 
 **Core Implementation Files**:
-- `src/cpp/include/uband_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
+- `src/cpp/include/tl_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
 - `src/cpp/include/difference_analyzer.h` — `DifferenceAnalyzer` class declaration
 - `src/cpp/src/difference_analyzer.cpp` — Core logic: `process_difference()`, `process_raw_values()`, `process_rounded_values()`, `round_to_decimals()`
 - `src/cpp/src/file_comparator.cpp` — Orchestration: `compare_files()`, `process_line()`, `process_column()`, summary printing
-- `src/cpp/main/uband_diff.cpp` — CLI parsing and threshold initialization
+- `src/cpp/main/tl_diff.cpp` — CLI parsing and threshold initialization
 
 **Key Functions by Level**:
 - LEVEL 1: `DifferenceAnalyzer::process_raw_values()`

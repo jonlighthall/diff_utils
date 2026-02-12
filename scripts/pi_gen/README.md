@@ -1,7 +1,7 @@
 # Pi Precision Test Suite
 
 ## Overview
-This test suite validates `uband_diff`'s sub-LSB (Least Significant Bit) detection capability using π calculated at different precisions across multiple programming languages.
+This test suite validates `tl_diff`'s sub-LSB (Least Significant Bit) detection capability using π calculated at different precisions across multiple programming languages.
 
 ## Test Philosophy
 When comparing numerical values at different precisions, values that differ by less than half the LSB of the coarser precision should be considered equivalent. This is critical for:
@@ -74,7 +74,7 @@ Each line in the output represents π at a specific precision level:
 ### Test 1: Identical Files
 **Command:**
 ```bash
-./bin/uband_diff pi_values1.txt pi_values2.txt 0 1 0
+./bin/tl_diff pi_values1.txt pi_values2.txt 0 1 0
 ```
 **Expected:** Files are identical
 **Result:** ✅ PASS
@@ -82,7 +82,7 @@ Each line in the output represents π at a specific precision level:
 ### Test 2: Cross-Precision Comparison (The Critical Test)
 **Command:**
 ```bash
-./bin/uband_diff pi_1dp.txt pi_2dp.txt 0 1 0
+./bin/tl_diff pi_1dp.txt pi_2dp.txt 0 1 0
 ```
 **Setup:**
 - `pi_1dp.txt`: Contains `3.1` (1 decimal place)
@@ -101,7 +101,7 @@ Each line in the output represents π at a specific precision level:
 ### Test 3: The Original Edge Case (30.8 vs 30.85)
 **Command:**
 ```bash
-./bin/uband_diff case6r.tl case6r_01.asc 0 1 0
+./bin/tl_diff case6r.tl case6r_01.asc 0 1 0
 ```
 **Analysis:**
 - Raw difference: |30.8 - 30.85| = 0.05
@@ -181,17 +181,17 @@ awk 'NR>4 {print $2}' pi_test1.txt > pi_values1.txt
 ### Run Tests
 ```bash
 # Test 1: Identical files
-./bin/uband_diff pi_values1.txt pi_values2.txt 0 1 0
+./bin/tl_diff pi_values1.txt pi_values2.txt 0 1 0
 
 # Test 2: Cross-precision (manual creation)
 echo "3.1" > pi_1dp.txt
 echo "3.14" > pi_2dp.txt
-./bin/uband_diff pi_1dp.txt pi_2dp.txt 0 1 0
+./bin/tl_diff pi_1dp.txt pi_2dp.txt 0 1 0
 ```
 
 ## Conclusion
 
-The π precision test suite demonstrates that `uband_diff` correctly handles:
+The π precision test suite demonstrates that `tl_diff` correctly handles:
 1. ✅ Values at different precisions (3.1 vs 3.14)
 2. ✅ Sub-LSB differences (differences smaller than minimum representable step)
 3. ✅ Floating-point edge cases (exact half-LSB boundaries)

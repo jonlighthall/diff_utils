@@ -1,8 +1,8 @@
-# uband_diff Documentation
+# tl_diff Documentation
 
 ## Overview
 
-This directory contains two LaTeX documents for the `uband_diff` utility:
+This directory contains two LaTeX documents for the `tl_diff` utility:
 
 1. **Technical Memorandum** - Concise overview emphasizing novelty and operational impact (8-12 pages)
 2. **Technical Report** - Comprehensive reference with full implementation details (30+ pages)
@@ -175,7 +175,7 @@ UBAND_DIFF_TECHNICAL_REPORT.pdf
 
 ## Key Features
 
-- **Comprehensive**: Combines all uband_diff documentation into one cohesive report
+- **Comprehensive**: Combines all tl_diff documentation into one cohesive report
 - **Mathematical Rigor**: Detailed derivations of thresholds and algorithms
 - **Cross-Referenced**: Internal hyperlinks for easy navigation
 - **Production Quality**: Publication-ready LaTeX formatting

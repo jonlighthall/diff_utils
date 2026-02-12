@@ -1,5 +1,5 @@
 /**
- * @file uband_diff.cpp
+ * @file tl_diff.cpp
  * @brief Main program for comparing numerical data files with
  * precision-aware difference thresholds. Supports complex numbers and variable
  * precision.
@@ -8,7 +8,7 @@
  * @date January 2025
  * Refactored from src/uband_diff.cpp (Jul 2025)
  *
- * Usage: uband_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
+ * Usage: tl_diff <file1> <file2> [sig_thresh] [crit_thresh] [print_thresh]
  *   file1, file2 - Input files to compare
  *   sig_thresh   - difference threshold for counting significant errors
  *                  (default: 0.05)
@@ -18,7 +18,7 @@
  *                  (default: 1.0)
  */
 
-#include "uband_diff.h"
+#include "tl_diff.h"
 
 #include <libgen.h>
 #include <limits.h>
@@ -71,7 +71,7 @@ bool show_help_if_requested(int argc, char* argv[]) {
   if (argc >= 2 &&
       (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help" ||
        std::string(argv[1]) == "help")) {
-    std::cout << "uband_diff - Numerical File Comparison Tool\n" << std::endl;
+    std::cout << "tl_diff - Numerical File Comparison Tool\n" << std::endl;
     std::cout << "USAGE:" << std::endl;
     std::cout << "  " << argv[0]
               << " <file1> <file2> [threshold] [hard_threshold] "
@@ -405,7 +405,7 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
 
 void call_plot_script(const std::string& file1, const std::string& file2,
                       double threshold, int debug_level) {
-  // Find the directory containing the uband_diff executable
+  // Find the directory containing the tl_diff executable
   char exe_path[PATH_MAX];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
 

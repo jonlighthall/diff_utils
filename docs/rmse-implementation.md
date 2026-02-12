@@ -2,13 +2,13 @@
 
 ## Overview
 
-Added Root Mean Square Error (RMSE) calculation and reporting to `uband_diff` with intelligent handling of multi-column data structures.
+Added Root Mean Square Error (RMSE) calculation and reporting to `tl_diff` with intelligent handling of multi-column data structures.
 
 ## Implementation Details
 
 ### Data Structures
 
-**File**: `src/cpp/include/uband_diff.h`
+**File**: `src/cpp/include/tl_diff.h`
 
 Added new `RMSEStats` structure with three levels of RMSE tracking:
 
@@ -189,7 +189,7 @@ else                   weight = (110.0 - TL) / 50.0;  // Linear
 
 ### Implementation Details
 
-**File**: `src/cpp/include/uband_diff.h`
+**File**: `src/cpp/include/tl_diff.h`
 
 Added to `RMSEStats`:
 - `sum_weighted_squared_errors_data` - Global weighted sum

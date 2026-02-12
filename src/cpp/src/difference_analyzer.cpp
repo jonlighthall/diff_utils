@@ -12,7 +12,7 @@
 #include <iostream>
 #include <limits>
 
-#include "uband_diff.h"  // For data structures
+#include "tl_diff.h"  // For data structures
 
 DifferenceAnalyzer::DifferenceAnalyzer(const Thresholds& thresholds)
     : thresh(thresholds) {}

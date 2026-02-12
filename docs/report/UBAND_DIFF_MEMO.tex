@@ -717,7 +717,7 @@ This provides both rapid feedback (useful in automated testing) and comprehensiv
 \subsubsection{Default Comparison (threshold = 0)}
 
 \begin{verbatim}
-$ uband_diff file1.txt file2.txt
+$ tl_diff file1.txt file2.txt
 \end{verbatim}
 
 Reports all non-trivial differences (maximum sensitivity mode).
@@ -725,7 +725,7 @@ Reports all non-trivial differences (maximum sensitivity mode).
 \subsubsection{Absolute Threshold}
 
 \begin{verbatim}
-$ uband_diff -t 0.01 file1.txt file2.txt
+$ tl_diff -t 0.01 file1.txt file2.txt
 \end{verbatim}
 
 Ignores differences below 0.01 (after rounding to common precision).
@@ -733,7 +733,7 @@ Ignores differences below 0.01 (after rounding to common precision).
 \subsubsection{Percent Threshold}
 
 \begin{verbatim}
-$ uband_diff -t -2 file1.txt file2.txt
+$ tl_diff -t -2 file1.txt file2.txt
 \end{verbatim}
 
 Ignores differences below 2\% (negative value activates percent mode).
@@ -819,7 +819,7 @@ COMPARISON: Files DIFFER (60 non-zero-weighted differences, 6.25% of total)
 
 \begin{verbatim}
 test: test_regression
-    @uband_diff -t 0.01 reference.txt output.txt
+    @tl_diff -t 0.01 reference.txt output.txt
     @echo "Validation passed"
 
 .PHONY: test
@@ -835,7 +835,7 @@ MODEL_OUTPUT="output/transmission_loss.txt"
 REFERENCE="data/reference/tl_baseline.txt"
 THRESHOLD=0.05
 
-if uband_diff -t ${THRESHOLD} ${REFERENCE} ${MODEL_OUTPUT}; then
+if tl_diff -t ${THRESHOLD} ${REFERENCE} ${MODEL_OUTPUT}; then
     echo "[PASS] Model validation PASSED"
     exit 0
 else
@@ -1021,7 +1021,7 @@ diff_utils/
 |-- src/
 |   |-- cpp/
 |   |   |-- include/
-|   |   |   |-- uband_diff.h           # Threshold/stat structures
+|   |   |   |-- tl_diff.h           # Threshold/stat structures
 |   |   |   |-- difference_analyzer.h  # Core analyzer
 |   |   |   |-- file_comparator.h      # File orchestration
 |   |   |   |-- file_reader.h          # Parsing utilities
@@ -1034,13 +1034,13 @@ diff_utils/
 |   |   |   |-- line_parser.cpp
 |   |   |   `-- format_tracker.cpp
 |   |   |-- main/
-|   |   |   `-- uband_diff.cpp         # CLI entry point
+|   |   |   `-- tl_diff.cpp         # CLI entry point
 |   |   `-- tests/
 |   `-- fortran/
 |       `-- pi_precision_test.f90      # Validation program
 |-- build/
 |   |-- bin/
-|   |   `-- uband_diff                 # Main executable
+|   |   `-- tl_diff                 # Main executable
 |   |-- obj/                           # Object files
 |   `-- test/                          # Test outputs
 |-- data/
@@ -1112,7 +1112,7 @@ private:
 \subsection{Dependency Graph}
 
 \begin{verbatim}
-uband_diff (main)
+tl_diff (main)
   `-- FileComparator
       |-- FileReader
       |   `-- LineParser

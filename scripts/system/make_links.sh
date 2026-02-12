@@ -32,7 +32,7 @@ link_dir=$HOME/bin
 cbar "Start Making Links"
 # list of C++ executables
 ext=''
-for my_link in uband_diff; do
+for my_link in tl_diff; do
 
     # define target (source)
     target=${target_dir}/${my_link}${ext}

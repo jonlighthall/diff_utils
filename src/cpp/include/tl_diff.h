@@ -4,8 +4,8 @@
  * Refactored from main/uband_diff.cpp
  */
 
-#ifndef UBAND_DIFF_H
-#define UBAND_DIFF_H
+#ifndef TL_DIFF_H
+#define TL_DIFF_H
 
 #include <cmath>
 #include <fstream>
@@ -696,4 +696,4 @@ class FileComparator {
                                 const std::string& color = "") const;
 };
 
-#endif  // UBAND_DIFF_H
+#endif  // TL_DIFF_H

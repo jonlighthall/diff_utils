@@ -2,9 +2,9 @@
 
 ## Overview
 
-This document describes the implementation of TL (Transmission Loss) curve comparison metrics in `uband_diff`, based on the **IEEE peer-reviewed methodology from Fabre et al.** for comparing acoustic propagation models.
+This document describes the implementation of TL (Transmission Loss) curve comparison metrics in `tl_diff`, based on the **IEEE peer-reviewed methodology from Fabre et al.** for comparing acoustic propagation models.
 
-**CRITICAL**: This is currently the ONLY known peer-reviewed, published quantitative standard for TL curve comparison. Any authoritative pass/fail decision on TL curve equivalence MUST use this algorithm. The role of `uband_diff` is to enable application of Fabre's method by first filtering out formatting artifacts that would otherwise prevent comparison.
+**CRITICAL**: This is currently the ONLY known peer-reviewed, published quantitative standard for TL curve comparison. Any authoritative pass/fail decision on TL curve equivalence MUST use this algorithm. The role of `tl_diff` is to enable application of Fabre's method by first filtering out formatting artifacts that would otherwise prevent comparison.
 
 ## Metrics Implemented
 
@@ -231,7 +231,7 @@ Based on methodology from:
 
 ## Code Locations
 
-- **Header**: `src/cpp/include/uband_diff.h` (lines ~314-407)
+- **Header**: `src/cpp/include/tl_diff.h` (lines ~314-407)
 - **Data Collection**: `src/cpp/src/file_comparator.cpp` (lines ~777-783)
 - **Finalization**: `src/cpp/src/file_comparator.cpp` (line ~532)
 - **Output**: `src/cpp/src/file_comparator.cpp` (lines ~2024-2070)

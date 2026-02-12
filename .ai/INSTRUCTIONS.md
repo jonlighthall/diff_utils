@@ -128,13 +128,13 @@ See engine conventions in [cpp_engine/INSTRUCTIONS.md](cpp_engine/INSTRUCTIONS.m
 
 **Hyphenated Names in bin/:**
 Programs in `bin/` are callable via hyphenated names (wrappers):
-- `./bin/uband-diff` → runs `./bin/uband_diff`
+- `./bin/tl-diff` → runs `./bin/tl_diff`
 - `./bin/pi-precision-test` → runs `./bin/pi_precision_test`
 - `./bin/pi-comparison` → runs `./bin/pi_comparison`
 
 Wrappers are lightweight bash scripts. They require executable permission:
 ```bash
-chmod +x bin/uband-diff bin/pi-precision-test bin/pi-comparison
+chmod +x bin/tl-diff bin/pi-precision-test bin/pi-comparison
 ```
 
 Use in scripts and documentation; they're more discoverable than underscored names.
@@ -280,15 +280,15 @@ Files that produced no output: N
 **Diff Results Section (appears FIRST for emphasis):**
 ```
 Diff Details:
-  Files that passed with tldiff or uband_diff (simple diff failed): N
-  Files that passed with uband_diff (tldiff failed): N
+  Files that passed with tldiff or tl_diff (simple diff failed): N
+  Files that passed with tl_diff (tldiff failed): N
   Files that failed all diff tools: N
 Passed files: N
 Failed files: N
 Skipped files: N
 ```
 
-**Key insight:** A file in "Passed files" may have required tldiff or uband_diff instead of exact match. Check "Diff Details" to see which tool passed it.
+**Key insight:** A file in "Passed files" may have required tldiff or tl_diff instead of exact match. Check "Diff Details" to see which tool passed it.
 
 **Binary File Cleanup:**
 ```
@@ -313,7 +313,7 @@ File: case1.in
 File: case2.in
   [Pass listed in first section]
   [Listed under "simple diff failed"]
-→ Passed tldiff/uband_diff because differences are sub-LSB (trivial)
+→ Passed tldiff/tl_diff because differences are sub-LSB (trivial)
 ```
 
 **Example 3: Genuine Difference**
@@ -347,7 +347,7 @@ File: case3.in
 
 **Problem: Diff shows files as failed but should be identical**
 - Common cause: floating-point rounding across platforms
-- `uband_diff` applies sub-LSB detection; check "Diff Details" section
+- `tl_diff` applies sub-LSB detection; check "Diff Details" section
 - Run with `--debug` to see exact diff output
 
 **Problem: Files being skipped with --skip-existing**
@@ -394,7 +394,7 @@ make -j4            # Parallel build with 4 jobs (faster)
 
 ```
 build/bin/
-├── uband_diff              # C++ main executable
+├── tl_diff              # C++ main executable
 ├── column_analyzer         # Utility
 ├── tl_metrics              # Utility
 ├── cpddiff                 # Fortran: Ducting probability
@@ -451,17 +451,17 @@ Regular builds (`make all`) will succeed—only test targets require gtest.
 # Simple test
 echo "1 30.8" > /tmp/ref.txt
 echo "1 30.85" > /tmp/test.txt
-./build/bin/uband_diff /tmp/ref.txt /tmp/test.txt 0 1 0
+./build/bin/tl_diff /tmp/ref.txt /tmp/test.txt 0 1 0
 # Expected: Classified as EQUIVALENT (sub-LSB)
 
 # Cross-precision test
 echo "A 10.1 20.2" > /tmp/ref.txt
 echo "A 10.15 20.25" > /tmp/test.txt
-./build/bin/uband_diff /tmp/ref.txt /tmp/test.txt 0 1 0
+./build/bin/tl_diff /tmp/ref.txt /tmp/test.txt 0 1 0
 # Expected: Both differences classified as sub-LSB (EQUIVALENT)
 
 # Zero-threshold maximum sensitivity
-./build/bin/uband_diff data/bbtl.pe02.ref.txt data/bbtl.pe02.test.txt 0 1 0
+./build/bin/tl_diff data/bbtl.pe02.ref.txt data/bbtl.pe02.test.txt 0 1 0
 # Expected: Every non-trivial, non-ignored difference counted as significant
 ```
 
@@ -582,10 +582,10 @@ make clean && make 2>&1 | head -50
 # Simplify test file first
 echo "1 10.0" > /tmp/simple.txt
 echo "1 10.01" > /tmp/simple_test.txt
-./build/bin/uband_diff /tmp/simple.txt /tmp/simple_test.txt 0 1 0
+./build/bin/tl_diff /tmp/simple.txt /tmp/simple_test.txt 0 1 0
 
 # GDB if needed
-gdb --args ./build/bin/uband_diff /tmp/simple.txt /tmp/simple_test.txt 0 1 0
+gdb --args ./build/bin/tl_diff /tmp/simple.txt /tmp/simple_test.txt 0 1 0
 ```
 
 ### Test Failures

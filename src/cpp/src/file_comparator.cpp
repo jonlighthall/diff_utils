@@ -1,5 +1,5 @@
 /**
- * @file uband_diff.cpp
+ * @file file_comparator.cpp
  * @brief Implementation of file comparison utilities for numerical data with
  * support for complex numbers.
  *
@@ -48,7 +48,7 @@
 
 #include "error_accumulation_analyzer.h"
 #include "precision_info.h"
-#include "uband_diff.h"
+#include "tl_diff.h"
 
 // Implementation moved outside the class definition
 
@@ -454,7 +454,7 @@ bool FileComparator::compare_files(const std::string& file1,
               << std::endl;
     // Create legacy PrintLevel for file_reader (TODO: update file_reader)
     PrintLevel legacy_print{debug.level, verbosity.quiet, debug.enabled,
-                           debug.detailed, debug.verbose};
+                            debug.detailed, debug.verbose};
     structures_compatible =
         file_reader_->compare_column_structures(file1, file2, legacy_print);
 
@@ -974,7 +974,8 @@ void FileComparator::print_table(const ColumnValues& column_data,
   if (counter.diff_print == 0) {
     std::cout << "DIFFERENCES:" << std::endl;
     if (thresh.significant < table.threshold) {
-      std::cout << "\033[1;33mWarning: Threshold for printing (" << table.threshold
+      std::cout << "\033[1;33mWarning: Threshold for printing ("
+                << table.threshold
                 << ") is greater than the significant difference threshold ("
                 << thresh.significant
                 << "). Some significant differences may not be "
@@ -1250,8 +1251,8 @@ void FileComparator::print_non_zero_differences_info(
   if (verbosity.show_statistics) {
     const size_t zero_diff = counter.elem_number - counter.diff_non_zero;
     std::cout << "   LEVEL 1 total: " << zero_diff << " exact matches + "
-              << counter.diff_non_zero << " non-zero = "
-              << counter.elem_number << " elements" << std::endl;
+              << counter.diff_non_zero << " non-zero = " << counter.elem_number
+              << " elements" << std::endl;
   }
 }
 
@@ -1294,11 +1295,12 @@ void FileComparator::print_maximum_difference_analysis(
         differ.ndp_non_zero,
         static_cast<int>(-std::floor(std::log10(differ.max_non_zero)) + 2));
     std::cout << "   \033[4;35mMaximum raw difference: "
-              << format_number(differ.max_non_zero, display_precision,
-                               static_cast<int>(std::round(std::log10(std::max(
-                                                    differ.max_non_zero, 1.0))) +
-                                                2),
-                               display_precision)
+              << format_number(
+                     differ.max_non_zero, display_precision,
+                     static_cast<int>(std::round(std::log10(
+                                          std::max(differ.max_non_zero, 1.0))) +
+                                      2),
+                     display_precision)
               << "\033[0m" << std::endl;
 
     // Print maximum percent error immediately after
@@ -1314,7 +1316,8 @@ void FileComparator::print_maximum_difference_analysis(
     }
   }
 
-  // Skip threshold comparison messages at verbosity 0 (only show at verbosity 1+)
+  // Skip threshold comparison messages at verbosity 0 (only show at verbosity
+  // 1+)
   if (!verbosity.show_statistics) {
     return;
   }
@@ -1558,8 +1561,9 @@ void FileComparator::print_rounded_summary(const SummaryParams& params) const {
   // Print binary discrimination total at verbosity 1+
   if (verbosity.show_statistics) {
     std::cout << "   LEVEL 2 total: " << trivial_diff << " trivial + "
-              << counter.diff_non_trivial << " non-trivial = "
-              << counter.diff_non_zero << " non-zero differences" << std::endl;
+              << counter.diff_non_trivial
+              << " non-trivial = " << counter.diff_non_zero
+              << " non-zero differences" << std::endl;
   }
 
   if (differ.max_non_trivial > thresh.significant) {
@@ -1623,13 +1627,19 @@ void FileComparator::print_significant_summary(
                                        counter.diff_marginal -
                                        counter.diff_critical;
 
-    std::cout << "  LEVEL 4 DISCRIMINATION: Zero-Weighted vs Non-Zero-Weighted (Operational Significance)" << std::endl;
-    if (counter.diff_marginal > 0) {
-      print_count_with_percent(params, "Zero-weighted differences (>" + std::to_string(static_cast<int>(thresh.marginal)) + " dB, weighted to zero)",
-                               counter.diff_marginal, "\033[1;33m");
-    }
-    std::cout << "   Non-zero-weighted differences (≤" << thresh.marginal << " dB): " << non_marginal_non_critical
+    std::cout << "  LEVEL 4 DISCRIMINATION: Zero-Weighted vs Non-Zero-Weighted "
+                 "(Operational Significance)"
               << std::endl;
+    if (counter.diff_marginal > 0) {
+      print_count_with_percent(
+          params,
+          "Zero-weighted differences (>" +
+              std::to_string(static_cast<int>(thresh.marginal)) +
+              " dB, weighted to zero)",
+          counter.diff_marginal, "\033[1;33m");
+    }
+    std::cout << "   Non-zero-weighted differences (≤" << thresh.marginal
+              << " dB): " << non_marginal_non_critical << std::endl;
 
     // Print binary discrimination total
     std::cout << "   LEVEL 4 total: " << counter.diff_marginal
@@ -1637,7 +1647,9 @@ void FileComparator::print_significant_summary(
               << " non-zero-weighted = " << counter.diff_significant
               << " normal differences" << std::endl;
     printbar(1);
-    std::cout << "  LEVEL 5 DISCRIMINATION: Critical vs Non-Critical (Magnitude Threshold >" << thresh.critical << " dB)" << std::endl;
+    std::cout << "  LEVEL 5 DISCRIMINATION: Critical vs Non-Critical "
+                 "(Magnitude Threshold >"
+              << thresh.critical << " dB)" << std::endl;
     if (counter.diff_critical > 0) {
       print_count_with_percent(params, "Critical differences",
                                counter.diff_critical, "\033[1;31m");
@@ -1646,15 +1658,20 @@ void FileComparator::print_significant_summary(
     }
 
     // Print binary discrimination total
-    std::cout << "   LEVEL 5 total: " << counter.diff_critical
-              << " critical + " << non_marginal_non_critical
-              << " non-critical = " << non_marginal_non_critical + counter.diff_critical
+    std::cout << "   LEVEL 5 total: " << counter.diff_critical << " critical + "
+              << non_marginal_non_critical << " non-critical = "
+              << non_marginal_non_critical + counter.diff_critical
               << " non-zero-weighted differences" << std::endl;
     printbar(1);
     if (non_marginal_non_critical > 0) {
-      std::cout << "  LEVEL 6 ASSESSMENT: User-Threshold Exceedances (" << counter.elem_number << " elements, tolerance <2%)" << std::endl;
-      print_count_with_percent(params, "Non-zero-weighted, non-critical differences (>" + std::to_string(thresh.significant) + " user threshold)",
-                               non_marginal_non_critical, "\033[1;36m");
+      std::cout << "  LEVEL 6 ASSESSMENT: User-Threshold Exceedances ("
+                << counter.elem_number << " elements, tolerance <2%)"
+                << std::endl;
+      print_count_with_percent(
+          params,
+          "Non-zero-weighted, non-critical differences (>" +
+              std::to_string(thresh.significant) + " user threshold)",
+          non_marginal_non_critical, "\033[1;36m");
     }
   }
 
@@ -1666,9 +1683,11 @@ void FileComparator::print_significant_summary(
 
 void FileComparator::print_significant_differences_count(
     const SummaryParams& params) const {
-  std::cout << "  LEVEL 3 DISCRIMINATION: Subnormal vs Normal (Machine Precision Limit)" << std::endl;
-  std::cout << "   Normal differences (≤" << thresh.ignore << " dB TL, user threshold >" << thresh.significant
-            << "): ";
+  std::cout << "  LEVEL 3 DISCRIMINATION: Subnormal vs Normal (Machine "
+               "Precision Limit)"
+            << std::endl;
+  std::cout << "   Normal differences (≤" << thresh.ignore
+            << " dB TL, user threshold >" << thresh.significant << "): ";
 
   std::cout << "\033[1;31m" << std::setw(params.fmt_wid)
             << counter.diff_significant << "\033[0m";
@@ -1777,11 +1796,13 @@ void FileComparator::print_significant_percentage() const {
 
 void FileComparator::print_insignificant_differences_count(
     const SummaryParams& params) const {
-  // Print subnormal differences if any exist (pressures < single-precision epsilon)
+  // Print subnormal differences if any exist (pressures < single-precision
+  // epsilon)
   if (counter.diff_insignificant > 0) {
     print_count_with_percent(params,
                              "Subnormal differences (>" +
-                                 std::to_string(thresh.ignore) + " dB, pressures < ε_single)",
+                                 std::to_string(thresh.ignore) +
+                                 " dB, pressures < ε_single)",
                              counter.diff_insignificant);
   }
 
@@ -2404,7 +2425,8 @@ void FileComparator::print_settings(const std::string& file1,
   }
   std::cout << "      Critical   : \033[1;31m" << thresh.critical
             << "\033[0m (halt)" << std::endl;
-  std::cout << "      Print      : " << table.threshold << " (print)" << std::endl;
+  std::cout << "      Print      : " << table.threshold << " (print)"
+            << std::endl;
   if (verbosity.show_statistics) {
     std::cout << "   Fixed Thresholds " << std::endl;
     std::cout << "      Zero       : " << thresh.zero << std::endl;

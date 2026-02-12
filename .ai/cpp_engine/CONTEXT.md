@@ -1,6 +1,6 @@
 # Context — C++ Engine (DifferenceAnalyzer)
 
-Purpose: Focused context for the numeric comparison engine used by uband_diff and related tools. Use this when working on core semantics, precision handling, and classification logic.
+Purpose: Focused context for the numeric comparison engine used by tl_diff and related tools. Use this when working on core semantics, precision handling, and classification logic.
 
 ---
 

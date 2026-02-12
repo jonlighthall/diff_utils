@@ -215,14 +215,14 @@ SUMMARY:
 
 ## Conclusion
 
-The sub-LSB fix ensures that `uband_diff` performs **true precision-aware comparison**, where:
+The sub-LSB fix ensures that `tl_diff` performs **true precision-aware comparison**, where:
 
 1. Values are compared at their **representational precision**, not just numeric precision
 2. Cross-platform formatting differences are **tolerated** as expected
 3. Only **distinguishable differences** at the coarser precision level are reported
 4. The tool behaves **rigorously** according to information theory and measurement principles
 
-This makes `uband_diff` suitable for:
+This makes `tl_diff` suitable for:
 - ✅ Cross-platform numerical validation
 - ✅ Multi-language code comparison (Fortran vs C++ vs Python)
 - ✅ Compiler optimization testing
