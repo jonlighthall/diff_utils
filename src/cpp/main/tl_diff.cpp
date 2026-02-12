@@ -38,15 +38,15 @@ struct ProgramArgs {
   double significant_threshold = 0.05;
   double critical_threshold = 10.0;
   double table_threshold = 1.0;  // Renamed from print_level (clearer purpose)
-  int verbosity_level = 0;  // User-facing output verbosity
-  int debug_level = 0;      // Developer diagnostics
-  size_t max_rows = 32;     // Maximum table rows before truncation
-  // If true, interpret significant_threshold as a percent threshold (fraction stored
-  // in significant_percent). This is set when the user supplies a negative
-  // threshold on the command line (e.g. -1 -> 1%).
+  int verbosity_level = 0;       // User-facing output verbosity
+  int debug_level = 0;           // Developer diagnostics
+  size_t max_rows = 32;          // Maximum table rows before truncation
+  // If true, interpret significant_threshold as a percent threshold (fraction
+  // stored in significant_percent). This is set when the user supplies a
+  // negative threshold on the command line (e.g. -1 -> 1%).
   bool significant_threshold_is_percent = false;
   double significant_percent = 0.0;  // fractional (0.01 == 1%)
-  bool plot_enabled = false;   // If true, call Python plotting script
+  bool plot_enabled = false;         // If true, call Python plotting script
 };
 
 bool show_help_if_requested(int argc, char* argv[]);
@@ -61,10 +61,10 @@ void call_plot_script(const std::string& file1, const std::string& file2,
                       double threshold, int debug_level);
 
 bool is_named_flag(const std::string& arg) {
-  return (arg == "--plot" ||
-          arg == "-v" || arg.substr(0, 12) == "--verbosity=" ||
-          arg == "-d" || arg.substr(0, 8) == "--debug=" ||
-          arg == "-m" || arg.substr(0, 11) == "--max-rows=");
+  return (arg == "--plot" || arg == "-v" ||
+          arg.substr(0, 12) == "--verbosity=" || arg == "-d" ||
+          arg.substr(0, 8) == "--debug=" || arg == "-m" ||
+          arg.substr(0, 11) == "--max-rows=");
 }
 
 bool show_help_if_requested(int argc, char* argv[]) {
@@ -78,37 +78,55 @@ bool show_help_if_requested(int argc, char* argv[]) {
                  "[table_threshold] [verbosity] [debug] [OPTIONS]"
               << std::endl;
     std::cout << "\nARGUMENTS:" << std::endl;
-    std::cout << "  file1              First input file to compare" << std::endl;
-    std::cout << "  file2              Second input file to compare" << std::endl;
+    std::cout << "  file1              First input file to compare"
+              << std::endl;
+    std::cout << "  file2              Second input file to compare"
+              << std::endl;
     std::cout << "  threshold          Soft threshold for counting differences"
               << std::endl;
     std::cout
         << "                     (default: 0.05). If negative, interpreted as "
            "percent (e.g. -1 => 1%)"
         << std::endl;
-    std::cout
-        << "  hard_threshold     Hard threshold for failure detection"
-        << std::endl;
-    std::cout << "                     (default: 10.0, must be ≥ 0)" << std::endl;
+    std::cout << "  hard_threshold     Hard threshold for failure detection"
+              << std::endl;
+    std::cout << "                     (default: 10.0, must be ≥ 0)"
+              << std::endl;
     std::cout << "  table_threshold    Minimum difference to show in table"
               << std::endl;
-    std::cout << "                     (default: 1.0, 0 shows all non-zero like diff)" << std::endl;
-    std::cout << "  verbosity          Output detail level: <0=quiet, 0=normal, 1+=verbose"
+    std::cout
+        << "                     (default: 1.0, 0 shows all non-zero like diff)"
+        << std::endl;
+    std::cout << "  verbosity          Output detail level: <0=quiet, "
+                 "0=normal, 1+=verbose"
               << std::endl;
     std::cout << "                     (default: 0)" << std::endl;
-    std::cout << "  debug              Debug diagnostic level: 0=off, 1-3=increasing detail"
+    std::cout << "  debug              Debug diagnostic level: 0=off, "
+                 "1-3=increasing detail"
               << std::endl;
-    std::cout << "                     (default: 0, for troubleshooting only)" << std::endl;
+    std::cout << "                     (default: 0, for troubleshooting only)"
+              << std::endl;
     std::cout << "\nOPTIONS:" << std::endl;
-    std::cout << "  -v, --verbosity=N   Set verbosity level (overrides positional arg)" << std::endl;
-    std::cout << "  -d, --debug=N       Set debug level (overrides positional arg)" << std::endl;
-    std::cout << "  -m, --max-rows=N    Set maximum table rows before truncation (default: 32)" << std::endl;
-    std::cout << "  --plot              Generate comparison plot using Python script" << std::endl;
-    std::cout << "                      (calls plot_tl_comparison.py with threshold)" << std::endl;
+    std::cout << "  -v, --verbosity=N   Set verbosity level (overrides "
+                 "positional arg)"
+              << std::endl;
+    std::cout
+        << "  -d, --debug=N       Set debug level (overrides positional arg)"
+        << std::endl;
+    std::cout << "  -m, --max-rows=N    Set maximum table rows before "
+                 "truncation (default: 32)"
+              << std::endl;
+    std::cout
+        << "  --plot              Generate comparison plot using Python script"
+        << std::endl;
+    std::cout
+        << "                      (calls plot_tl_comparison.py with threshold)"
+        << std::endl;
     std::cout << "\nEXAMPLES:" << std::endl;
     std::cout << "  " << argv[0] << " data1.txt data2.txt" << std::endl;
     std::cout << "  " << argv[0] << " file1.dat file2.dat 0.01" << std::endl;
-    std::cout << "  # threshold=0.05, hard=1.0, table=0.1, verbosity=1, debug=0" << std::endl;
+    std::cout << "  # threshold=0.05, hard=1.0, table=0.1, verbosity=1, debug=0"
+              << std::endl;
     std::cout << "  " << argv[0] << " test1.txt test2.txt 0.05 1.0 0.1 1 0"
               << std::endl;
     std::cout << "  # With plotting" << std::endl;
@@ -276,9 +294,11 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       if (arg == "-v" && i + 1 < argc) {
         if (!parse_debug_level_argument(argv[++i], value)) return false;
       } else if (arg.substr(0, 12) == "--verbosity=") {
-        if (!parse_debug_level_argument(arg.substr(12).c_str(), value)) return false;
+        if (!parse_debug_level_argument(arg.substr(12).c_str(), value))
+          return false;
       } else {
-        std::cerr << "\n\033[1;31mERROR:\033[0m -v requires a value" << std::endl;
+        std::cerr << "\n\033[1;31mERROR:\033[0m -v requires a value"
+                  << std::endl;
         return false;
       }
       args.verbosity_level = value;
@@ -287,9 +307,11 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       if (arg == "-d" && i + 1 < argc) {
         if (!parse_debug_level_argument(argv[++i], value)) return false;
       } else if (arg.substr(0, 8) == "--debug=") {
-        if (!parse_debug_level_argument(arg.substr(8).c_str(), value)) return false;
+        if (!parse_debug_level_argument(arg.substr(8).c_str(), value))
+          return false;
       } else {
-        std::cerr << "\n\033[1;31mERROR:\033[0m -d requires a value" << std::endl;
+        std::cerr << "\n\033[1;31mERROR:\033[0m -d requires a value"
+                  << std::endl;
         return false;
       }
       args.debug_level = value;
@@ -298,13 +320,16 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       if (arg == "-m" && i + 1 < argc) {
         if (!parse_debug_level_argument(argv[++i], value)) return false;
       } else if (arg.substr(0, 11) == "--max-rows=") {
-        if (!parse_debug_level_argument(arg.substr(11).c_str(), value)) return false;
+        if (!parse_debug_level_argument(arg.substr(11).c_str(), value))
+          return false;
       } else {
-        std::cerr << "\n\033[1;31mERROR:\033[0m -m requires a value" << std::endl;
+        std::cerr << "\n\033[1;31mERROR:\033[0m -m requires a value"
+                  << std::endl;
         return false;
       }
       if (value < 0) {
-        std::cerr << "\n\033[1;31mERROR:\033[0m max-rows must be non-negative" << std::endl;
+        std::cerr << "\n\033[1;31mERROR:\033[0m max-rows must be non-negative"
+                  << std::endl;
         return false;
       }
       args.max_rows = static_cast<size_t>(value);
@@ -323,8 +348,10 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       if (parsed < 0.0) {
         // Negative indicates percent-mode: -1 => 1%
         args.significant_threshold_is_percent = true;
-        args.significant_percent = std::abs(parsed) / 100.0;  // store fractional
-        // Set significant_threshold to zero for internal absolute-threshold usages
+        args.significant_percent =
+            std::abs(parsed) / 100.0;  // store fractional
+        // Set significant_threshold to zero for internal absolute-threshold
+        // usages
         args.significant_threshold = 0.0;
       } else {
         // Non-negative: regular absolute threshold
@@ -353,7 +380,8 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
       return true;
     }
 
-    if (!parse_threshold_argument(argv[4], args.critical_threshold, "High threshold")) {
+    if (!parse_threshold_argument(argv[4], args.critical_threshold,
+                                  "High threshold")) {
       return false;
     }
     if (args.critical_threshold < args.significant_threshold) {
@@ -508,7 +536,8 @@ int main(int argc, char* argv[]) {
   // Create comparator and run comparison
   FileComparator comparator(args.significant_threshold, args.critical_threshold,
                             args.table_threshold, args.verbosity_level,
-                            args.debug_level, args.significant_threshold_is_percent,
+                            args.debug_level,
+                            args.significant_threshold_is_percent,
                             args.significant_percent, args.max_rows);
   bool result = comparator.compare_files(args.file1, args.file2);
   comparator.print_summary(args.file1, args.file2, argc, argv);
