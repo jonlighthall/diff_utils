@@ -404,6 +404,16 @@ run: all
 	fi
 
 # =============================================================================
+# Package Target — assemble extras/ for NSPE delivery
+# =============================================================================
+
+.PHONY: package
+package:
+	@echo "Assembling extras/ package for NSPE delivery..."
+	cp main/tldiff.f90 main/prsdiff.f90 main/tsdiff.f90 modules/file_diff_utils.f90 extras/
+	@echo "extras/ is ready to copy to the NSPE distribution."
+
+# =============================================================================
 # Help Target
 # =============================================================================
 
@@ -414,4 +424,5 @@ help:
 	@echo "  clean     - remove all generated files"
 	@echo "  remake    - clean then build all"
 	@echo "  run       - build and run the first executable"
+	@echo "  package   - assemble extras/ for NSPE delivery"
 	@echo "  help      - show this help message"
