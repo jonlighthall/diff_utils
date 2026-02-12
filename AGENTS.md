@@ -2,15 +2,9 @@
 
 ## For Humans
 
-You've found the machine-readable project brief. This file exists because AI coding assistants (GitHub Copilot, Cursor, Claude, etc.) are increasingly trained to look for `AGENTS.md` at the repository root for onboarding context.
+You have found a file that was not meant for you. This file provides structured context for AI coding agents working on this repository. For project documentation, see the main [README.md](README.md) or [docs/guide/getting-started.md](docs/guide/getting-started.md).
 
-**What you're looking for is probably:**
-- [README.md](README.md) — Project overview, quick start, technical details
-- [docs/guide/getting-started.md](docs/guide/getting-started.md) — Build instructions, test commands, troubleshooting
-
-This file won't help you. It's a pointer to the `.ai/` folder where AI agents find their working notes. Please don't edit it—the robots will get confused.
-
-—*The AI Context Management Bureau*
+The `.ai/` folder is maintained by AI agents as working memory between sessions. Do not delete or modify files within it unless you understand the implications for AI context continuity.
 
 ---
 
