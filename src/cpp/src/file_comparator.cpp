@@ -46,7 +46,6 @@
 #include <string>
 #include <vector>
 
-#include "error_accumulation_analyzer.h"
 #include "precision_info.h"
 #include "tl_diff.h"
 
@@ -525,16 +524,6 @@ bool FileComparator::compare_files(const std::string& file1,
   }
   flag.file_end_reached = true;
 
-  // Finalize TL metrics (calculate last 4% statistics)
-  tl_metrics.finalize();
-
-  // Compute accumulation metrics if we have sufficient data
-  // This populates the cache for later use in print_summary
-  if (accumulation_data_.n_points >= 5) {
-    ErrorAccumulationAnalyzer analyzer;
-    accumulation_metrics_ = analyzer.analyze(accumulation_data_);
-  }
-
   // Validate file lengths and return result
   if (!file_reader_->compare_file_lengths(file1, file2)) {
     return false;
@@ -771,54 +760,6 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
                                                           column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
 
-  // Accumulate RMSE statistics (use raw difference for all comparisons)
-  rmse_stats.add_error(column_index, diff_unrounded);
-
-  // Accumulate weighted RMSE for data columns (column > 0)
-  // Use TL values for weighting
-  if (column_index > 0) {
-    rmse_stats.add_weighted_error(column_index, diff_unrounded,
-                                  column_data.value1, column_data.value2);
-
-    // Track TL metrics data for M2, M3, and M_curve calculations
-    tl_metrics.add_point(column_data.range, column_data.value1,
-                         column_data.value2, diff_unrounded);
-  }
-
-  // Collect data for error accumulation analysis
-  // Only collect for SIGNIFICANT errors (Level 3+) to focus on meaningful
-  // differences Collect if we have at least 2 columns and this is not column 0
-  // (the independent variable) Increased limit to 200 points to capture errors
-  // throughout entire file (not just first 100 lines)
-  if (column_index > 0 && accumulation_data_.n_points < 200) {
-    // Only add to accumulation data if this is a significant error
-    bool is_significant = (diff_unrounded > thresh.significant);
-
-    if (debug.enabled && is_significant && counter.line_number < 10) {
-      std::cout << "[DEBUG] Line " << counter.line_number << ", col "
-                << column_index << ": is_significant=" << is_significant
-                << ", diff=" << diff_unrounded
-                << ", thresh=" << thresh.significant << "\n";
-    }
-
-    if (is_significant) {
-      accumulation_data_.add_point(
-          column_data.range,   // range value (first column)
-          diff_unrounded,      // raw error magnitude
-          column_data.value1,  // TL from reference file
-          column_data.value2,  // TL from test file
-          is_significant       // significance flag (always true here)
-      );
-      if (debug.enabled && accumulation_data_.n_points <= 3) {
-        std::cout << "[DEBUG] Added point #" << accumulation_data_.n_points
-                  << " at range=" << column_data.range << "\n";
-      }
-    }
-  } else if (debug.enabled && column_index == 0 && counter.line_number < 3) {
-    std::cout << "[DEBUG] Line " << counter.line_number << ", col "
-              << column_index << " - SKIPPED (column_index = 0)\n";
-  }
-
   // Percent error relative to second file (file2) using raw difference.
   double percent_error = 0.0;
   double ref = std::abs(column_data.value2);
@@ -949,22 +890,12 @@ void FileComparator::print_table(const ColumnValues& column_data,
 
   int val_width = mxint + mxdec + 1;  // total width for value columns
 
-  // Calculate weighted diff for display (only for data columns, column_index >
-  // 0)
-  double weighted_diff = 0.0;
-  double tl_weight = 0.0;
-  if (column_index > 0) {
-    double avg_tl = (column_data.value1 + column_data.value2) / 2.0;
-    tl_weight = RMSEStats::calculate_tl_weight(avg_tl);
-    weighted_diff = tl_weight * diff_unrounded;
-  }
-
   // define column widths
   //                     line | col | range | file1 |
-  //                     file2 | thres |diff_rnd | diff_raw | wtd_diff | %err
-  std::vector<int> col_widths = {5,         5,         val_width, val_width,
-                                 val_width, val_width, val_width, val_width,
-                                 val_width, 10};
+  //                     file2 | thres |diff_rnd | diff_raw | %err
+  std::vector<int> col_widths = {5,         5,         val_width,
+                                 val_width, val_width, val_width,
+                                 val_width, val_width, 10};
 
   auto padLeft = [](const std::string& str, int width) {
     if (static_cast<int>(str.length()) >= width) return str;
@@ -991,8 +922,7 @@ void FileComparator::print_table(const ColumnValues& column_data,
     std::cout << padLeft(" thres |", col_widths[5] + 3);
     std::cout << padLeft("diff_rnd |", col_widths[6] + 3);
     std::cout << padLeft("diff_raw |", col_widths[7] + 2);
-    std::cout << padLeft("wtd_diff |", col_widths[8] + 2);
-    std::cout << padLeft("%err", col_widths[9] + 1) << std::endl;
+    std::cout << padLeft("%err", col_widths[8] + 1) << std::endl;
 
     // Print horizontal line matching header width
     int total_width = 0;
@@ -1066,7 +996,6 @@ void FileComparator::print_table(const ColumnValues& column_data,
     }
     if (rdiff > thresh.critical) {
       std::cout << "\033[1;31m";  // Red for critical differences
-      flag.error_found = true;
     }
   };
 
@@ -1080,35 +1009,14 @@ void FileComparator::print_table(const ColumnValues& column_data,
   std::cout << format_number(diff_unrounded, column_data.max_dp, mxint, mxdec);
   std::cout << "\033[0m";
 
-  // weighted difference (only for data columns, column_index > 0)
-  std::cout << " | ";
-  if (column_index > 0) {
-    // Color based on weight: green for high weight (operational), dim for low
-    // weight (marginal)
-    if (tl_weight >= 0.8) {
-      std::cout << "\033[1;32m";  // Green - operational region (high weight)
-    } else if (tl_weight >= 0.3) {
-      std::cout << "\033[1;33m";  // Yellow - transition region
-    } else if (tl_weight > 0.0) {
-      std::cout << "\033[2;37m";  // Dim white - low weight
-    } else {
-      std::cout << "\033[2;90m";  // Dim gray - zero weight (marginal)
-    }
-    std::cout << format_number(weighted_diff, column_data.max_dp, mxint, mxdec);
-    std::cout << "\033[0m";
-  } else {
-    // Range column - no weighted diff
-    std::cout << std::setw(val_width) << "---";
-  }
-
   // percent error column
   std::cout << " | ";
   if (std::isfinite(percent_error)) {
     std::ostringstream pss;
     pss << std::fixed << std::setprecision(2) << percent_error << "%";
-    std::cout << std::setw(col_widths[9]) << pss.str();
+    std::cout << std::setw(col_widths[8]) << pss.str();
   } else {
-    std::cout << std::setw(col_widths[9]) << "INF";
+    std::cout << std::setw(col_widths[8]) << "INF";
   }
   // Emit exactly one newline per printed diff row (centralized here).
   std::cout << std::endl;
@@ -1172,7 +1080,9 @@ void FileComparator::print_hard_threshold_error(double rounded1,
   }
   difference_analyzer_.print_hard_threshold_error(
       rounded1, rounded2, diff_rounded, column_index, counter);
-  flag.error_found = true;
+  // NOTE: error_found is NOT set for critical threshold exceedances.
+  // Critical threshold controls print truncation; pass/fail comes from
+  // files_are_close_enough (set at Level 3 when diffs are significant).
 }
 
 void FileComparator::print_format_info(const ColumnValues& column_data,
@@ -1707,44 +1617,30 @@ void FileComparator::print_significant_percentage() const {
   std::cout << " (" << std::fixed << std::setw(5) << std::setprecision(2)
             << percent << "%)" << std::endl;
 
-  // Calculate non-zero-weighted, non-critical, normal differences
-  // These are the differences of real interest that cannot be attributed to:
-  // - Model failure (critical)
-  // - Being outside operational range (zero-weighted, >110 dB)
-  // - Machine precision errors (subnormal, >138.47 dB)
+  // Strict pass/fail: any non-marginal significant difference is a failure.
+  // This aligns with Fortran's nerr3 > 0 behavior.
+  // Marginal and critical differences are already handled by their own
+  // thresholds; the operative question is whether normal significant
+  // differences exist.
   size_t non_marginal_non_critical_significant =
       counter.diff_significant - counter.diff_marginal - counter.diff_critical;
 
-  double critical_percent =
-      100.0 * static_cast<double>(non_marginal_non_critical_significant) /
-      static_cast<double>(counter.elem_number);
-
-  // NOTE: The 2% failure threshold is an ad hoc value derived from visual
-  // inspection of real output file differences during early development. It is
-  // not based on theory, peer-reviewed standards, or statistical analysis. It
-  // motivated development of Fabre's curve-level metrics (tl_metric) and may
-  // be revised or replaced as the program architecture matures.
-  constexpr double failure_threshold_percent = 2.0;
-
-  if (critical_percent > failure_threshold_percent) {
-    std::cout << "   \033[1;31mFAIL: Non-marginal, non-critical significant "
-                 "differences ("
-              << non_marginal_non_critical_significant << ", " << std::fixed
-              << std::setprecision(2) << critical_percent << "%) exceed "
-              << failure_threshold_percent << "% threshold\033[0m" << std::endl;
+  if (non_marginal_non_critical_significant > 0) {
+    double critical_percent =
+        100.0 * static_cast<double>(non_marginal_non_critical_significant) /
+        static_cast<double>(counter.elem_number);
+    std::cout << "   \033[1;31mFAIL: " << non_marginal_non_critical_significant
+              << " non-marginal, non-critical significant differences ("
+              << std::fixed << std::setprecision(2) << critical_percent
+              << "%)\033[0m" << std::endl;
     flag.files_are_close_enough = false;
-  } else if (critical_percent > 0) {
-    std::cout << "   \033[1;33mPASS: Non-zero-weighted, non-critical "
-                 "differences ("
-              << non_marginal_non_critical_significant << ", " << std::fixed
-              << std::setprecision(2) << critical_percent << "%) within "
-              << failure_threshold_percent << "% tolerance\033[0m" << std::endl;
-    flag.files_are_close_enough = true;
-  } else {
-    std::cout << "   \033[1;32mPASS: No non-zero-weighted, non-critical "
-                 "differences found\033[0m"
+  } else if (counter.diff_significant > 0) {
+    std::cout << "   \033[1;32mPASS: All significant differences are marginal "
+                 "or critical (handled separately)\033[0m"
               << std::endl;
-    flag.files_are_close_enough = true;
+  } else {
+    std::cout << "   \033[1;32mPASS: No significant differences found\033[0m"
+              << std::endl;
   }
 }
 
@@ -1810,8 +1706,6 @@ void FileComparator::print_maximum_significant_difference_details() const {
   if (differ.ndp_significant > differ.ndp_single_precision) {
     std::cout << "   \033[1;33mProbably OK: single precision exceeded"
               << "\033[0m" << std::endl;
-    // Set flag for files being close enough
-    flag.files_are_close_enough = true;
     print_flag_status();
   }
 }
@@ -1988,149 +1882,8 @@ void FileComparator::print_statistics(const std::string& file1) const {
   }
 }
 
-// Helper function to print RMSE statistics
-void FileComparator::print_rmse_statistics() const {
-  if (verbosity.level < 0 || rmse_stats.count_all == 0) {
-    return;
-  }
-
-  std::cout << "RMSE (Root Mean Square Error):" << std::endl;
-
-  // Print overall RMSE
-  double rmse_all = rmse_stats.get_rmse_all();
-  std::cout << "   All elements:     " << std::scientific
-            << std::setprecision(4) << rmse_all << std::endl;
-
-  // Print RMSE for data only (excluding range column) if multi-column
-  if (rmse_stats.count_data > 0 &&
-      rmse_stats.count_data < rmse_stats.count_all) {
-    double rmse_data = rmse_stats.get_rmse_data();
-    std::cout << "   Data only (excluding range): " << std::scientific
-              << std::setprecision(4) << rmse_data << std::endl;
-
-    // Print weighted RMSE if we have weighted data (TL values)
-    if (rmse_stats.has_weighted_data()) {
-      double weighted_rmse_data = rmse_stats.get_weighted_rmse_data();
-      std::cout << "   Weighted RMSE (TL-weighted, data only): "
-                << std::scientific << std::setprecision(4) << weighted_rmse_data
-                << " [weight: 1.0 at TL≤60 dB, 0.0 at TL≥110 dB]" << std::endl;
-    }
-
-    // If we have multiple data columns, print per-column RMSE
-    size_t num_data_columns = rmse_stats.count_per_column.size();
-    if (num_data_columns > 2) {  // Range + at least 2 TL columns
-      std::cout << "   Per-column RMSE:" << std::endl;
-
-      // Get number of columns from the largest column index
-      size_t max_col = 0;
-      for (const auto& pair : rmse_stats.count_per_column) {
-        if (pair.first > max_col) max_col = pair.first;
-      }
-
-      // Print RMSE for each column
-      for (size_t col = 0; col <= max_col; ++col) {
-        auto it = rmse_stats.count_per_column.find(col);
-        if (it != rmse_stats.count_per_column.end() && it->second > 0) {
-          double rmse_col = rmse_stats.get_rmse_column(col);
-
-          if (col == 0) {
-            // Range column
-            std::cout << "      Column " << std::setw(2) << (col + 1)
-                      << " (range):   " << std::scientific
-                      << std::setprecision(4) << rmse_col << std::endl;
-          } else {
-            // Data column (TL or other)
-            std::cout << "      Column " << std::setw(2) << (col + 1)
-                      << " (curve " << col << "): " << std::scientific
-                      << std::setprecision(4) << rmse_col;
-
-            // Add weighted RMSE for this column if available
-            double weighted_rmse_col = rmse_stats.get_weighted_rmse_column(col);
-            if (weighted_rmse_col > 0) {
-              std::cout << " (weighted: " << std::scientific
-                        << std::setprecision(4) << weighted_rmse_col << ")";
-            }
-            std::cout << std::endl;
-          }
-        }
-      }
-    }
-  } else if (rmse_stats.count_data == 0) {
-    // Single column file (e.g., pi data)
-    std::cout << "   (Single column data)" << std::endl;
-  }
-
-  std::cout << std::endl;
-}
-
-// Helper function to print TL curve comparison metrics
-void FileComparator::print_tl_metrics() const {
-  // Only print if we have TL data and weighted RMSE
-  if (verbosity.level < 0 || !tl_metrics.has_data ||
-      !rmse_stats.has_weighted_data()) {
-    return;
-  }
-
-  std::cout << "TL Curve Comparison Metrics:" << std::endl;
-
-  // Get M1 (weighted RMSE - already calculated)
-  double m1_diff = rmse_stats.get_weighted_rmse_data();
-
-  // Calculate M2 (last 4% mean difference)
-  double m2_diff = tl_metrics.calculate_m2();
-
-  // Calculate M3 (correlation coefficient)
-  double correlation = tl_metrics.calculate_correlation();
-
-  // Calculate M_curve (average of M1, M2, M3 scores)
-  double m_curve = tl_metrics.calculate_m_curve(m1_diff);
-
-  // Convert component differences to scores
-  double score1 = TLMetrics::score_from_diff(m1_diff);
-  double score2 = TLMetrics::score_from_diff(m2_diff);
-  double score3 = std::max(0.0, correlation * 100.0);
-
-  std::cout << "   M1 (weighted TL diff):    " << std::scientific
-            << std::setprecision(4) << m1_diff << " dB  (score: " << std::fixed
-            << std::setprecision(1) << score1 << "/100)" << std::endl;
-
-  std::cout << "   M2 (last 4% TL diff):     " << std::scientific
-            << std::setprecision(4) << m2_diff << " dB  (score: " << std::fixed
-            << std::setprecision(1) << score2 << "/100)" << std::endl;
-
-  std::cout << "   M3 (TL correlation):      " << std::fixed
-            << std::setprecision(4) << correlation
-            << "      (score: " << std::setprecision(1) << score3 << "/100)"
-            << std::endl;
-
-  std::cout << "   M_curve (avg of M1-M3):   " << std::setprecision(1)
-            << m_curve << "/100";
-
-  // Add interpretation
-  if (m_curve >= 90.0) {
-    std::cout << "  \033[1;32m(EXCELLENT agreement)\033[0m";
-  } else if (m_curve >= 80.0) {
-    std::cout << "  \033[1;32m(GOOD agreement)\033[0m";
-  } else if (m_curve >= 70.0) {
-    std::cout << "  \033[1;33m(FAIR agreement)\033[0m";
-  } else if (m_curve >= 60.0) {
-    std::cout << "  \033[1;33m(MARGINAL agreement)\033[0m";
-  } else {
-    std::cout << "  \033[1;31m(POOR agreement)\033[0m";
-  }
-  std::cout << std::endl;
-
-  // Add details about data points
-  std::cout << "   Data points analyzed:     " << tl_metrics.tl1_values.size()
-            << " (max range: " << std::fixed << std::setprecision(2)
-            << tl_metrics.max_range;
-  if (tl_metrics.count_last_4pct > 0) {
-    std::cout << ", last 4%: " << tl_metrics.count_last_4pct << " points";
-  }
-  std::cout << ")" << std::endl;
-
-  std::cout << std::endl;
-}
+// NOTE: print_rmse_statistics() and print_tl_metrics() have been moved to
+// tl_metric. tl_diff is a point-by-point comparator.
 
 // Helper function to print flag status
 void FileComparator::print_flag_status() const {
@@ -2318,12 +2071,6 @@ void FileComparator::print_summary(const std::string& file1,
   print_settings(params.file1, params.file2);
   print_statistics(params.file1);
 
-  // RMSE and TL metrics require verbosity level 1 or higher
-  if (verbosity.show_statistics) {
-    print_rmse_statistics();
-    print_tl_metrics();
-  }
-
   // FLAGS and COUNTERS sections are for detailed debugging (verbosity 2+)
   if (verbosity.show_detailed) {
     print_flag_status();
@@ -2340,16 +2087,6 @@ void FileComparator::print_summary(const std::string& file1,
   print_additional_diff_info(params);
   print_critical_threshold_info();
   if (debug.enabled) print_consistency_checks();
-
-  // Print error accumulation analysis if applicable
-  if (debug.enabled) {
-    std::cout << "\n[DEBUG] About to call print_accumulation_analysis():\n";
-    std::cout << "  accumulation_data_.n_points = "
-              << accumulation_data_.n_points << "\n";
-    std::cout << "  flag.has_significant_diff = " << flag.has_significant_diff
-              << "\n";
-  }
-  print_accumulation_analysis();
 }
 
 void FileComparator::print_settings(const std::string& file1,
@@ -2543,135 +2280,6 @@ ColumnValues FileComparator::extract_column_values(const LineData& data1,
   return {val1, val2, rangeValue, dp1, dp2, min_dp, max_dp};
 }
 
-// ========================================================================
-// Error Accumulation Analysis
-// ========================================================================
-
-void FileComparator::print_accumulation_analysis() const {
-  // Only perform analysis if:
-  // 1. We have significant differences (Level 3+)
-  // 2. We have enough data points (at least 10 significant errors)
-  // 3. We have verbosity level 2 or higher (detailed analysis)
-  //
-  // This ensures we only analyze when there are meaningful errors to
-  // investigate, not for trivial formatting differences or random noise
-
-  if (verbosity.show_detailed) {
-    std::cout << "\nDEBUG: Accumulation analysis check:\n";
-    std::cout << "  has_significant_diff: " << flag.has_significant_diff
-              << "\n";
-    std::cout << "  accumulation_data_.n_points: "
-              << accumulation_data_.n_points << "\n";
-    std::cout << "  diff_significant: " << counter.diff_significant << "\n";
-    std::cout << "  verbosity.level: " << verbosity.level << "\n";
-  }
-
-  // Skip if no significant differences found
-  if (!flag.has_significant_diff) {
-    if (verbosity.show_statistics) {
-      std::cout
-          << "Skipping accumulation analysis (no significant differences)\n";
-    }
-    return;
-  }
-
-  // Skip if insufficient significant error data points or verbosity too low
-  if (accumulation_data_.n_points < 10 || !verbosity.show_detailed) {
-    if (verbosity.show_statistics && accumulation_data_.n_points > 0) {
-      std::cout << "Skipping accumulation analysis (n_significant_points="
-                << accumulation_data_.n_points << " < 10)\n";
-    }
-    return;
-  }
-
-  // Use cached metrics if available, otherwise compute them
-  AccumulationMetrics metrics;
-  if (accumulation_metrics_.has_value()) {
-    metrics = *accumulation_metrics_;
-  } else {
-    ErrorAccumulationAnalyzer analyzer;
-    metrics = analyzer.analyze(accumulation_data_);
-  }
-
-  // Skip printing if insufficient data
-  if (metrics.pattern == AccumulationMetrics::ErrorPattern::INSUFFICIENT_DATA) {
-    return;
-  }
-
-  std::cout << "\n";
-  std::cout << "========================================\n";
-  std::cout << "ERROR ACCUMULATION ANALYSIS\n";
-  std::cout << "(Significant Errors Only - Level 3+)\n";
-  std::cout << "========================================\n";
-  std::cout << "Range: " << std::fixed << std::setprecision(2)
-            << accumulation_data_.range_min << " to "
-            << accumulation_data_.range_max << "\n";
-  std::cout << "Significant error data points: " << accumulation_data_.n_points
-            << " (out of " << counter.diff_significant
-            << " total significant)\n\n";
-
-  // Linear regression results
-  std::cout << "Linear Regression (error vs range):\n";
-  std::cout << "  Slope:       " << std::scientific << std::setprecision(4)
-            << metrics.slope << " (error per unit range)\n";
-  std::cout << "  Intercept:   " << metrics.intercept << "\n";
-  std::cout << "  R²:          " << std::fixed << std::setprecision(3)
-            << metrics.r_squared;
-  if (metrics.r_squared > 0.7) {
-    std::cout << " \033[1;33m(strong fit)\033[0m\n";
-  } else if (metrics.r_squared > 0.3) {
-    std::cout << " (moderate fit)\n";
-  } else {
-    std::cout << " (weak fit)\n";
-  }
-  std::cout << "  P-value:     " << std::scientific << metrics.p_value_slope;
-  if (metrics.p_value_slope < 0.05) {
-    std::cout << " \033[1;31m(SIGNIFICANT)\033[0m\n";
-  } else {
-    std::cout << " (not significant)\n";
-  }
-  std::cout << "  RMSE:        " << metrics.rmse << "\n\n";
-
-  // Autocorrelation analysis
-  std::cout << "Autocorrelation Analysis:\n";
-  std::cout << "  Lag-1 correlation: " << std::fixed << std::setprecision(3)
-            << metrics.autocorr_lag1 << "\n";
-  std::cout << "  Status: ";
-  if (metrics.is_correlated) {
-    std::cout << "\033[1;33mCORRELATED (systematic pattern)\033[0m\n";
-  } else {
-    std::cout << "\033[1;32mUNCORRELATED (random)\033[0m\n";
-  }
-  std::cout << "\n";
-
-  // Run test results
-  std::cout << "Run Test (randomness):\n";
-  std::cout << "  Observed runs:  " << metrics.n_runs << "\n";
-  std::cout << "  Expected runs:  " << metrics.expected_runs << "\n";
-  std::cout << "  Z-score:        " << std::setprecision(2)
-            << metrics.run_test_z_score << "\n";
-  std::cout << "  Status: ";
-  if (metrics.is_random) {
-    std::cout << "\033[1;32mRANDOM (passes test)\033[0m\n";
-  } else {
-    std::cout << "\033[1;33mNON-RANDOM (systematic trend)\033[0m\n";
-  }
-  std::cout << "\n";
-
-  // Classification
-  std::cout << "========================================\n";
-  std::cout << "CLASSIFICATION\n";
-  std::cout << "========================================\n";
-  std::cout << "Pattern: \033[1;36m"
-            << ErrorAccumulationAnalyzer::get_pattern_name(metrics.pattern)
-            << "\033[0m\n\n";
-  std::cout << "Interpretation:\n";
-  std::cout << metrics.interpretation << "\n\n";
-
-  // Recommendation
-  std::cout << "========================================\n";
-  std::cout << "RECOMMENDATION\n";
-  std::cout << "========================================\n";
-  std::cout << metrics.recommendation << "\n";
-  std::cout << "========================================\n\n";
-}
+// NOTE: print_accumulation_analysis() has been moved to tl_analysis.
+// tl_diff is a point-by-point comparator and does not perform
+// aggregate/curve-level analysis.
