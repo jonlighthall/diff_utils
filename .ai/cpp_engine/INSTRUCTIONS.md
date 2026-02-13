@@ -18,12 +18,18 @@ Purpose: Procedures and standing orders when working on the core numeric compari
 ### The Six-Level Difference Hierarchy
 1. Level 1: Non-zero vs zero raw differences
 2. Level 2: Trivial vs non-trivial (sub-LSB rule with FP tolerance)
-3. Level 3: Insignificant vs significant (user threshold)
+3. Level 3: Insignificant vs significant (user threshold) — sets `files_are_close_enough = false` (THE pass/fail gate)
 4. Level 4: Marginal band (110 dB TL)
-5. Level 5: Critical threshold breaches
-6. Level 6: Statistical/error-classification (experimental)
+5. Level 5: Critical threshold breaches — sets `has_critical_diff = true` (print truncation only, does NOT set `error_found`)
+6. Level 6: Statistical/error-classification (removed from tl_diff; staged in `src/cpp/reference/` for tl_analysis)
 
-Key Principle: Level 2 trivial filtering is immutable.
+Key Principles:
+- Level 2 trivial filtering is immutable.
+- `files_are_close_enough` is the comparison pass/fail mechanism (set at Level 3).
+- `error_found` is reserved for file access/parse errors only — never set by comparison logic.
+- `has_critical_diff` controls output truncation but does not affect exit code.
+
+**Source:** Session 2026-02-13
 
 ### Sub-LSB Detection
 - Shared minimum precision determines LSB
@@ -121,13 +127,14 @@ debug_file.close();
 
 ### Known Architecture Issues
 
-**DifferenceAnalyzer status:** Currently not verified to be called during test comparisons. The `process_rounded_values()` function containing the 6-level hierarchy logic may not be executed during tests; actual counting may happen in a different code path (FileComparator, FileReader, or legacy system).
+**DifferenceAnalyzer status:** ✅ RESOLVED. `DifferenceAnalyzer::process_hierarchy()` (renamed from `process_rounded_values()`) is confirmed to be called during all test comparisons.
 
-**Before implementing in DifferenceAnalyzer:**
-- Trace the full path: `FileComparator::compare_files()` → `process_line()` → `process_column()` → `process_difference()` → `DifferenceAnalyzer::process_difference()` → `DifferenceAnalyzer::process_rounded_values()`
-- Verify each step with debug file output
-- If any step fails to execute, the hierarchy logic won't run
-- Document which path is actually responsible for populating `CountStats` counters
+**Verified call path:**
+`FileComparator::compare_files()` → `process_line()` → `process_column()` → `process_difference()` → `DifferenceAnalyzer::process_difference()` → `DifferenceAnalyzer::process_hierarchy()`
+
+All 55 unit tests exercise this path. The debug-file technique described above remains useful for future subsystem verification.
+
+**Source:** Session 2026-02-13
 
 ---
 

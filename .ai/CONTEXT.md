@@ -95,10 +95,13 @@ diff_utils/
 │   │   ├── include/                  # Headers
 │   │   ├── src/                      # Implementation
 │   │   ├── tests/                    # Unit tests
-│   │   └── main/                     # Main executables
-│   ├── fortran/                      # Legacy Fortran programs
-│   │   ├── programs/                 # cpddiff, prsdiff, tldiff, tsdiff
-│   │   └── modules/                  # Shared modules
+│   │   ├── main/                     # Main executables
+│   │   ├── reference/                # Staging: code for future tl_metric/tl_analysis
+│   │   └── CHANGELOG.md              # C++ version history (v2.0.0+)
+│   ├── fortran/                      # Delivered Fortran programs (v1.0.0, sealed)
+│   │   ├── main/                     # tldiff, cpddiff, prsdiff, tsdiff
+│   │   ├── modules/                  # Shared modules
+│   │   └── CHANGELOG.md              # Fortran version history (v1.0.0)
 │   └── java/                         # Java utilities
 │
 ├── build/                            # Compiled artifacts
@@ -127,16 +130,23 @@ diff_utils/
 ## Key Components
 Engine details moved to topic file: see [.ai/cpp_engine/CONTEXT.md](cpp_engine/CONTEXT.md).
 
-### ErrorAccumulationAnalyzer (Experimental)
+### ErrorAccumulationAnalyzer (Staged for tl_analysis)
 
 **Purpose:** Cross-file statistics and exploratory diagnostics
 
-**Status:** ⚠️ **Experimental** — Use for investigation only, not for authoritative pass/fail decisions.
+**Status:** ⚠️ **Staged** — Moved to `src/cpp/reference/` (Feb 2026). Not compiled
+into tl_diff. Preserved as seed code for future tl_analysis program.
 
-**Responsibilities:**
-- Accumulate differences across multiple comparisons
+**Files:**
+- `src/cpp/reference/error_accumulation_analyzer.h` (227 lines)
+- `src/cpp/reference/error_accumulation_analyzer.cpp` (421 lines)
+- `src/cpp/reference/tl_metrics.cpp` (342 lines, standalone Fabre M1-M5)
+
+**Responsibilities (future tl_analysis):**
+- Accumulate differences across range
 - Diagnostic pattern analysis (run tests, autocorrelation, regression)
-- Identify transient spikes or systematic biases
+- Phase error estimation (curve stretching)
+- 2% installation verification discriminator
 
 See `docs/future-work.md` for research roadmap.
 
@@ -216,11 +226,109 @@ The following features have been moved out of `tl_diff` to their future homes:
 - **Error accumulation analysis** (ErrorAccumulationAnalyzer) → `tl_analysis`
 - **Weighted diff display column** → removed from diff table
 
-The `ErrorAccumulationData` struct and `ErrorAccumulationAnalyzer` class remain
-in the repository (with the struct moved to `error_accumulation_analyzer.h`)
-but are no longer compiled into or linked by the `tl_diff` executable.
+The `ErrorAccumulationData` struct and `ErrorAccumulationAnalyzer` class have
+been moved to `src/cpp/reference/` and are no longer compiled into or linked by
+the `tl_diff` executable. The standalone `tl_metrics.cpp` (Fabre M1-M5) is also
+in `src/cpp/reference/`.
 
-**Source:** Session 2026-02-12
+**Source:** Sessions 2026-02-12 and 2026-02-13
+
+### Versioning (Decided)
+
+Separate version tracks for each implementation:
+
+| Implementation | Version | Changelog |
+|---------------|---------|-----------|
+| Fortran tl_diff | v1.0.0 (sealed) | `src/fortran/CHANGELOG.md` |
+| C++ tl_diff | v2.0.0 + unreleased | `src/cpp/CHANGELOG.md` |
+
+Root `CHANGELOG.md` is a pointer to both. Fortran v1.0.0 was delivered with
+NSPE v6.2 extras. C++ v2.0.0 is a complete rewrite, not a port. Future
+tl_metric and tl_analysis will share the C++ version track.
+
+**Source:** Session 2026-02-13
+
+### Critical Threshold Decoupled from error_found (Decided)
+
+`error_found` is now reserved for actual errors (file access failures, parse
+errors). Critical threshold exceedances no longer set `error_found`. Critical
+diffs still cause failure because they are classified as "significant" at
+Level 3, which sets `files_are_close_enough = false`.
+
+The critical threshold has three effects:
+1. **Print truncation** — `has_critical_diff` stops table printing (kept)
+2. ~~**error_found**~~ — removed (was a redundant parallel failure path)
+3. **Counting** — `diff_critical++` increments (kept)
+
+Exit code semantics:
+- `error_found = true` → exit 1 with "Error found." (something broke)
+- `files_are_close_enough = false` → exit 1 with "Files differ significantly."
+- Both false → exit 0
+
+**Source:** Session 2026-02-13
+
+### files_are_close_enough Is the Pass/Fail Mechanism (Decided)
+
+The `files_are_close_enough` flag is NOT deprecated. It is THE proper mechanism
+for point-by-point threshold-based pass/fail in tl_diff. It is set to `false`
+at Level 3 whenever any significant difference is found.
+
+This embodies the separation of function and evaluation:
+- **tl_diff** performs the **function**: point-by-point comparison against a
+  user-supplied threshold. `files_are_close_enough` answers "does every point
+  pass the threshold?"
+- **tl_analysis** (future) performs the **evaluation**: interpreting what the
+  pattern of differences *means*.
+
+**Source:** Session 2026-02-13
+
+### Fortran CLI Compatibility (Decided)
+
+The C++ tl_diff accepts the same 3 positional arguments as the Fortran version
+(FILE1 FILE2 THRESH). Additional C++ arguments are optional with sensible
+defaults. The threshold semantics differ intentionally:
+
+- **Fortran:** effective error = user_thresh + comp_diff (0.05)
+- **C++:** threshold applied directly; sub-LSB detection replaces comp_diff
+
+The Fortran `comp_diff` addition was an ad hoc forerunner of the C++ sub-LSB
+detection algorithm. The C++ approach is strictly better — it adapts to the
+actual precision of each comparison point rather than adding a fixed offset.
+Existing Fortran callers' inputs are valid; the C++ behavior is an intentional
+improvement, not a compatibility bug.
+
+**Source:** Session 2026-02-13
+
+### Four Use Cases (Decided)
+
+| ID | Use Case | Description | Program |
+|----|----------|-------------|---------|
+| UC1 | Same model, same input | Installation verification | tl_diff (+ tl_analysis --verify) |
+| UC2 | Different models, same input | Model comparison | tl_metric (Fabre) |
+| UC3 | Same model, different inputs | Sensitivity analysis | tl_analysis |
+| Agnostic | Any two TL curves | Quantitative comparison | tl_metric (Fabre) |
+
+The 2% threshold belongs to UC1 (installation verification) and lives in
+tl_analysis, not tl_diff. The Fabre metric is agnostic of use case.
+
+**Source:** Session 2026-02-13
+
+### Restructuring Plan (Planned)
+
+Sequence for extracting the three-program architecture:
+
+1. **Extract shared library** — FileReader, LineParser, FormatTracker,
+   threshold constants, calculate_tl_weight → shared linkable code
+2. **Scaffold tl_metric** — Fabre M1-M5 only, using shared library and
+   `src/cpp/reference/tl_metrics.cpp` as seed
+3. **Scaffold tl_analysis** — ErrorAccumulationAnalyzer, 2% threshold
+   (--verify mode), RMSE, phase error estimation, using
+   `src/cpp/reference/error_accumulation_analyzer.*` as seed
+
+Reference code is staged in `src/cpp/reference/`. No tl_metric or tl_analysis
+main programs exist yet.
+
+**Source:** Session 2026-02-13
 
 ---
 

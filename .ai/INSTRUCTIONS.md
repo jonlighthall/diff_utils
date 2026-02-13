@@ -174,7 +174,13 @@ For batch processing drivers (`process_ram_in_files.sh`, `process_nspe_in_files.
 
 ### Changelog
 
-Maintain a project changelog in the repository root: [CHANGELOG.md](CHANGELOG.md).
+Separate changelogs per implementation:
+
+| File | Tracks | Current |
+|------|--------|---------|
+| `src/cpp/CHANGELOG.md` | C++ tl_diff (and future tl_metric, tl_analysis) | v2.0.0 + Unreleased |
+| `src/fortran/CHANGELOG.md` | Fortran tl_diff | v1.0.0 (sealed) |
+| `CHANGELOG.md` (root) | Pointer to both | — |
 
 - Format: Follow "Keep a Changelog" style with sections `Unreleased` and versioned entries `X.Y.Z - YYYY-MM-DD`.
 - Categories: Use `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security` as applicable.
@@ -186,6 +192,10 @@ Maintain a project changelog in the repository root: [CHANGELOG.md](CHANGELOG.md
 - Cross-links: Link to detailed docs (e.g., [docs/IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md)) and reference PRs/commits when helpful.
 - README tie-in: Keep README concise. Optionally highlight top 1–3 bullets from the latest release; defer full detail to the changelog and docs.
 - Process: Update `Unreleased` on merge of qualifying changes; date and tag a release when publishing.
+- Fortran changelog is sealed at v1.0.0. Do not add entries unless a Fortran-side bugfix is made.
+- Future tl_metric and tl_analysis share the C++ version track.
+
+**Source:** Session 2026-02-13
 
 ### Harvest Snippet (for chat reuse)
 
