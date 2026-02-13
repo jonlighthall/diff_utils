@@ -202,7 +202,7 @@ bool sub_lsb_diff = (raw_diff < big_zero) ||
 bool trivial_after_rounding = (rounded_diff == 0.0 || sub_lsb_diff);
 ```
 
-**Test Suite Status:** 55/55 tests passing (verified 2026-02-13)
+**Test Suite Status:** 86/86 tests passing (verified 2026-02-13)
 
 **Pi Precision Validation:**
 - Automated test script: `scripts/pi_gen/test_pi_precision.sh`
@@ -237,12 +237,15 @@ Key Tests:
 4. Hierarchy invariant validation added via `print_consistency_checks()`
 5. Critical threshold decoupled from `error_found` — sets `has_critical_diff` only (2026-02-13)
 
-**Test Coverage:** 55 tests across 15 test suites including:
+**Test Coverage:** 86 tests across 18 test suites including:
 - `FileComparatorSummationTest.SixLevelHierarchyValidation` — validates all 6 levels
 - `SubLSBBoundaryTest` — 6 tests for sub-LSB detection
 - `SemanticInvariants` — 4 tests for zero-threshold contracts
 - `PercentThresholdTest` — 3 tests for percent-mode thresholds
 - `PiCrossLanguagePrecisionTests` — 5 tests for cross-language π precision validation
+- `TLMetricTest` — 20 tests for Fabre M1-M5 metrics, grid interpolation, scoring
+- `ErrorAccumulationDataTest` — 2 tests for data structure operations
+- `ErrorAccumulationAnalyzerTest` — 9 tests for statistical analysis, pattern classification
 
 ## Links
 - Project-wide context: ../../CONTEXT.md

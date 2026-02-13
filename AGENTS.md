@@ -42,7 +42,7 @@ make test         # Run 55 unit tests
 make pi_gen_data  # Regenerate π test files
 ```
 
-**Current test count:** 55 tests across 15 suites (including 5 cross-language precision tests)
+**Current test count:** 86 tests across 18 suites (including 5 cross-language precision tests)
 
 ---
 

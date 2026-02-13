@@ -18,7 +18,6 @@
  */
 
 #include "tl_analysis.h"
-#include "tl_metric.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -27,6 +26,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#include "tl_metric.h"
 
 struct ProgramArgs {
   std::string file1;
@@ -121,8 +122,7 @@ double interpolate_tl(const std::vector<RangeTLPair>& curve, double r) {
 
   for (size_t i = 0; i < curve.size() - 1; ++i) {
     if (r >= curve[i].range && r <= curve[i + 1].range) {
-      double t =
-          (r - curve[i].range) / (curve[i + 1].range - curve[i].range);
+      double t = (r - curve[i].range) / (curve[i + 1].range - curve[i].range);
       return curve[i].tl + t * (curve[i + 1].tl - curve[i].tl);
     }
   }
@@ -142,8 +142,7 @@ double interpolate_tl(const std::vector<RangeTLPair>& curve, double r) {
  */
 bool read_and_diff(const std::string& file1, const std::string& file2,
                    double threshold, ErrorAccumulationData& data,
-                   bool& grid_mismatch, size_t& n_points1,
-                   size_t& n_points2) {
+                   bool& grid_mismatch, size_t& n_points1, size_t& n_points2) {
   std::vector<RangeTLPair> curve1, curve2;
 
   if (!read_tl_file(file1, curve1)) return false;
@@ -160,16 +159,14 @@ bool read_and_diff(const std::string& file1, const std::string& file2,
 
   if (grid_mismatch) {
     std::cerr << "\033[1;33mNOTE:\033[0m Grid sizes differ (" << n_points1
-              << " vs " << n_points2
-              << "). Interpolating to common grid with " << numPoints
-              << " points." << std::endl;
+              << " vs " << n_points2 << "). Interpolating to common grid with "
+              << numPoints << " points." << std::endl;
   }
 
   // Build common grid and compute differences
   for (size_t i = 0; i < numPoints; ++i) {
-    double r =
-        minRange + (maxRange - minRange) * static_cast<double>(i) /
-                       static_cast<double>(numPoints - 1);
+    double r = minRange + (maxRange - minRange) * static_cast<double>(i) /
+                              static_cast<double>(numPoints - 1);
     double tl1 = interpolate_tl(curve1, r);
     double tl2 = interpolate_tl(curve2, r);
     double error = tl1 - tl2;
