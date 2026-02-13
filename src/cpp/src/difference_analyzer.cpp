@@ -44,7 +44,9 @@ bool DifferenceAnalyzer::process_difference(
                                  raw_diff, column_index, counter);
     }
     flags.has_critical_diff = true;
-    flags.error_found = true;  // ensure program exits non-zero
+    // NOTE: error_found is NOT set here. Critical threshold controls
+    // print truncation only. Pass/fail is determined by
+    // files_are_close_enough (set at Level 3 for significant diffs).
   }
   return true;
 }
@@ -235,7 +237,7 @@ void DifferenceAnalyzer::process_hierarchy(const ColumnValues& column_data,
             // CRITICAL
             counter.diff_critical++;
             flags.has_critical_diff = true;
-            flags.error_found = true;  // ensure failure exit code
+            // NOTE: error_found is NOT set here — see early check comment
           } else {
             // NON-CRITICAL
             // LEVEL 6: non_critical = error + non_error (user threshold split)

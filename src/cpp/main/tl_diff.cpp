@@ -548,7 +548,10 @@ int main(int argc, char* argv[]) {
                      args.debug_level);
   }
 
-  // Check for errors and return appropriate exit code
+  // Check for actual errors (file access, parse failures)
+  // NOTE: critical threshold exceedances do NOT set error_found.
+  // They are classified as significant diffs and handled by the
+  // files_are_close_enough path below.
   if (comparator.getFlag().error_found) {
     std::cout << "   \033[1;31mError found.\033[0m" << std::endl;
     return 1;

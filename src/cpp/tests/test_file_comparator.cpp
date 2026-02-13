@@ -18,8 +18,10 @@ class FileComparatorTest : public ::testing::Test {
     std::filesystem::create_directories(TEST_DIR);
 
     // Set up test with default thresholds
-    // Constructor: (significant_threshold, critical_threshold, table_threshold, verbosity, debug, is_percent, percent_value, max_rows)
-    comparator = std::make_unique<FileComparator>(0.05, 10.0, 1.0, 0, 0, false, 0.0, 32);
+    // Constructor: (significant_threshold, critical_threshold, table_threshold,
+    // verbosity, debug, is_percent, percent_value, max_rows)
+    comparator =
+        std::make_unique<FileComparator>(0.05, 10.0, 1.0, 0, 0, false, 0.0, 32);
 
     // Clean up any existing test files
     cleanup_test_files();
@@ -353,7 +355,8 @@ class FileComparatorSummationTest : public FileComparatorTest {
                                          counter.diff_marginal -
                                          counter.diff_critical;
 
-      // Strict: any non-marginal significant difference → files_are_close_enough = false
+      // Strict: any non-marginal significant difference →
+      // files_are_close_enough = false
       if (non_marginal_non_critical > 0) {
         EXPECT_FALSE(flags.files_are_close_enough)
             << "Files should not be close enough when any non-marginal "
@@ -497,9 +500,9 @@ TEST_F(FileComparatorSummationTest, CriticalTLDifferences) {
   const auto& counter = critical_comparator.getCountStats();
   const auto& flags = critical_comparator.getFlag();
 
-  // Critical differences should cause early exit, so only 1 element processed
+  // Critical differences truncate table printing, so only 1 element shown
   EXPECT_EQ(counter.elem_number, 1)
-      << "Should have processed 1 element before critical exit";
+      << "Should have processed 1 element before critical truncation";
   EXPECT_TRUE(flags.has_significant_diff)
       << "Should have significant differences";
   EXPECT_TRUE(flags.has_critical_diff) << "Should have critical differences";
