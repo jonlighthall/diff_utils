@@ -18,7 +18,9 @@
  */
 
 #include "tl_analysis.h"
+#include "tl_metric.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -66,63 +68,119 @@ void print_usage(const char* program_name) {
 }
 
 /**
- * @brief Read two TL files and compute differences
- * @param file1 Reference file path
- * @param file2 Test file path
- * @param threshold Significance threshold
- * @param data Output error accumulation data
- * @return true if files were read successfully
+ * @brief Read a single TL file into range-TL pairs
+ * @param filename Path to TL data file
+ * @param curve Output vector of range-TL pairs
+ * @return true if file was read successfully
  */
-bool read_and_diff(const std::string& file1, const std::string& file2,
-                   double threshold, ErrorAccumulationData& data) {
-  std::ifstream f1(file1);
-  std::ifstream f2(file2);
-
-  if (!f1.is_open()) {
-    std::cerr << "\033[1;31mERROR:\033[0m Cannot open file: " << file1
-              << std::endl;
-    return false;
-  }
-  if (!f2.is_open()) {
-    std::cerr << "\033[1;31mERROR:\033[0m Cannot open file: " << file2
+bool read_tl_file(const std::string& filename,
+                  std::vector<RangeTLPair>& curve) {
+  std::ifstream f(filename);
+  if (!f.is_open()) {
+    std::cerr << "\033[1;31mERROR:\033[0m Cannot open file: " << filename
               << std::endl;
     return false;
   }
 
-  std::string line1, line2;
-  size_t line_number = 0;
+  std::string line;
   size_t skipped = 0;
-
-  while (std::getline(f1, line1) && std::getline(f2, line2)) {
-    line_number++;
-
-    // Skip empty lines and comments
-    if (line1.empty() || line1[0] == '#' || line1[0] == '!') continue;
-    if (line2.empty() || line2[0] == '#' || line2[0] == '!') continue;
-
-    std::istringstream iss1(line1);
-    std::istringstream iss2(line2);
-    double range1, tl1, range2, tl2;
-
-    if ((iss1 >> range1 >> tl1) && (iss2 >> range2 >> tl2)) {
-      // Use range from file 1
-      double error = tl1 - tl2;
-      bool significant = std::abs(error) >= threshold;
-      data.add_point(range1, error, tl1, tl2, significant);
+  while (std::getline(f, line)) {
+    if (line.empty() || line[0] == '#' || line[0] == '!') continue;
+    std::istringstream iss(line);
+    double range, tl;
+    if (iss >> range >> tl) {
+      curve.push_back({range, tl});
     } else {
       skipped++;
     }
   }
 
-  if (data.n_points == 0) {
-    std::cerr << "\033[1;31mERROR:\033[0m No valid comparison data found."
+  if (curve.empty()) {
+    std::cerr << "\033[1;31mERROR:\033[0m No valid data in: " << filename
               << std::endl;
     return false;
   }
 
   if (skipped > 0) {
     std::cerr << "\033[1;33mWARNING:\033[0m Skipped " << skipped
-              << " non-parseable line pairs." << std::endl;
+              << " non-parseable lines in " << filename << std::endl;
+  }
+
+  return true;
+}
+
+/**
+ * @brief Linearly interpolate a TL value at a given range
+ * @param curve Sorted range-TL pairs
+ * @param r Target range
+ * @return Interpolated TL value
+ */
+double interpolate_tl(const std::vector<RangeTLPair>& curve, double r) {
+  if (r <= curve.front().range) return curve.front().tl;
+  if (r >= curve.back().range) return curve.back().tl;
+
+  for (size_t i = 0; i < curve.size() - 1; ++i) {
+    if (r >= curve[i].range && r <= curve[i + 1].range) {
+      double t =
+          (r - curve[i].range) / (curve[i + 1].range - curve[i].range);
+      return curve[i].tl + t * (curve[i + 1].tl - curve[i].tl);
+    }
+  }
+  return curve.back().tl;
+}
+
+/**
+ * @brief Read two TL files, interpolate to common grid, and compute differences
+ * @param file1 Reference file path
+ * @param file2 Test file path
+ * @param threshold Significance threshold
+ * @param data Output error accumulation data
+ * @param grid_mismatch Output: true if files had different grid sizes
+ * @param n_points1 Output: number of points in file 1
+ * @param n_points2 Output: number of points in file 2
+ * @return true if files were read successfully
+ */
+bool read_and_diff(const std::string& file1, const std::string& file2,
+                   double threshold, ErrorAccumulationData& data,
+                   bool& grid_mismatch, size_t& n_points1,
+                   size_t& n_points2) {
+  std::vector<RangeTLPair> curve1, curve2;
+
+  if (!read_tl_file(file1, curve1)) return false;
+  if (!read_tl_file(file2, curve2)) return false;
+
+  n_points1 = curve1.size();
+  n_points2 = curve2.size();
+  grid_mismatch = (n_points1 != n_points2);
+
+  // Determine common range and grid
+  double maxRange = std::min(curve1.back().range, curve2.back().range);
+  double minRange = std::max(curve1.front().range, curve2.front().range);
+  size_t numPoints = std::max(n_points1, n_points2);
+
+  if (grid_mismatch) {
+    std::cerr << "\033[1;33mNOTE:\033[0m Grid sizes differ (" << n_points1
+              << " vs " << n_points2
+              << "). Interpolating to common grid with " << numPoints
+              << " points." << std::endl;
+  }
+
+  // Build common grid and compute differences
+  for (size_t i = 0; i < numPoints; ++i) {
+    double r =
+        minRange + (maxRange - minRange) * static_cast<double>(i) /
+                       static_cast<double>(numPoints - 1);
+    double tl1 = interpolate_tl(curve1, r);
+    double tl2 = interpolate_tl(curve2, r);
+    double error = tl1 - tl2;
+    bool significant = std::abs(error) >= threshold;
+    data.add_point(r, error, tl1, tl2, significant);
+  }
+
+  if (data.n_points == 0) {
+    std::cerr << "\033[1;31mERROR:\033[0m No valid comparison data found."
+              << std::endl;
+    return false;
   }
 
   return true;
@@ -132,12 +190,18 @@ bool read_and_diff(const std::string& file1, const std::string& file2,
  * @brief Print analysis results
  */
 void print_results(const AccumulationMetrics& metrics,
-                   const ErrorAccumulationData& data, const ProgramArgs& args) {
+                   const ErrorAccumulationData& data, const ProgramArgs& args,
+                   bool grid_mismatch, size_t n_points1, size_t n_points2) {
   std::cout << "\n===== TL Error Accumulation Analysis =====" << std::endl;
   std::cout << "Reference: " << args.file1 << std::endl;
   std::cout << "Test:      " << args.file2 << std::endl;
   std::cout << "Threshold: " << args.threshold << std::endl;
-  std::cout << "Points:    " << data.n_points << std::endl;
+  std::cout << "Points:    " << data.n_points;
+  if (grid_mismatch) {
+    std::cout << " (interpolated from " << n_points1 << " / " << n_points2
+              << ")";
+  }
+  std::cout << std::endl;
   std::cout << "Range:     " << data.range_min << " to " << data.range_max
             << std::endl;
 
@@ -250,9 +314,12 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Read files and compute differences
+  // Read files, interpolate to common grid, and compute differences
   ErrorAccumulationData data;
-  if (!read_and_diff(args.file1, args.file2, args.threshold, data)) {
+  bool grid_mismatch = false;
+  size_t n_points1 = 0, n_points2 = 0;
+  if (!read_and_diff(args.file1, args.file2, args.threshold, data,
+                     grid_mismatch, n_points1, n_points2)) {
     return 1;
   }
 
@@ -263,7 +330,7 @@ int main(int argc, char* argv[]) {
   AccumulationMetrics metrics = analyzer.analyze(data);
 
   // Print results
-  print_results(metrics, data, args);
+  print_results(metrics, data, args, grid_mismatch, n_points1, n_points2);
 
   // Exit code: in verify mode, fail if >2% significant
   if (args.verify_mode) {
