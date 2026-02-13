@@ -209,16 +209,22 @@ In this example there are 27 significant differences
                        e.g. 3 = 3 + 0
 ---
 
-### `pe.std2.pe02` — "Close Enough" Scenario
+### `pe.std2.pe02` — Significant Differences Scenario
 
 **Files**: `pe.std2.pe02.ref.txt`, `pe.std2.pe02.test.txt`, `pe.std2.pe02.test2.txt`
 
-**Description**: Realistic comparison scenario testing the 2% rule. Files have significant differences but should pass due to low overall percentage of differing elements.
+**Description**: Realistic comparison scenario. Files have significant differences
+and will fail under strict pass/fail semantics (any non-marginal significant
+difference = failure).
 
 **Characteristics**:
 - Contains significant differences
-- Tests pass-with-warning logic (< 2% threshold)
+- Tests strict pass/fail logic
 - Realistic operational comparison case
+
+> **Historical note.** Previous versions of this description referenced a
+> "2% rule" that permitted a small proportion of significant differences.
+> That rule has been removed.
 
 divering - should fail all tests
 actually very close, again would pass a more sophisticaed test
@@ -231,7 +237,7 @@ file (case 2)
 
 nspe.std2.
    another great example
-   this should "fail" but should pass with the 2% rule
+   this should "fail" — strict mode: any significant difference = fail
 ---
 
 ### `pe.std3.pe01` — Structure Mismatch and Range Precision
@@ -259,7 +265,7 @@ test of transient spikes
 ./bin/tl_diff data/nspe.std3.test.nspe01.txt data/nspe.std3.refe.nspe01.txt 0.2 3 0.6
 ```
 
-**Expected behavior**: Should fail due to >2% significant differences (905/3554 = 25%)
+**Expected behavior**: Should fail due to significant differences (905/3554 = 25%)
 
 history
    considering the ouptut of ./bin/tl-diff data/pe.std3.test.nspe01.txt data/pe.std3.refe.nspe01.txt
@@ -308,7 +314,7 @@ unit scaling error
 - LEVEL 5: 0 critical, 3 non-critical
 - LEVEL 6: 3 error (based on user threshold)
 
-**Expected behavior**: Pass with note (3/3883 = 0.077% < 2% threshold)
+**Expected behavior**: Fail under strict mode (3 non-marginal significant differences exist)
 
 ---
 

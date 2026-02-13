@@ -1,5 +1,11 @@
 # TRANSIENT_SPIKES Pattern Enhancement
 
+> **Status:** Both the TRANSIENT_SPIKES override and the 2% threshold it
+> modified have been removed from `tl_diff`. Error pattern analysis
+> belongs in `tl_analysis`. tl_diff now uses strict pass/fail: any
+> non-marginal significant difference = failure. This document is
+> retained for historical reference.
+
 ## Overview
 
 This document describes the enhancement to `tl_diff` pass/fail logic that incorporates the **TRANSIENT_SPIKES** error pattern analysis into the decision-making process.

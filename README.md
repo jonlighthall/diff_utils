@@ -76,16 +76,16 @@ classified at one level, it cannot be reclassified at a later level.
 | 6 | Does it exceed the user threshold? | error vs non-error |
 
 **Pass/fail:** Critical threshold exceedances always cause failure.
-Otherwise, the pass/fail determination is based on the proportion of
-non-marginal, non-critical significant differences.
+Otherwise, the pass/fail determination is strict: any non-marginal,
+non-critical significant difference causes failure (exit code 1).
+This aligns with Fortran's `nerr3 > 0` behavior.
 
-> **Note on the 2% threshold.** The current failure threshold (2% of
-> elements) is an ad hoc value derived from visual inspection of real
-> output file differences during early development. It is not based on
-> theory, peer-reviewed standards, or statistical analysis. This value
-> motivated development of more rigorous curve-level metrics (see
-> [TL Metrics](docs/guide/tl-metrics-implementation.md)), and may be
-> revised or replaced as the program architecture matures.
+> **Note on strict semantics.** Previous versions used an ad hoc 2%
+> aggregate threshold for pass/fail. This has been removed
+> because aggregate/curve-level assessment belongs in **tl_metric** and
+> **tl_analysis**, not in a point-by-point comparator. tl_diff now
+> answers a single binary question: are these files point-by-point
+> equivalent within the specified thresholds?
 
 ### Threshold reference
 

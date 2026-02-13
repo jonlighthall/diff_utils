@@ -1,5 +1,11 @@
 # Error Accumulation Analysis for Acoustic Propagation Models
 
+> **Status:** This analysis has been moved out of `tl_diff` and will be
+> implemented in `tl_analysis`. The `ErrorAccumulationAnalyzer` class and
+> `ErrorAccumulationData` struct remain in the repository for future use
+> but are no longer compiled into or used by `tl_diff`. This document
+> describes the design for reference.
+
 ## Overview
 
 This document describes a proposed enhancement to `tl_diff` that analyzes the **spatial coherence** of errors as a function of range. This addresses the operational need to distinguish between:

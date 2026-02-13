@@ -1,5 +1,10 @@
 # RMSE Implementation Summary
 
+> **Status:** RMSE statistics and weighted RMSE have been moved out of
+> `tl_diff` and will be implemented in `tl_metric`. The `RMSEStats`
+> struct has been removed from `tl_diff.h`. This document describes the
+> original design for reference.
+
 ## Overview
 
 Added Root Mean Square Error (RMSE) calculation and reporting to `tl_diff` with intelligent handling of multi-column data structures.

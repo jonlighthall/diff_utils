@@ -190,15 +190,15 @@ that early versions of this tool conflated into a single algorithm:
 parsing, line parsing) supports all three. Each program has its own validation
 standard appropriate to the question it answers.
 
-### The 2% Threshold (Historical)
+### The 2% Threshold (Removed)
 
-The current `tl_diff` failure threshold (2% of non-marginal, non-critical
-significant differences) is an ad hoc value derived from visual inspection of
-real output file differences during early development. It is a magic number in
-the classic sense — empirically derived from limited observation, not from
-theory or peer-reviewed standards. This value motivated the development of more
-rigorous curve-level metrics (Fabre's method), and may be revised or replaced
-as the program architecture matures.
+The former `tl_diff` failure threshold (2% of non-marginal, non-critical
+significant differences) was an ad hoc value derived from visual inspection of
+real output file differences during early development. It has been **removed**.
+tl_diff now uses strict pass/fail: any non-marginal, non-critical significant
+difference causes failure (exit code 1), aligning with Fortran's `nerr3 > 0`
+behavior. Aggregate/curve-level "close enough" assessment belongs in
+**tl_metric** and **tl_analysis**.
 
 ### TRANSIENT_SPIKES Override (Removed)
 
@@ -207,6 +207,18 @@ spike pattern detected) has been removed from `tl_diff`'s pass/fail logic.
 This was experimental code that contaminated the core pass/fail decision with
 exploratory diagnostics. Error pattern analysis belongs in `tl_analysis`, not
 in the installation verification tool.
+
+### Aggregate Analysis (Moved out of tl_diff)
+
+The following features have been moved out of `tl_diff` to their future homes:
+- **RMSE statistics** (RMSEStats, weighted RMSE) → `tl_metric`
+- **TL curve metrics** (TLMetrics, M1/M2/M3/M_curve) → `tl_metric`
+- **Error accumulation analysis** (ErrorAccumulationAnalyzer) → `tl_analysis`
+- **Weighted diff display column** → removed from diff table
+
+The `ErrorAccumulationData` struct and `ErrorAccumulationAnalyzer` class remain
+in the repository (with the struct moved to `error_accumulation_analyzer.h`)
+but are no longer compiled into or linked by the `tl_diff` executable.
 
 **Source:** Session 2026-02-12
 

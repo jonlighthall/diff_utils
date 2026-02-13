@@ -1,5 +1,11 @@
 # TL Curve Comparison Metrics Implementation
 
+> **Status:** TL curve metrics (TLMetrics struct, M1/M2/M3/M_curve) have
+> been moved out of `tl_diff` and will be implemented in `tl_metric`.
+> The standalone reference implementation remains in `tl_metrics.cpp`
+> at the repository root. This document describes the design for
+> reference.
+
 ## Overview
 
 This document describes the implementation of TL (Transmission Loss) curve comparison metrics in `tl_diff`, based on the **IEEE peer-reviewed methodology from Fabre et al.** for comparing acoustic propagation models.
