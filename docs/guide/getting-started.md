@@ -48,8 +48,9 @@ sub-interval differences as **trivial**.
 
 The pass/fail is strict: any non-marginal, non-critical significant
 difference causes failure (exit code 1). Critical threshold exceedances
-also cause immediate failure. This aligns with Fortran's `nerr3 > 0`
-behavior.
+are also classified as significant differences and cause failure through
+the same path; the critical threshold additionally truncates the
+difference table to prevent runaway output.
 
 > **Historical note.** Previous versions used an ad hoc 2% aggregate
 > failure threshold. This was removed because aggregate assessment

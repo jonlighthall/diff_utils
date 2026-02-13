@@ -130,7 +130,7 @@ trivial = (rounded_diff == 0.0) OR
           (|raw_diff - big_zero| < FP_TOLERANCE × max(raw_diff, big_zero))
 ```
 
-**Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
+**Implementation**: `DifferenceAnalyzer::process_hierarchy()` in `src/cpp/src/difference_analyzer.cpp`
 
 **Counters**: `counter.diff_trivial`, `counter.diff_non_trivial`, `differ.max_non_trivial`
 
@@ -171,16 +171,16 @@ if (both_above_ignore) {
         // Percent mode: compare fractional difference
         ref = |value2|
         if (ref <= thresh.zero) {
-            exceeds_user_threshold = (rounded_diff > thresh.zero)  // Conservative
+            exceeds_user_threshold = (raw_diff > thresh.zero)  // Conservative
         } else {
-            exceeds_user_threshold = (rounded_diff / ref) > thresh.significant_percent
+            exceeds_user_threshold = (raw_diff / ref) > thresh.significant_percent
         }
     } else if (thresh.significant == 0.0) {
         // Sensitive mode: all non-trivial below ignore are normal
         exceeds_user_threshold = true
     } else {
         // Standard mode: absolute threshold
-        exceeds_user_threshold = (rounded_diff > thresh.significant)
+        exceeds_user_threshold = (raw_diff > thresh.significant)
     }
 
     if (NOT both_above_ignore AND exceeds_user_threshold) {
@@ -191,7 +191,7 @@ if (both_above_ignore) {
 }
 ```
 
-**Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
+**Implementation**: `DifferenceAnalyzer::process_hierarchy()` in `src/cpp/src/difference_analyzer.cpp`
 
 **Counters**: `counter.diff_insignificant` (subnormal), `counter.diff_significant` (normal), `counter.diff_high_ignore`
 
@@ -226,7 +226,7 @@ if (NOT skip_tl_check AND
 }
 ```
 
-**Implementation**: `DifferenceAnalyzer::process_rounded_values()` in `src/cpp/src/difference_analyzer.cpp`
+**Implementation**: `DifferenceAnalyzer::process_hierarchy()` in `src/cpp/src/difference_analyzer.cpp`
 
 **Counters**: `counter.diff_marginal` (zero-weighted)
 
@@ -248,11 +248,12 @@ if (NOT skip_tl_check AND
 skip_tl_check = (column_index == 0) AND (flags.column1_is_range_data)
 
 if (NOT skip_tl_check AND
-    rounded_diff > thresh.critical AND
+    raw_diff > thresh.critical AND
     value1 <= thresh.ignore AND value2 <= thresh.ignore) {
     critical  // Large difference in numerically valid range
     flags.has_critical_diff = true
-    flags.error_found = true
+    // NOTE: error_found is NOT set — critical threshold controls
+    // print truncation only. Pass/fail comes from Level 3.
 } else {
     non_critical
 }
@@ -260,11 +261,11 @@ if (NOT skip_tl_check AND
 
 **Implementation**:
 - Early check: `DifferenceAnalyzer::process_difference()` (top-level)
-- Per-element: `DifferenceAnalyzer::process_rounded_values()`
+- Per-element: `DifferenceAnalyzer::process_hierarchy()`
 
 **Counters**: `counter.diff_critical`
 
-**Behavior**: Upon detecting the first critical difference, `print_hard_threshold_error()` is called to report it. The `error_found` flag ensures non-zero exit code. Processing continues to maintain consistent statistics, but table printing may be abbreviated.
+**Behavior**: Upon detecting the first critical difference, `print_hard_threshold_error()` is called to report it. The `has_critical_diff` flag truncates further table printing. Processing continues to maintain consistent statistics. Critical differences are already classified as "significant" at Level 3, which sets `files_are_close_enough = false` and ensures non-zero exit code through the normal pass/fail path.
 
 ---
 
@@ -413,8 +414,8 @@ The comparison fails (non-zero exit code) under these conditions:
 
 1. **Structural Mismatch**: Files have incompatible column structures
 2. **File Access Error**: Cannot open or read one or both files
-3. **Critical Difference**: Any difference exceeding `thresh.critical` in the valid numerical range
-4. **Significant Difference Threshold**: Any non-marginal, non-critical significant difference (strict mode)
+3. **Significant Difference**: Any non-marginal, non-critical significant difference (strict mode)
+4. **Critical Difference**: Any difference exceeding `thresh.critical` in the valid numerical range (these are also classified as significant at Level 3)
 
 > **Note:** Previous versions had a "pass-with-warning" scenario where
 > files with < 2% significant differences were considered "close enough."
@@ -430,7 +431,7 @@ The comparison fails (non-zero exit code) under these conditions:
 3. `FileComparator::process_column()` extracts column values
 4. `FileComparator::process_difference()` → `DifferenceAnalyzer::process_difference()`
 5. `DifferenceAnalyzer::process_raw_values()` implements LEVEL 1
-6. `DifferenceAnalyzer::process_rounded_values()` implements LEVELS 2-6
+6. `DifferenceAnalyzer::process_hierarchy()` implements LEVELS 2-6
 
 **Summary Generation**:
 - `FileComparator::print_diff_like_summary()` — LEVEL 1 summary
@@ -452,13 +453,13 @@ For developers working on the discrimination algorithm:
 **Core Implementation Files**:
 - `src/cpp/include/tl_diff.h` — Threshold definitions, data structures (`Thresholds`, `CountStats`, `DiffStats`, `Flags`)
 - `src/cpp/include/difference_analyzer.h` — `DifferenceAnalyzer` class declaration
-- `src/cpp/src/difference_analyzer.cpp` — Core logic: `process_difference()`, `process_raw_values()`, `process_rounded_values()`, `round_to_decimals()`
+- `src/cpp/src/difference_analyzer.cpp` — Core logic: `process_difference()`, `process_raw_values()`, `process_hierarchy()`, `round_to_decimals()`
 - `src/cpp/src/file_comparator.cpp` — Orchestration: `compare_files()`, `process_line()`, `process_column()`, summary printing
 - `src/cpp/main/tl_diff.cpp` — CLI parsing and threshold initialization
 
 **Key Functions by Level**:
 - LEVEL 1: `DifferenceAnalyzer::process_raw_values()`
-- LEVELS 2-6: `DifferenceAnalyzer::process_rounded_values()`
+- LEVELS 2-6: `DifferenceAnalyzer::process_hierarchy()`
 - Summary: `FileComparator::print_diff_like_summary()`, `print_rounded_summary()`, `print_significant_summary()`
 
 ---
