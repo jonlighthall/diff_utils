@@ -268,41 +268,35 @@ if (NOT skip_tl_check AND
 
 ---
 
-### LEVEL 6: Pass/Fail Assessment (2% Tolerance Rule)
+### LEVEL 6: Pass/Fail Assessment (Strict Mode)
 
-**Purpose**: Evaluate overall file comparison success based on the count of non-zero-weighted, non-critical differences relative to total elements
-
-**Assessment**: `pass_threshold = 0.02 × total_elements`
+**Purpose**: Evaluate overall file comparison success based on whether any non-marginal, non-critical significant differences exist
 
 **Decision Rule**:
 ```cpp
-// Count non-zero-weighted, non-critical, normal differences
-// (These exclude: subnormal, zero-weighted, and critical differences)
-non_zero_weighted_non_critical = counter.diff_significant -
-                                  counter.diff_marginal -
-                                  counter.diff_critical
+// Count non-marginal, non-critical, significant differences
+non_marginal_non_critical = counter.diff_significant -
+                             counter.diff_marginal -
+                             counter.diff_critical
 
-// Calculate percentage of total elements
-critical_percent = 100.0 × non_zero_weighted_non_critical / total_elements
-
-if (critical_percent < 2.0) {
-    PASS  // Files are "close enough" within tolerance
+if (non_marginal_non_critical > 0) {
+    FAIL  // Any significant operational difference = failure
 } else {
-    FAIL  // Too many operationally significant differences
+    PASS  // All differences are marginal, critical (handled), or absent
 }
 ```
 
 **Implementation**: `FileComparator::print_significant_percentage()` in `src/cpp/src/file_comparator.cpp`
 
-**Rationale**: This assessment focuses on differences that are:
-1. **Normal** (not subnormal): Numerically reliable (≤138.47 dB)
-2. **Non-zero-weighted** (not zero-weighted): Operationally significant (≤110 dB)
-3. **Non-critical**: Not model failures (< critical threshold)
-4. **Exceed user threshold**: Detected as meaningful by user criteria
+**Rationale**: This strict assessment aligns with Fortran's `nerr3 > 0`
+behavior. Any non-marginal significant difference means the files are
+not point-by-point equivalent. Aggregate/curve-level evaluation of
+"close enough" belongs in `tl_metric` and `tl_analysis`.
 
-If fewer than 2% of elements fall into this category, files pass despite having differences, reflecting operational tolerance for small numbers of localized discrepancies.
-
-**Special Handling**: Error accumulation analysis may detect transient spike patterns (isolated outliers), which trigger a green PASS message rather than yellow, indicating the differences are not systematic.
+> **Historical note.** Previous versions used an ad hoc 2% tolerance
+> rule that permitted a small proportion of significant differences.
+> This was removed to maintain clean separation between point-by-point
+> comparison (tl_diff) and aggregate analysis (tl_metric/tl_analysis).
 
 ---
 
@@ -420,9 +414,11 @@ The comparison fails (non-zero exit code) under these conditions:
 1. **Structural Mismatch**: Files have incompatible column structures
 2. **File Access Error**: Cannot open or read one or both files
 3. **Critical Difference**: Any difference exceeding `thresh.critical` in the valid numerical range
-4. **Significant Difference Threshold**: When non-marginal, non-critical significant differences exceed user expectations
+4. **Significant Difference Threshold**: Any non-marginal, non-critical significant difference (strict mode)
 
-**Pass-with-Warning Scenario**: If non-marginal, non-critical significant differences represent less than 2% of total elements, files are considered "close enough" (configurable behavior).
+> **Note:** Previous versions had a "pass-with-warning" scenario where
+> files with < 2% significant differences were considered "close enough."
+> This has been removed in favor of strict pass/fail semantics.
 
 ---
 

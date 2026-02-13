@@ -554,25 +554,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (args.debug_level > 0) {
-    std::cout << "   Close enough flag: " << std::boolalpha
-              << comparator.getFlag().files_are_close_enough << std::endl;
-  }
-
   if (result) {
     return 0;
   } else {
+    // Strict pass/fail: any non-marginal significant difference is a failure.
+    // This aligns with Fortran's nerr3 > 0 behavior.
     if (args.debug_level >= 0) {
-      std::cout << "\033[1;31mFiles differ";
-
-      if (comparator.getFlag().files_are_close_enough) {
-        std::cout << ",\033[1;33m but are probably close enough (within "
-                     "tolerance).\033[0m"
-                  << std::endl;
-        return 0;
-      } else {
-        std::cout << " significantly.\033[0m" << std::endl;
-      }
+      std::cout << "\033[1;31mFiles differ significantly.\033[0m" << std::endl;
     }
     return 1;
   }

@@ -341,8 +341,9 @@ class FileComparatorSummationTest : public FileComparatorTest {
         << "Print differences should not exceed non-zero differences";
   }
 
-  // Helper to validate 2% threshold logic
-  void validate2PercentLogic() {
+  // Helper to validate strict pass/fail logic
+  // With strict semantics, ANY non-marginal significant difference = FAIL
+  void validateStrictPassFail() {
     const auto& counter = comparator->getCountStats();
     const auto& flags = comparator->getFlag();
 
@@ -352,18 +353,11 @@ class FileComparatorSummationTest : public FileComparatorTest {
                                          counter.diff_marginal -
                                          counter.diff_critical;
 
-      double percentage = 100.0 *
-                          static_cast<double>(non_marginal_non_critical) /
-                          static_cast<double>(counter.elem_number);
-
-      // The 2% logic should be reflected in the flags
-      if (percentage > 2.0) {
-        EXPECT_TRUE(flags.error_found)
-            << "Error should be found when non-marginal, non-critical "
-               "significant "
-            << "differences (" << percentage << "%) exceed 2%";
+      // Strict: any non-marginal significant difference → files_are_close_enough = false
+      if (non_marginal_non_critical > 0) {
         EXPECT_FALSE(flags.files_are_close_enough)
-            << "Files should not be close enough when exceeding 2% threshold";
+            << "Files should not be close enough when any non-marginal "
+               "significant differences exist (strict mode)";
       }
     }
   }
@@ -602,8 +596,8 @@ TEST_F(FileComparatorSummationTest, ThresholdEdgeCases) {
             << std::endl;
 }
 
-// Test 2% failure threshold with different TL ranges
-TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
+// Test strict pass/fail with different TL ranges
+TEST_F(FileComparatorSummationTest, StrictPassFailWithTLRanges) {
   std::vector<std::string> lines1, lines2;
 
   // Create 100 elements where most are identical but some have differences in
@@ -613,13 +607,11 @@ TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
     lines2.push_back("50.0");  // Identical
   }
 
-  // Add 3 differences in low TL range (should be significant and count toward
-  // 2% threshold)
+  // Add 3 differences in low TL range (should be significant, non-marginal)
   lines1.push_back("60.0 70.0 80.0");
   lines2.push_back("60.2 70.2 80.2");  // Small but significant differences
 
-  // Add 2 differences in high TL range (should be ignored and NOT count toward
-  // 2% threshold)
+  // Add 2 differences in high TL range (should be ignored and NOT counted)
   lines1.push_back("200.0 250.0");
   lines2.push_back("220.0 280.0");  // Large differences but in ignore range
 
@@ -631,12 +623,20 @@ TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
                                 getTestFilePath("test_2percent_tl2.txt"));
 
   validateCounterInvariants();
-  validate2PercentLogic();
+  validateStrictPassFail();
 
   const auto& counter = comparator->getCountStats();
   const auto& flags = comparator->getFlag();
 
   EXPECT_EQ(counter.elem_number, 100) << "Should have exactly 100 elements";
+
+  // With strict semantics: any non-marginal significant difference = FAIL.
+  // The 3 low-TL diffs (0.2 > threshold) are significant and non-marginal,
+  // so files_are_close_enough should be false.
+  EXPECT_FALSE(flags.files_are_close_enough)
+      << "Files should not be close enough with significant differences "
+         "(strict mode)";
+  EXPECT_FALSE(result) << "compare_files should return false";
 
   // Calculate non-marginal, non-critical significant differences
   size_t non_marginal_non_critical =
@@ -644,20 +644,15 @@ TEST_F(FileComparatorSummationTest, TwoPercentThresholdWithTLRanges) {
   double percentage = 100.0 * static_cast<double>(non_marginal_non_critical) /
                       static_cast<double>(counter.elem_number);
 
-  std::cout << "\n2% Threshold with TL Ranges Test:" << std::endl;
+  std::cout << "\nStrict Pass/Fail with TL Ranges Test:" << std::endl;
   std::cout << "  Total elements: " << counter.elem_number << std::endl;
   std::cout << "  Total significant: " << counter.diff_significant << std::endl;
   std::cout << "  Non-marginal, non-critical: " << non_marginal_non_critical
             << " (" << percentage << "%)" << std::endl;
-  std::cout << "  Expected: Only low TL differences should count (3%), high TL "
-               "ignored"
+  std::cout << "  Expected: Only low TL differences count, high TL ignored"
             << std::endl;
-
-  // Should have exactly 3% significant differences (3 out of 100), exceeding 2%
-  // threshold
-  if (percentage > 2.0) {
-    EXPECT_TRUE(flags.error_found) << "Should trigger 2% failure threshold";
-  }
+  std::cout << "  Strict result: FAIL (any non-marginal significant = fail)"
+            << std::endl;
 }
 
 // ============================================================================

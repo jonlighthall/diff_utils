@@ -14,11 +14,55 @@
 #ifndef ERROR_ACCUMULATION_ANALYZER_H
 #define ERROR_ACCUMULATION_ANALYZER_H
 
+#include <limits>
 #include <string>
 #include <vector>
 
-// Forward declaration
-struct ErrorAccumulationData;
+/**
+ * @brief Data collected for error accumulation analysis
+ *
+ * Moved here from tl_diff.h as part of the trio separation (tl_diff /
+ * tl_metric / tl_analysis). This struct and its analyzer are used by
+ * tl_analysis for systematic error classification.
+ */
+struct ErrorAccumulationData {
+  std::vector<double> ranges;          // Range values (typically column 1)
+  std::vector<double> errors;          // raw_diff values
+  std::vector<double> tl_values_ref;   // TL from reference file (column 2+)
+  std::vector<double> tl_values_test;  // TL from test file (column 2+)
+  std::vector<bool> is_significant;    // Significance flags
+
+  // Metadata
+  size_t n_points = 0;
+  double range_min = std::numeric_limits<double>::max();
+  double range_max = std::numeric_limits<double>::lowest();
+
+  // Add a data point
+  void add_point(double range, double error, double tl_ref, double tl_test,
+                 bool significant) {
+    ranges.push_back(range);
+    errors.push_back(error);
+    tl_values_ref.push_back(tl_ref);
+    tl_values_test.push_back(tl_test);
+    is_significant.push_back(significant);
+    n_points++;
+
+    if (range < range_min) range_min = range;
+    if (range > range_max) range_max = range;
+  }
+
+  // Clear all data
+  void clear() {
+    ranges.clear();
+    errors.clear();
+    tl_values_ref.clear();
+    tl_values_test.clear();
+    is_significant.clear();
+    n_points = 0;
+    range_min = std::numeric_limits<double>::max();
+    range_max = std::numeric_limits<double>::lowest();
+  }
+};
 
 /**
  * @brief Statistical metrics for error accumulation analysis

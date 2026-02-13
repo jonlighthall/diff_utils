@@ -13,8 +13,6 @@
 #include <numeric>
 #include <sstream>
 
-#include "tl_diff.h"
-
 AccumulationMetrics ErrorAccumulationAnalyzer::analyze(
     const ErrorAccumulationData& data) {
   AccumulationMetrics metrics;

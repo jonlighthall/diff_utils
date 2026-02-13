@@ -39,26 +39,22 @@ sub-interval differences as **trivial**.
    band flags differences that are technically significant but outside the
    range of practical interest.
 
-3. **Curve-level metrics** (informational) — When enabled with `-v 1`,
-   the program reports TL curve comparison metrics (weighted RMSE,
-   correlation, combined score) based on the methodology of
-   [Fabre et al. (2009)](https://doi.org/10.23919/OCEANS.2009.5422312).
-   These metrics are displayed for reference but **do not affect the
-   pass/fail determination**. Full curve-level analysis will move to a
-   dedicated `tl_metric` program.
+3. **Curve-level metrics** — Weighted RMSE, correlation, and combined
+   score (based on [Fabre et al. (2009)](https://doi.org/10.23919/OCEANS.2009.5422312))
+   have been moved to the dedicated `tl_metric` program. Error
+   accumulation analysis has been moved to `tl_analysis`.
 
 ### Pass/fail decision
 
-The default pass/fail is based entirely on layers 1 and 2. Critical
-threshold exceedances cause immediate failure. Otherwise, the pass/fail
-determination is based on the proportion of non-marginal, non-critical
-significant differences.
+The pass/fail is strict: any non-marginal, non-critical significant
+difference causes failure (exit code 1). Critical threshold exceedances
+also cause immediate failure. This aligns with Fortran's `nerr3 > 0`
+behavior.
 
-> **Historical note.** The current 2% failure threshold is an ad hoc
-> value based on visual inspection of real output file differences during
-> early development. It predates the implementation of Fabre's
-> curve-level metrics and is not derived from theory or peer review. It
-> may be revised or replaced as the architecture matures.
+> **Historical note.** Previous versions used an ad hoc 2% aggregate
+> failure threshold. This was removed because aggregate assessment
+> belongs in **tl_metric** and **tl_analysis**, not in a point-by-point
+> comparator.
 
 ### What tl_diff does *not* do
 
