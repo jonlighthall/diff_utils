@@ -506,6 +506,15 @@ def plot_geometry(source_depth, beam_angle, r_source, range_m, central_angle, r_
     ax.grid(True, alpha=0.3)
     ax.set_xlabel("Horizontal Range (km)", fontsize=12)
     ax.set_ylabel("Depth Below Surface (m)", fontsize=12)
+
+    # Match y-axis range with panel 2 (zoomed geometry)
+    # Both axes are inverted, so get current limits and union them
+    ax2_ymin, ax2_ymax = ax2.get_ylim()  # inverted: ymin > ymax
+    ax3_ymin, ax3_ymax = ax3.get_ylim()  # inverted: ymin > ymax
+    shared_ymin = max(ax2_ymin, ax3_ymin)  # largest depth (bottom)
+    shared_ymax = min(ax2_ymax, ax3_ymax)  # smallest depth (top)
+    ax2.set_ylim(shared_ymin, shared_ymax)
+    ax3.set_ylim(shared_ymin, shared_ymax)
     ax.set_title(
         "Depth Profile: Ray Curves Up to Meet Flat Surface", fontsize=14, weight="bold"
     )
