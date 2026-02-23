@@ -214,7 +214,7 @@ def plot_geometry(source_depth, beam_angle, r_source, range_m, central_angle, r_
     gs = fig.add_gridspec(2, 3, height_ratios=[1, 1])
     ax1 = fig.add_subplot(gs[:, 0])  # Left: full geometry (spans both rows)
     ax2 = fig.add_subplot(gs[0, 1:])  # Top right: zoomed view
-    ax3 = fig.add_subplot(gs[1, 1:])  # Bottom right: depth profile
+    ax3 = fig.add_subplot(gs[1, 1:], sharex=ax2)  # Bottom right: depth profile
 
     # Left plot: Full geometry
     ax = ax1
@@ -532,9 +532,12 @@ def plot_geometry(source_depth, beam_angle, r_source, range_m, central_angle, r_
     print(f"\nPlot saved as: spherical_earth_acoustic.png")
 
     # Show the plot
-    plt.show(block=False)
-    plt.pause(0.1)  # Give the window time to render
-    print("Plot window opened")
+    # Use block=True so Tk's event loop runs properly on WSLg.
+    # block=False with pause() can produce blank windows under WSLg's
+    # X11 compositor. The input() prompt below won't be reached until
+    # the user closes the plot window, which is fine for interactive use.
+    plt.show(block=True)
+    print("Plot window closed")
 
     return max_depth, max_depth_range
 
@@ -685,15 +688,9 @@ def main():
             print(f"Max depth location:   {max_depth_range/1000:12.3f} km from source")
             print()
 
-            # Keep the plot window open until user presses Enter
-            try:
-                input(
-                    "Press Enter to close the plot and exit (or close the plot window manually)..."
-                )
-            except (KeyboardInterrupt, EOFError):
-                print("\nExiting...")
-            finally:
-                plt.close("all")
+            # Plot window blocks until closed (plt.show(block=True))
+            # so no additional input() prompt needed
+            plt.close("all")
 
         except Exception as e:
             print(f"Warning: Could not create plot: {e}")
