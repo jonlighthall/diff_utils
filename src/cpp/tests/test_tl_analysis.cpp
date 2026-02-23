@@ -301,3 +301,240 @@ TEST(ErrorAccumulationAnalyzerTest, InterpretationNonEmpty) {
   EXPECT_FALSE(metrics.interpretation.empty());
   EXPECT_FALSE(metrics.recommendation.empty());
 }
+
+// ============================================================================
+// Verification criteria tests
+// ============================================================================
+
+// Simulate the three-criteria verification logic used by --verify mode.
+// This mirrors the decision logic in main/tl_analysis.cpp.
+// The quantization step (lsb) defaults to 0 for synthetic tests,
+// meaning no quantization tolerance is applied unless specified.
+struct VerifyResult {
+  bool rmse_pass;
+  bool spike_pass;
+  bool trend_pass;
+  bool all_pass;
+};
+
+static VerifyResult run_verify(const AccumulationMetrics& m,
+                               double rmse_limit = 0.01,
+                               double spike_factor = 10.0,
+                               double lsb = 0.0,
+                               double range_extent = 0.0) {
+  VerifyResult v;
+  v.rmse_pass = m.rmse < rmse_limit;
+  // Spike: max_error must exceed both ratio threshold AND the RMSE tolerance
+  double spike_limit = std::max(spike_factor * m.rmse, rmse_limit);
+  v.spike_pass = (m.rmse == 0.0) || (m.max_error < spike_limit);
+  // Trend: sub-LSB drift is not meaningful
+  double total_drift = (range_extent > 0.0) ?
+      std::abs(m.slope) * range_extent : 0.0;
+  v.trend_pass = m.p_value_slope > 0.05 || std::isnan(m.p_value_slope) ||
+                 (lsb > 0 && total_drift < lsb);
+  v.all_pass = v.rmse_pass && v.spike_pass && v.trend_pass;
+  return v;
+}
+
+TEST(VerificationTest, IdenticalCurvesPass) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Zero error everywhere
+  for (int i = 0; i < 50; ++i) {
+    data.add_point(i * 1.0, 0.0, 70.0, 70.0, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+  auto v = run_verify(metrics);
+
+  EXPECT_TRUE(v.rmse_pass);
+  EXPECT_TRUE(v.spike_pass);
+  EXPECT_TRUE(v.trend_pass);
+  EXPECT_TRUE(v.all_pass);
+}
+
+TEST(VerificationTest, TinyNoisePasses) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Floating-point-level noise: alternating ± 0.001 dB
+  for (int i = 0; i < 100; ++i) {
+    double error = (i % 2 == 0) ? 0.001 : -0.001;
+    data.add_point(i * 1.0, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+  auto v = run_verify(metrics);
+
+  EXPECT_LT(metrics.rmse, 0.01);
+  EXPECT_TRUE(v.rmse_pass);
+  EXPECT_TRUE(v.all_pass);
+}
+
+TEST(VerificationTest, LargeRMSEFails) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // 1 dB errors — way above 0.01 dB tolerance
+  for (int i = 0; i < 50; ++i) {
+    double error = (i % 2 == 0) ? 1.0 : -1.0;
+    data.add_point(i * 1.0, error, 70.0, 70.0 + error, true);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+  auto v = run_verify(metrics);
+
+  EXPECT_GT(metrics.rmse, 0.01);
+  EXPECT_FALSE(v.rmse_pass);
+  EXPECT_FALSE(v.all_pass);
+}
+
+TEST(VerificationTest, AnomalousSpikeFailsTest2) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Mostly tiny errors, one huge spike at a much higher ratio
+  for (int i = 0; i < 200; ++i) {
+    double error = 0.001;
+    if (i == 100) error = 10.0;  // single massive spike
+    data.add_point(i * 1.0, error, 70.0, 70.0 + error, error > 0.05);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+  // Use rmse_limit=1.0 so Test 1 passes (RMSE ≈ 0.71) but spike_limit is
+  // dominated by spike_factor * RMSE ≈ 7.07, which max_error (10.0) exceeds.
+  auto v = run_verify(metrics, 1.0, 10.0);
+
+  // max_error / RMSE should be well above 10 with 200 points diluting the spike
+  EXPECT_GT(metrics.max_error / metrics.rmse, 10.0);
+  EXPECT_FALSE(v.spike_pass);
+}
+
+TEST(VerificationTest, SystematicTrendFailsTest3) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Error grows linearly with range
+  for (int i = 0; i < 100; ++i) {
+    double range = static_cast<double>(i);
+    double error = 0.0001 * range;  // small but systematic
+    data.add_point(range, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+  auto v = run_verify(metrics, 1.0);  // very loose RMSE to isolate trend test
+
+  // Should detect significant slope
+  EXPECT_LT(metrics.p_value_slope, 0.05);
+  EXPECT_FALSE(v.trend_pass);
+}
+
+TEST(VerificationTest, CustomRMSELimit) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // 0.05 dB errors — fails at 0.01, passes at 0.1
+  for (int i = 0; i < 50; ++i) {
+    double error = (i % 2 == 0) ? 0.05 : -0.05;
+    data.add_point(i * 1.0, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+
+  auto strict = run_verify(metrics, 0.01);
+  auto loose = run_verify(metrics, 0.1);
+
+  EXPECT_FALSE(strict.rmse_pass);
+  EXPECT_TRUE(loose.rmse_pass);
+}
+
+// ============================================================================
+// Quantization-aware verification tests
+// ============================================================================
+
+TEST(QuantizationTest, SubLSBSpikePassesWithQuantizationFloor) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Simulate 1-decimal data: most points match, a few have 0.1 dB rounding diff
+  // RMSE is small, so max/RMSE ratio is high, but max is within rmse_limit
+  for (int i = 0; i < 200; ++i) {
+    double error = 0.0;
+    if (i == 50 || i == 100) error = 0.1;  // single-LSB rounding differences
+    data.add_point(i * 0.5, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+
+  // With auto-calibrated rmse_limit for 1-decimal data
+  double rmse_limit = 0.122;  // 3-sigma for 1-decimal data
+  auto v = run_verify(metrics, rmse_limit, 10.0);
+
+  EXPECT_LT(metrics.rmse, rmse_limit);                // RMSE passes
+  EXPECT_GE(metrics.max_error / metrics.rmse, 10.0);   // ratio >= 10
+  EXPECT_TRUE(v.spike_pass);  // passes because max < rmse_limit
+  EXPECT_TRUE(v.all_pass);
+}
+
+TEST(QuantizationTest, SubLSBTrendPassesWithDriftCheck) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Small systematic slope that is statistically significant but sub-LSB total
+  for (int i = 0; i < 200; ++i) {
+    double range = static_cast<double>(i);
+    double error = 0.0001 * range;  // slope 1e-4 dB/unit
+    data.add_point(range, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+
+  // Without drift check: p < 0.05 → FAIL
+  EXPECT_LT(metrics.p_value_slope, 0.05);
+
+  // With drift check: total drift = 0.0001 * 199 = 0.02 dB < 0.1 LSB
+  double lsb = 0.1;
+  double range_extent = 199.0;
+  auto v = run_verify(metrics, 1.0, 10.0, lsb, range_extent);
+
+  EXPECT_TRUE(v.trend_pass);  // passes because total drift < LSB
+}
+
+TEST(QuantizationTest, RealTrendStillFails) {
+  ErrorAccumulationAnalyzer analyzer;
+  ErrorAccumulationData data;
+
+  // Large systematic slope: total drift exceeds LSB
+  for (int i = 0; i < 200; ++i) {
+    double range = static_cast<double>(i);
+    double error = 0.01 * range;  // slope 0.01 dB/unit, total drift = 2 dB
+    data.add_point(range, error, 70.0, 70.0 + error, false);
+  }
+
+  AccumulationMetrics metrics = analyzer.analyze(data);
+
+  double lsb = 0.1;
+  double range_extent = 199.0;
+  auto v = run_verify(metrics, 100.0, 10.0, lsb, range_extent);
+
+  // Total drift = 0.01 * 199 = 1.99 dB >> 0.1 LSB
+  EXPECT_LT(metrics.p_value_slope, 0.05);
+  EXPECT_FALSE(v.trend_pass);  // fails because drift exceeds LSB
+}
+
+TEST(QuantizationTest, ComputeQuantizationRMSELimit) {
+  // Verify the mathematical formula: 3 * 10^(-d) / sqrt(6)
+  // For 1 decimal: 3 * 0.1 / sqrt(6) = 0.3 / 2.449 ≈ 0.1225
+  // For 2 decimals: 3 * 0.01 / sqrt(6) ≈ 0.01225
+  // For 0 decimals: 3 * 1.0 / sqrt(6) ≈ 1.225
+
+  auto compute = [](int d) {
+    return 3.0 * std::pow(10.0, -d) / std::sqrt(6.0);
+  };
+
+  EXPECT_NEAR(compute(0), 1.2247, 0.001);
+  EXPECT_NEAR(compute(1), 0.1225, 0.001);
+  EXPECT_NEAR(compute(2), 0.01225, 0.001);
+  EXPECT_NEAR(compute(3), 0.001225, 0.0001);
+}
