@@ -30,6 +30,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Forward declarations
 struct ProgramArgs {
@@ -57,6 +58,7 @@ bool parse_threshold_argument(const char* arg, double& value,
                               const std::string& name);
 bool parse_debug_level_argument(const char* arg, int& value);
 bool is_named_flag(const std::string& arg);
+std::string find_plot_script(int debug_level);
 void call_plot_script(const std::string& file1, const std::string& file2,
                       double threshold, int debug_level);
 
@@ -431,32 +433,91 @@ bool parse_numeric_arguments(int argc, char* argv[], ProgramArgs& args) {
   return true;
 }
 
-void call_plot_script(const std::string& file1, const std::string& file2,
-                      double threshold, int debug_level) {
-  // Find the directory containing the tl_diff executable
+/**
+ * @brief Locate the plot_tl_comparison.py script.
+ *
+ * Search order:
+ *   1. $NSPE_PLOT_UTILS/plot_tl_comparison.py  (env-var override)
+ *   2. ~/utils/nspe_python_plot_utils/plot_tl_comparison.py  (default install)
+ *   3. <exe_dir>/../../scripts/plot_tl_comparison.py  (legacy: diff_utils tree)
+ *   4. scripts/plot_tl_comparison.py  (cwd-relative fallback)
+ *
+ * @return Resolved path to the script, or empty string if not found.
+ */
+std::string find_plot_script(int debug_level) {
+  const std::string script_name = "plot_tl_comparison.py";
+  std::vector<std::string> candidates;
+
+  // 1. Environment variable override
+  const char* env_dir = std::getenv("NSPE_PLOT_UTILS");
+  if (env_dir != nullptr && env_dir[0] != '\0') {
+    candidates.push_back(std::string(env_dir) + "/" + script_name);
+  }
+
+  // 2. Default install location (~/utils/nspe_python_plot_utils/)
+  const char* home = std::getenv("HOME");
+  if (home != nullptr) {
+    candidates.push_back(std::string(home) +
+                         "/utils/nspe_python_plot_utils/" + script_name);
+  }
+
+  // 3. Relative to executable (legacy: build/bin/../../scripts/)
   char exe_path[PATH_MAX];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-
-  std::string script_path;
   if (len != -1) {
     exe_path[len] = '\0';
-    // Get directory of executable and resolve any symlinks
     char resolved_path[PATH_MAX];
     if (realpath(exe_path, resolved_path) != nullptr) {
       char* exe_dir = dirname(resolved_path);
-      // Construct path to script: ../../scripts/plot_tl_comparison.py
-      // (from build/bin to scripts/)
-      script_path =
-          std::string(exe_dir) + "/../../scripts/plot_tl_comparison.py";
+      candidates.push_back(std::string(exe_dir) + "/../../scripts/" +
+                           script_name);
     } else {
-      // Fallback if realpath fails
       char* exe_dir = dirname(exe_path);
-      script_path =
-          std::string(exe_dir) + "/../../scripts/plot_tl_comparison.py";
+      candidates.push_back(std::string(exe_dir) + "/../../scripts/" +
+                           script_name);
     }
-  } else {
-    // Fallback to relative path if readlink fails
-    script_path = "scripts/plot_tl_comparison.py";
+  }
+
+  // 4. CWD-relative fallback
+  candidates.push_back("scripts/" + script_name);
+
+  // Check each candidate
+  for (const auto& path : candidates) {
+    // Resolve to absolute path for reliable access check
+    char resolved[PATH_MAX];
+    const char* check_path = path.c_str();
+    if (realpath(check_path, resolved) != nullptr) {
+      if (debug_level > 1) {
+        std::cout << "   Plot script found: " << resolved << std::endl;
+      }
+      return std::string(resolved);
+    }
+    if (debug_level > 1) {
+      std::cout << "   Plot script not at: " << path << std::endl;
+    }
+  }
+
+  return "";  // not found
+}
+
+void call_plot_script(const std::string& file1, const std::string& file2,
+                      double threshold, int debug_level) {
+  std::string script_path = find_plot_script(debug_level);
+
+  if (script_path.empty()) {
+    std::cerr
+        << "\n\033[1;33mWARNING:\033[0m Plotting requested but "
+           "plot_tl_comparison.py was not found.\n"
+        << "         Searched locations:\n"
+        << "           1. $NSPE_PLOT_UTILS/plot_tl_comparison.py\n"
+        << "           2. ~/utils/nspe_python_plot_utils/"
+           "plot_tl_comparison.py\n"
+        << "           3. <exe_dir>/../../scripts/plot_tl_comparison.py\n"
+        << "           4. scripts/plot_tl_comparison.py  (cwd-relative)\n"
+        << "         To fix: set NSPE_PLOT_UTILS to the directory containing\n"
+        << "         plot_tl_comparison.py, or install nspe_python_plot_utils\n"
+        << "         in ~/utils/.\n";
+    return;
   }
 
   std::ostringstream command;
