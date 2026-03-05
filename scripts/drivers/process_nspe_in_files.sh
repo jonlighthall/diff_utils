@@ -26,7 +26,9 @@
 #   --skip-existing     Skip files where outputs already exist
 #   --skip-newer        Skip files where outputs are newer than input
 #   --force             Override skip options and process all matched files
-#   --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
+#   --keep-bin          Keep binary and extra output files (default: only keep ASCII files with references)
+#   --keep-log          Keep log files (default: only kept for case6/case7)
+#   --keep-all          Keep all output files (equivalent to --keep-bin --keep-log)
 #   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
 #   --dry-run           Show what would be processed without running
 #   --debug             Show detailed file filtering information
@@ -66,7 +68,9 @@ Options:
   --skip-existing     Skip files where outputs already exist
   --skip-newer        Skip files where outputs are newer than input
   --force             Override skip options and process all matched files
-  --keep-bin          Keep all binary and extra output files (default: only keep ASCII files with references)
+  --keep-bin          Keep binary and extra output files (default: only keep ASCII files with references)
+  --keep-log          Keep log files (default: only kept for case6/case7)
+  --keep-all          Keep all output files (equivalent to --keep-bin --keep-log)
   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
   --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
@@ -96,6 +100,7 @@ force=false
 dry_run=false
 debug=false
 keep_bin=false
+keep_log=false
 cli_exe=""
 diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force tl_diff
 no_make=false
@@ -145,6 +150,8 @@ while [[ $# -gt 0 ]]; do
         --skip-newer) skip_newer=true; shift;;
         --force) force=true; shift;;
         --keep-bin) keep_bin=true; shift;;
+        --keep-log) keep_log=true; shift;;
+        --keep-all) keep_bin=true; keep_log=true; shift;;
         --diff-level) diff_level="$2"; shift 2;;
         --stop-on-error) stop_on_error=true; shift;;
         --dry-run) dry_run=true; shift;;
@@ -825,8 +832,8 @@ for infile in "${infiles[@]}"; do
                         fi
                     done
 
-                    # Keep log file only for case6 and case7
-                    if [[ ! "$basename_noext" =~ case[67] ]]; then
+                    # Keep log file only for case6 and case7, or if --keep-log is set
+                    if [[ "$keep_log" == false && ! "$basename_noext" =~ case[67] ]]; then
                         if [[ -f "$directory/${basename_noext}.log" ]]; then
                             rm "$directory/${basename_noext}.log"
                             echo "   Removed ${basename_noext}.log (only kept for case6/case7)"
@@ -1104,6 +1111,20 @@ for infile in "${infiles[@]}"; do
                                 continue
                                 ;;
                         esac
+                        # Skip log files if --keep-log is set (or case6/case7)
+                        if [[ "$f" == *.log ]]; then
+                            if [[ "$keep_log" == true || "$basename_noext" =~ case[67] ]]; then
+                                continue
+                            fi
+                        fi
+                        # Skip binary/extra files if --keep-bin is set
+                        if [[ "$keep_bin" == true ]]; then
+                            case "$f" in
+                                *.003|*.dat|*.bin|*.prs|*.pulse)
+                                    continue
+                                    ;;
+                            esac
+                        fi
                         # Only delete files
                         if [[ -f "$f" ]]; then
                             rm "$f"
