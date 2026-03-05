@@ -1,32 +1,36 @@
 #!/usr/bin/env bash
-# timing_stats.sh — Statistical summary of timing.log files
+# timing_stats.sh — Statistical summary of _timing.log files
 #
-# Reads one or more timing.log files (TSV format from process_nspe_in_files.sh)
+# Reads one or more _timing.log files (TSV format from process_nspe_in_files.sh)
 # and produces per-input-file statistics: count, mean, std dev, min, max.
 #
 # Usage:
-#   timing_stats.sh <timing.log> [timing.log ...]
-#   timing_stats.sh <timing.log> --exe <executable> --status PASS --host <hostname>
-#   timing_stats.sh dir1/timing.log dir2/timing.log --compare
+#   timing_stats.sh <_timing.log> [_timing.log ...]
+#   timing_stats.sh <_timing.log> --exe <executable> --status PASS --host <hostname>
+#   timing_stats.sh dir1/_timing.log dir2/_timing.log --compare
 #
 # Options:
 #   --exe <name>       Filter by executable basename (e.g., nspe.x)
-#   --status <s>       Filter by status (PASS or FAIL)
+#   --status <s>       Filter by status (default: PASS; use FAIL, TIMEOUT, etc.)
+#   --all              Include all statuses (PASS, FAIL, TIMEOUT)
 #   --host <name>      Filter by hostname
-#   --compare          Side-by-side comparison of two timing.log files
+#   --compare          Side-by-side comparison of two _timing.log files
 #   --csv              Output in CSV format instead of table
 #   --sort <col>       Sort by: name (default), mean, count, stddev, min, max
 #   --help             Show this help message
 #
 # Examples:
 #   # Summarize a single file
-#   timing_stats.sh std_copy/timing.log
+#   timing_stats.sh std_copy/_timing.log
 #
 #   # Compare Fortran vs C++ timing
-#   timing_stats.sh fortran/std_copy/timing.log cpp/std_copy/timing.log --compare
+#   timing_stats.sh fortran/std_copy/_timing.log cpp/std_copy/_timing.log --compare
 #
-#   # Filter to only passing runs with nspe.x
-#   timing_stats.sh timing.log --exe nspe.x --status PASS
+#   # Include failed and timed-out runs
+#   timing_stats.sh _timing.log --all
+#
+#   # Show only timed-out runs
+#   timing_stats.sh _timing.log --status TIMEOUT
 
 set -euo pipefail
 
@@ -34,7 +38,7 @@ set -euo pipefail
 
 declare -a log_files=()
 filter_exe=""
-filter_status=""
+filter_status="PASS"
 filter_host=""
 compare_mode=false
 csv_mode=false
@@ -49,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --exe)      filter_exe="${2:?Error: --exe requires a value}";       shift 2 ;;
         --status)   filter_status="${2:?Error: --status requires a value}"; shift 2 ;;
+        --all)      filter_status="";   shift   ;;
         --host)     filter_host="${2:?Error: --host requires a value}";     shift 2 ;;
         --compare)  compare_mode=true;  shift   ;;
         --csv)      csv_mode=true;      shift   ;;
