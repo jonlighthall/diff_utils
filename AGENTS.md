@@ -30,6 +30,7 @@ All AI agents should prioritize the following files for project-specific guidanc
 |-----------|---------|
 | `src/cpp/` | C++ comparison engine (tl_diff) |
 | `src/fortran/` | Legacy Fortran utilities |
+| `scripts/drivers/` | Batch validation scripts (process_nspe_in_files.sh, process_ram_in_files.sh) |
 | `scripts/pi_gen/` | Cross-language π precision test generators |
 | `data/` | Test data files |
 | `build/bin/` | Compiled executables |

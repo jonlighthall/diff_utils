@@ -171,11 +171,38 @@ for test prerequisites and details.
 ```
 src/cpp/           C++ comparison engine (tl_diff)
 src/fortran/       Legacy Fortran utilities
-scripts/           Shell scripts (batch processing)
+scripts/drivers/   Batch validation scripts (see below)
+scripts/pi_gen/    Cross-language π precision test generators
 data/              Test data files
 build/bin/         Compiled executables
 docs/              Documentation and technical reports
 ```
+
+### Batch validation scripts
+
+The `scripts/drivers/` directory contains shell scripts for batch-processing
+NSPE and RAM input files — running the executable, collecting output, and
+comparing results against references using `tl_diff`.
+
+| Script | Description |
+|--------|-------------|
+| `process_nspe_in_files.sh` | Batch validator for NSPE `.in` files (make/copy/test/diff modes, pattern filtering, 3-level diff escalation, colored summary) |
+| `process_ram_in_files.sh` | Batch validator for RAM `.in` files (same feature set as above) |
+| `lib_diff_utils.sh` | Shared library (`diff_files()`, `headtail_truncate()`) used by both drivers |
+
+Also at the `scripts/` root:
+
+| Script | Description |
+|--------|-------------|
+| `run_pf_ram_batch.sh` | Simple batch runner for `pf_ram` / `pf_flyer` executables |
+
+**Example — run all std cases and diff against references:**
+```bash
+scripts/drivers/process_nspe_in_files.sh --diff /path/to/std/
+```
+
+See [.ai/INSTRUCTIONS.md](.ai/INSTRUCTIONS.md) for the full working guide
+including common options, output interpretation, and troubleshooting.
 
 ### Documentation index
 
