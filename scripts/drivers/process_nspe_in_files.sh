@@ -272,6 +272,10 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
     simple_diff_fail_files=()
     tldiff_fail_files=()
     tl_diff_fail_files=()
+    # Per-basename overall status
+    declare -A bn_has_pass=()
+    declare -A bn_has_fail=()
+    total_pairs=0
 
     term_width=$(tput cols 2>/dev/null || echo 80)
     line_len=$((term_width * 5 / 10))
@@ -411,25 +415,29 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
             diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
             diff_exit_code=${PIPESTATUS[0]}
 
+            total_pairs=$((total_pairs + 1))
+            local_label="${bn}_${suffix}.asc"
             if [[ $diff_exit_code -eq 0 ]]; then
                 echo -e "\e[32m[[PASS]]\e[0m"
-                add_to_array_if_not_present "pass_files" "$bn"
+                pass_files+=("$local_label")
+                bn_has_pass["$bn"]=1
                 if grep -q "diff FAILED" "$diff_output_file"; then
                     if grep -q "tldiff OK" "$diff_output_file"; then
-                        simple_diff_fail_files+=("$bn")
+                        simple_diff_fail_files+=("$local_label")
                     elif grep -q "tl_diff OK" "$diff_output_file"; then
-                        tldiff_fail_files+=("$bn")
+                        tldiff_fail_files+=("$local_label")
                     fi
                 fi
             else
                 echo -e "\e[31m[[FAIL]]\e[0m"
-                add_to_array_if_not_present "fail_files" "$bn"
+                fail_files+=("$local_label")
+                bn_has_fail["$bn"]=1
                 if grep -q "diff FAILED" "$diff_output_file"; then
                     if grep -q "tldiff FAILED" "$diff_output_file"; then
                         if grep -q "tl_diff FAILED" "$diff_output_file"; then
-                            tl_diff_fail_files+=("$bn")
+                            tl_diff_fail_files+=("$local_label")
                         else
-                            tldiff_fail_files+=("$bn")
+                            tldiff_fail_files+=("$local_label")
                         fi
                     fi
                 fi
@@ -462,12 +470,16 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
             diff_output_file=$(mktemp)
             diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
             diff_exit_code=${PIPESTATUS[0]}
+            total_pairs=$((total_pairs + 1))
+            local_label="${bn}.${ext}"
             if [[ $diff_exit_code -eq 0 ]]; then
                 echo -e "\e[32m[[PASS]]\e[0m"
-                add_to_array_if_not_present "pass_files" "$bn"
+                pass_files+=("$local_label")
+                bn_has_pass["$bn"]=1
             else
                 echo -e "\e[31m[[FAIL]]\e[0m"
-                add_to_array_if_not_present "fail_files" "$bn"
+                fail_files+=("$local_label")
+                bn_has_fail["$bn"]=1
             fi
             rm -f "$diff_output_file"
             pair_found=true
@@ -488,7 +500,7 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
     echo "  Ref dir:  $ref_dir"
     echo
 
-    echo "Diff Results:"
+    echo "Pair Results ($total_pairs pairs compared):"
     echo "============="
     if [[ ${#pass_files[@]} -gt 0 ]]; then
         echo "Passed: ${#pass_files[@]}"
@@ -529,6 +541,28 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
             echo -e "   \e[33mSKIPPED\e[0m $f"
         done
     fi
+
+    # Per-basename overall status
+    echo ""
+    echo "Per-Case Summary:"
+    echo "================="
+    # Collect all basenames that had any result
+    declare -A all_result_bns=()
+    for bn in "${!bn_has_pass[@]}"; do all_result_bns["$bn"]=1; done
+    for bn in "${!bn_has_fail[@]}"; do all_result_bns["$bn"]=1; done
+    # Sort and display
+    bn_pass_count=0
+    bn_fail_count=0
+    for bn in $(echo "${!all_result_bns[@]}" | tr ' ' '\n' | sort); do
+        if [[ -n "${bn_has_fail[$bn]+x}" ]]; then
+            echo -e "   \e[31mFAIL\e[0m $bn"
+            bn_fail_count=$((bn_fail_count + 1))
+        else
+            echo -e "   \e[32mPASS\e[0m $bn"
+            bn_pass_count=$((bn_pass_count + 1))
+        fi
+    done
+    echo "  Cases passed: $bn_pass_count  Failed: $bn_fail_count"
 
     echo ""
     echo "Overall Status:"
