@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
+#include <unordered_map>
 
 #include "tl_diff.h"  // for PrintLevel definition
 
@@ -248,14 +249,12 @@ ColumnStructure FileReader::analyze_column_structure(
   size_t most_common_frequency = 0;
 
   // Find the most frequent column count (likely the main data format)
-  for (size_t target_count : column_counts) {
-    size_t frequency = 0;
-    for (size_t count : column_counts) {
-      if (count == target_count) frequency++;
-    }
-    if (frequency > most_common_frequency) {
-      most_common_frequency = frequency;
-      most_common_count = target_count;
+  std::unordered_map<size_t, size_t> freq_map;
+  for (size_t count : column_counts) {
+    size_t f = ++freq_map[count];
+    if (f > most_common_frequency) {
+      most_common_frequency = f;
+      most_common_count = count;
     }
   }
 
