@@ -30,6 +30,8 @@
 #   --keep-log          Keep log files (default: only kept for case6/case7)
 #   --keep-all          Keep all output files (equivalent to --keep-bin --keep-log)
 #   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
+#   --test-dir <path>   Directory containing test output files (for two-directory diff)
+#   --ref-dir <path>    Directory containing reference files (for two-directory diff)
 #   --dry-run           Show what would be processed without running
 #   --debug             Show detailed file filtering information
 #   -h, --help          Show this help message
@@ -72,6 +74,8 @@ Options:
   --keep-log          Keep log files (default: only kept for case6/case7)
   --keep-all          Keep all output files (equivalent to --keep-bin --keep-log)
   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
+  --test-dir <path>   Directory containing test output files (for two-directory diff)
+  --ref-dir <path>    Directory containing reference files (for two-directory diff)
   --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
@@ -106,6 +110,8 @@ diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force tl_
 no_make=false
 input_filename="nspe.in"  # Default input filename
 stop_on_error=false
+test_dir=""
+ref_dir=""
 
 # Handle help first
 if [[ $# -eq 0 ]]; then
@@ -157,6 +163,8 @@ while [[ $# -gt 0 ]]; do
         --dry-run) dry_run=true; shift;;
         --debug) debug=true; shift;;
         --no-make) no_make=true; shift;;
+        --test-dir) test_dir="$2"; shift 2;;
+        --ref-dir) ref_dir="$2"; shift 2;;
         -h|--help) usage; exit 0;;
         *) echo "Unknown option: $1" >&2; usage; exit 1;;
     esac
@@ -214,6 +222,333 @@ if [[ "$mode" != "make" && "$mode" != "copy" && "$mode" != "test" && "$mode" != 
     echo "  diff - Compare existing output files to reference files (no program execution)"
     exit 1
 fi
+
+# Helper function to add file to array only if not already present
+add_to_array_if_not_present() {
+    local array_name="$1"
+    local file="$2"
+    local -n array_ref="$array_name"
+
+    # Check if file is already in array
+    local item
+    for item in "${array_ref[@]}"; do
+        if [[ "$item" == "$file" ]]; then
+            return 0  # File already present, don't add
+        fi
+    done
+
+    # File not found, add it
+    array_ref+=("$file")
+}
+
+# ─── Two-directory diff mode ────────────────────────────────────────────────
+# When both --test-dir and --ref-dir are specified, compare output files across
+# two directories without needing .in files or execution.
+if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
+    if [[ -z "$test_dir" || -z "$ref_dir" ]]; then
+        echo -e "\e[31mError: Both --test-dir and --ref-dir must be specified together.\e[0m" >&2
+        exit 1
+    fi
+    if [[ "$mode" != "diff" ]]; then
+        echo -e "\e[31mError: --test-dir and --ref-dir can only be used with 'diff' mode.\e[0m" >&2
+        exit 1
+    fi
+
+    # Validate directories
+    test_dir="${test_dir%/}"
+    ref_dir="${ref_dir%/}"
+    for d in "$test_dir" "$ref_dir"; do
+        if [[ ! -d "$d" ]]; then
+            echo -e "\e[31mError: Directory '$d' does not exist.\e[0m" >&2
+            exit 1
+        fi
+    done
+
+    # Initialize counters
+    pass_files=()
+    fail_files=()
+    missing_files=()
+    skipped_files=()
+    simple_diff_fail_files=()
+    tldiff_fail_files=()
+    tl_diff_fail_files=()
+
+    term_width=$(tput cols 2>/dev/null || echo 80)
+    line_len=$((term_width * 5 / 10))
+
+    printf '%*s\n' "$line_len" '' | tr '  ' '='
+    echo "Two-directory diff"
+    echo "  Test dir: $test_dir"
+    echo "  Ref dir:  $ref_dir"
+    if [[ $diff_level -ne 0 ]]; then
+        case $diff_level in
+            1) echo "  Diff level: 1 (diff only)" ;;
+            2) echo "  Diff level: 2 (max tldiff)" ;;
+            3) echo "  Diff level: 3 (force tl_diff)" ;;
+        esac
+    fi
+    printf '%*s\n' "$line_len" '' | tr '  ' '='
+
+    # Collect unique basenames from test directory output files
+    # Look for: *_01.asc, *_02.asc, *_03.asc, *.tl, *.rtl, *.ftl
+    shopt -s nullglob
+    declare -A basenames_seen
+    for f in "$test_dir"/*_0[1-3].asc "$test_dir"/*.tl "$test_dir"/*.rtl "$test_dir"/*.ftl; do
+        fname=$(basename "$f")
+        # Extract basename: strip _01.asc/_02.asc/_03.asc or .tl/.rtl/.ftl
+        case "$fname" in
+            *_01.asc) bn="${fname%_01.asc}" ;;
+            *_02.asc) bn="${fname%_02.asc}" ;;
+            *_03.asc) bn="${fname%_03.asc}" ;;
+            *.tl)     bn="${fname%.tl}" ;;
+            *.rtl)    bn="${fname%.rtl}" ;;
+            *.ftl)    bn="${fname%.ftl}" ;;
+            *)        continue ;;
+        esac
+        basenames_seen["$bn"]=1
+    done
+    shopt -u nullglob
+
+    # Sort basenames
+    mapfile -t basenames < <(printf '%s\n' "${!basenames_seen[@]}" | sort -V)
+
+    if [[ ${#basenames[@]} -eq 0 ]]; then
+        echo -e "\e[33mNo output files found in test directory: $test_dir\e[0m"
+        exit 0
+    fi
+
+    # Apply pattern filtering to basenames
+    if [[ ${#patterns[@]} -gt 0 ]]; then
+        filtered=()
+        for bn in "${basenames[@]}"; do
+            matched=false
+            for pattern in "${patterns[@]}"; do
+                if [[ "$bn" == $pattern || "${bn}.in" == $pattern ]]; then
+                    matched=true
+                    break
+                fi
+            done
+            if $matched; then
+                filtered+=("$bn")
+            fi
+        done
+        basenames=("${filtered[@]}")
+    fi
+
+    # Apply exclude filtering
+    if [[ ${#excludes[@]} -gt 0 ]]; then
+        filtered=()
+        for bn in "${basenames[@]}"; do
+            excluded=false
+            for exclude in "${excludes[@]}"; do
+                if [[ "$bn" == $exclude || "${bn}.in" == $exclude ]]; then
+                    excluded=true
+                    break
+                fi
+            done
+            if ! $excluded; then
+                filtered+=("$bn")
+            fi
+        done
+        basenames=("${filtered[@]}")
+    fi
+
+    echo "Files to compare: ${#basenames[@]}"
+    echo
+
+    for bn in "${basenames[@]}"; do
+        echo "Comparing: $bn"
+        pair_found=false
+
+        # Priority order for matching file pairs:
+        #   1. Same-name match: _01.asc↔_01.asc, _02.asc↔_02.asc, _03.asc↔_03.asc
+        #   2. Traditional ref: _01.asc↔.tl, _02.asc↔.rtl, _03.asc↔.ftl
+        #   3. Ref-format match: .tl↔.tl, .rtl↔.rtl, .ftl↔.ftl
+        declare -a pairs=()
+
+        for suffix in 01 02 03; do
+            test_file="$test_dir/${bn}_${suffix}.asc"
+            if [[ ! -f "$test_file" ]]; then
+                continue
+            fi
+
+            # Look for reference file in priority order
+            ref_file=""
+            case $suffix in
+                01) ref_candidates=("$ref_dir/${bn}_01.asc" "$ref_dir/${bn}.tl") ;;
+                02) ref_candidates=("$ref_dir/${bn}_02.asc" "$ref_dir/${bn}.rtl") ;;
+                03) ref_candidates=("$ref_dir/${bn}_03.asc" "$ref_dir/${bn}.ftl") ;;
+            esac
+
+            for rc in "${ref_candidates[@]}"; do
+                if [[ -f "$rc" ]]; then
+                    ref_file="$rc"
+                    break
+                fi
+            done
+
+            if [[ -z "$ref_file" ]]; then
+                echo -e "   $(basename "$test_file"): \e[33m[[NO REF]]\e[0m (no matching reference found)"
+                missing_files+=("$test_file")
+                continue
+            fi
+
+            # Compare
+            echo -n "   $(basename "$test_file") ↔ $(basename "$ref_file")... "
+
+            if [[ ! -s "$test_file" ]]; then
+                echo -e "\e[33m[[EMPTY TEST]]\e[0m"
+                skipped_files+=("$test_file")
+                continue
+            fi
+            if [[ ! -s "$ref_file" ]]; then
+                echo -e "\e[33m[[EMPTY REF]]\e[0m"
+                skipped_files+=("$ref_file")
+                continue
+            fi
+
+            diff_output_file=$(mktemp)
+            diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
+            diff_exit_code=${PIPESTATUS[0]}
+
+            if [[ $diff_exit_code -eq 0 ]]; then
+                echo -e "\e[32m[[PASS]]\e[0m"
+                add_to_array_if_not_present "pass_files" "$bn"
+                if grep -q "diff FAILED" "$diff_output_file"; then
+                    if grep -q "tldiff OK" "$diff_output_file"; then
+                        simple_diff_fail_files+=("$bn")
+                    elif grep -q "tl_diff OK" "$diff_output_file"; then
+                        tldiff_fail_files+=("$bn")
+                    fi
+                fi
+            else
+                echo -e "\e[31m[[FAIL]]\e[0m"
+                add_to_array_if_not_present "fail_files" "$bn"
+                if grep -q "diff FAILED" "$diff_output_file"; then
+                    if grep -q "tldiff FAILED" "$diff_output_file"; then
+                        if grep -q "tl_diff FAILED" "$diff_output_file"; then
+                            tl_diff_fail_files+=("$bn")
+                        else
+                            tldiff_fail_files+=("$bn")
+                        fi
+                    fi
+                fi
+            fi
+            rm -f "$diff_output_file"
+            pair_found=true
+        done
+
+        # Also check for .tl/.rtl/.ftl in test dir matched against ref dir
+        for ext in tl rtl ftl; do
+            test_file="$test_dir/${bn}.${ext}"
+            if [[ ! -f "$test_file" ]]; then
+                continue
+            fi
+            # Skip if we already compared the equivalent _XX.asc pair
+            case $ext in
+                tl)  [[ -f "$test_dir/${bn}_01.asc" ]] && continue ;;
+                rtl) [[ -f "$test_dir/${bn}_02.asc" ]] && continue ;;
+                ftl) [[ -f "$test_dir/${bn}_03.asc" ]] && continue ;;
+            esac
+
+            ref_file="$ref_dir/${bn}.${ext}"
+            if [[ ! -f "$ref_file" ]]; then
+                echo -e "   ${bn}.${ext}: \e[33m[[NO REF]]\e[0m"
+                missing_files+=("$test_file")
+                continue
+            fi
+
+            echo -n "   ${bn}.${ext} ↔ ${bn}.${ext}... "
+            diff_output_file=$(mktemp)
+            diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
+            diff_exit_code=${PIPESTATUS[0]}
+            if [[ $diff_exit_code -eq 0 ]]; then
+                echo -e "\e[32m[[PASS]]\e[0m"
+                add_to_array_if_not_present "pass_files" "$bn"
+            else
+                echo -e "\e[31m[[FAIL]]\e[0m"
+                add_to_array_if_not_present "fail_files" "$bn"
+            fi
+            rm -f "$diff_output_file"
+            pair_found=true
+        done
+
+        if ! $pair_found; then
+            echo -e "   \e[33m[[SKIPPED]]\e[0m No matchable file pairs found"
+            skipped_files+=("$bn")
+        fi
+        printf '%*s\n' "$line_len" '' | tr '  ' '='
+    done
+
+    # Summary
+    echo
+    echo "Two-Directory Diff Summary"
+    printf '%*s\n' "$line_len" '' | tr '  ' '='
+    echo "  Test dir: $test_dir"
+    echo "  Ref dir:  $ref_dir"
+    echo
+
+    echo "Diff Results:"
+    echo "============="
+    if [[ ${#pass_files[@]} -gt 0 ]]; then
+        echo "Passed: ${#pass_files[@]}"
+        for f in "${pass_files[@]}"; do
+            echo -e "   \e[32mPASS\e[0m $f"
+        done
+    else
+        echo "Passed: 0"
+    fi
+    if [[ ${#fail_files[@]} -gt 0 ]]; then
+        echo "Failed: ${#fail_files[@]}"
+        for f in "${fail_files[@]}"; do
+            echo -e "   \e[31mFAIL\e[0m $f"
+        done
+    else
+        echo "Failed: 0"
+    fi
+
+    if [[ ${#simple_diff_fail_files[@]} -gt 0 ]]; then
+        echo ""
+        echo "*** All files are IDENTICAL - would pass simple 'diff' ***"
+    elif [[ ${#pass_files[@]} -gt 0 && ${#fail_files[@]} -eq 0 ]]; then
+        echo ""
+        echo "*** All files are IDENTICAL - would pass simple 'diff' ***"
+    fi
+
+    if [[ ${#missing_files[@]} -gt 0 ]]; then
+        echo ""
+        echo "Missing reference files: ${#missing_files[@]}"
+        for f in "${missing_files[@]}"; do
+            echo -e "   \e[33mMISSING\e[0m $(basename "$f")"
+        done
+    fi
+    if [[ ${#skipped_files[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped: ${#skipped_files[@]}"
+        for f in "${skipped_files[@]}"; do
+            echo -e "   \e[33mSKIPPED\e[0m $f"
+        done
+    fi
+
+    echo ""
+    echo "Overall Status:"
+    echo "==============="
+    if [[ ${#fail_files[@]} -eq 0 && ${#skipped_files[@]} -eq 0 && ${#missing_files[@]} -eq 0 ]]; then
+        echo -e "\e[32mAll diffs passed!\e[0m"
+    elif [[ ${#fail_files[@]} -gt 0 ]]; then
+        echo -e "\e[31mSome diff comparisons failed.\e[0m"
+    else
+        echo -e "\e[33mSome files were skipped or had missing references.\e[0m"
+    fi
+    echo "=============================="
+
+    # Exit code
+    if [[ ${#fail_files[@]} -gt 0 ]]; then
+        exit 1
+    fi
+    exit 0
+fi
+# ─── End two-directory diff mode ────────────────────────────────────────────
 
 if [[ ! -d "$directory" ]]; then
     echo "Error: Directory '$directory' does not exist. Exiting."
@@ -433,24 +768,6 @@ missing_exec_output_files=()
 simple_diff_fail_files=()
 tldiff_fail_files=()
 tl_diff_fail_files=()
-
-# Helper function to add file to array only if not already present
-add_to_array_if_not_present() {
-    local array_name="$1"
-    local file="$2"
-    local -n array_ref="$array_name"
-
-    # Check if file is already in array
-    local item
-    for item in "${array_ref[@]}"; do
-        if [[ "$item" == "$file" ]]; then
-            return 0  # File already present, don't add
-        fi
-    done
-
-    # File not found, add it
-    array_ref+=("$file")
-}
 
 # Print mode header once at the beginning
 term_width=$(tput cols 2>/dev/null || echo 80)
