@@ -76,6 +76,7 @@ Options:
   --diff-level <N>    Force diff level: 1=diff only, 2=max tldiff, 3=force tl_diff (default: auto hierarchy)
   --test-dir <path>   Directory containing test output files (for two-directory diff)
   --ref-dir <path>    Directory containing reference files (for two-directory diff)
+  --timeout <secs>    Kill executable if it runs longer than N seconds (0=no limit, default)
   --stop-on-error     Stop processing remaining files if an error occurs
   --no-make           Skip automatic 'make' command before running (for make/test modes)
   --dry-run           Show what would be processed without running
@@ -105,6 +106,7 @@ dry_run=false
 debug=false
 keep_bin=false
 keep_log=false
+run_timeout=0
 cli_exe=""
 diff_level=0  # 0 = auto (default), 1 = diff only, 2 = max tldiff, 3 = force tl_diff
 no_make=false
@@ -158,6 +160,7 @@ while [[ $# -gt 0 ]]; do
         --keep-bin) keep_bin=true; shift;;
         --keep-log) keep_log=true; shift;;
         --keep-all) keep_bin=true; keep_log=true; shift;;
+        --timeout) run_timeout="${2:?Error: --timeout requires a value}"; shift 2;;
         --diff-level) diff_level="$2"; shift 2;;
         --stop-on-error) stop_on_error=true; shift;;
         --dry-run) dry_run=true; shift;;
@@ -798,6 +801,7 @@ processed_files=()
 skipped_files=()
 exec_success_files=()
 exec_fail_files=()
+exec_timeout_files=()
 missing_exec_output_files=()
 simple_diff_fail_files=()
 tldiff_fail_files=()
@@ -1019,14 +1023,20 @@ for infile in "${infiles[@]}"; do
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
             _t_start="$EPOCHREALTIME"
+            # Build timeout prefix if --timeout is set
+            if [[ $(awk "BEGIN{print ($run_timeout > 0)}") -eq 1 ]]; then
+                timeout_cmd=(timeout "$run_timeout")
+            else
+                timeout_cmd=()
+            fi
             if [[ "$mode" == "test" ]]; then
                 # Change to directory before running to ensure input file is found
-                (cd "$directory" && { time "$prog_path" "$input_filename"; }) >> "$LOG_FILE" 2>&1
+                (cd "$directory" && { time "${timeout_cmd[@]}" "$prog_path" "$input_filename"; }) >> "$LOG_FILE" 2>&1
                 RETVAL=$?
             else
                 echo
                 # Change to directory before running to ensure input file is found
-                (cd "$directory" && "$prog_path" "$input_filename")
+                (cd "$directory" && "${timeout_cmd[@]}" "$prog_path" "$input_filename")
                 RETVAL=$?
                 echo -n "   "
             fi
@@ -1035,7 +1045,39 @@ for infile in "${infiles[@]}"; do
             set -e  # Re-enable exit on error
             echo -en "\x1B[0m" # Reset text color
             # check PROG exit status
-            if [[ $RETVAL -eq 0 ]]; then
+            if [[ $RETVAL -eq 124 && $(awk "BEGIN{print ($run_timeout > 0)}") -eq 1 ]]; then
+                echo -e "\e[33mTIMEOUT\e[0m (killed after ${run_timeout}s)"
+                echo -e "   \e[33mWarning: ${PROG} timed out after ${run_timeout}s for $infile\e[0m"
+                echo "   Timeout: ${PROG} killed after ${run_timeout}s for $infile" >> "$LOG_FILE"
+                exec_timeout_files+=("$infile")
+                # Append timing record for timed-out execution
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
+                    "$(basename "$PROG")" "$(basename "$infile")" "TIMEOUT" "$_elapsed" \
+                    >> "$TIMING_LOG"
+
+                # Clean up temporary files after timeout
+                for temp_file in "$input_filename" nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
+                    if [[ -f "$directory/$temp_file" ]]; then
+                        rm "$directory/$temp_file"
+                    fi
+                done
+                for temp_file in "$directory"/for[0-9][0-9][0-9].*; do
+                    if [[ -f "$temp_file" ]]; then
+                        rm "$temp_file"
+                    fi
+                done
+                # Clean up any partial output files
+                for suffix in 01 02 03; do
+                    for pattern in "nspe_${suffix}.asc" "nspe${suffix}.asc"; do
+                        if [[ -f "$directory/$pattern" ]]; then
+                            rm "$directory/$pattern"
+                        fi
+                    done
+                done
+
+                echo "   Continuing..."; continue
+            elif [[ $RETVAL -eq 0 ]]; then
                 if [[ "$mode" != "test" ]]; then
                     echo -n "$PROG "
                 fi
@@ -1638,6 +1680,13 @@ if [[ "$mode" == "test" || "$mode" == "diff" || "$mode" == "copy" || "$mode" == 
             done
         else
             echo "Executable failed: 0"
+        fi
+
+        if [[ ${#exec_timeout_files[@]} -gt 0 ]]; then
+            echo "Executable timed out: ${#exec_timeout_files[@]}"
+            for f in "${exec_timeout_files[@]}"; do
+                echo -e "   \e[33mTIMEOUT\e[0m $f"
+            done
         fi
 
         if [[ ${#missing_exec_output_files[@]} -gt 0 ]]; then
