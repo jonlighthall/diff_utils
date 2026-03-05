@@ -17,6 +17,7 @@
 #   --compare          Side-by-side comparison of two _timing.log files
 #   --csv              Output in CSV format instead of table
 #   --sort <col>       Sort by: name (default), mean, count, stddev, min, max
+#   --list-below <N>   Output only filenames where mean runtime < N seconds (one per line)
 #   --help             Show this help message
 #
 # Examples:
@@ -43,6 +44,7 @@ filter_host=""
 compare_mode=false
 csv_mode=false
 sort_col="name"
+list_below=""
 
 usage() {
     sed -n '2,/^$/{ s/^# \?//; p }' "$0"
@@ -55,8 +57,9 @@ while [[ $# -gt 0 ]]; do
         --status)   filter_status="${2:?Error: --status requires a value}"; shift 2 ;;
         --all)      filter_status="";   shift   ;;
         --host)     filter_host="${2:?Error: --host requires a value}";     shift 2 ;;
-        --compare)  compare_mode=true;  shift   ;;
-        --csv)      csv_mode=true;      shift   ;;
+        --compare)   compare_mode=true;  shift   ;;
+        --csv)       csv_mode=true;      shift   ;;
+        --list-below) list_below="${2:?Error: --list-below requires a value}"; shift 2 ;;
         --sort)
             if [[ -z "${2:-}" || "$2" == -* ]]; then
                 sort_col="mean"
@@ -246,6 +249,13 @@ if ! $compare_mode; then
 
     if [[ -z "$stats_output" ]]; then
         echo "No matching records found."
+        exit 0
+    fi
+
+    # --list-below: emit only filenames with mean < threshold; skip TOTAL
+    if [[ -n "$list_below" ]]; then
+        echo "$stats_output" | awk -F'\t' -v thresh="$list_below" \
+            '$1 != "TOTAL" && $3 != "-" && $3+0 < thresh+0 { print $1 }'
         exit 0
     fi
 
