@@ -469,6 +469,18 @@ if [[ $diff_level -ne 0 && ("$mode" == "test" || "$mode" == "diff") ]]; then
         3) echo "Diff level: 3 (force tl_diff - always run all tools)" ;;
     esac
 fi
+
+# Timing log setup — append per-execution timing data for benchmarking
+TIMING_LOG="$directory/timing.log"
+if [[ "$mode" == "make" || "$mode" == "test" ]]; then
+    if [[ ! -f "$TIMING_LOG" ]]; then
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "hostname" "date" "time" "executable" "input_file" "status" "elapsed_s" \
+            > "$TIMING_LOG"
+    fi
+    echo "Timing log: $TIMING_LOG"
+fi
+
 printf '%*s\n' "$line_len" '' | tr '  ' '='
 
 for infile in "${infiles[@]}"; do
@@ -648,6 +660,7 @@ for infile in "${infiles[@]}"; do
             echo -n "   Running: $PROG $input_filename... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
+            _t_start="$EPOCHREALTIME"
             if [[ "$mode" == "test" ]]; then
                 # Change to directory before running to ensure input file is found
                 (cd "$directory" && { time "$prog_path" "$input_filename"; }) >> "$LOG_FILE" 2>&1
@@ -659,6 +672,8 @@ for infile in "${infiles[@]}"; do
                 RETVAL=$?
                 echo -n "   "
             fi
+            _t_end="$EPOCHREALTIME"
+            _elapsed=$(awk "BEGIN{printf \"%.6f\", $_t_end - $_t_start}")
             set -e  # Re-enable exit on error
             echo -en "\x1B[0m" # Reset text color
             # check PROG exit status
@@ -666,11 +681,16 @@ for infile in "${infiles[@]}"; do
                 if [[ "$mode" != "test" ]]; then
                     echo -n "$PROG "
                 fi
-                echo -e "\e[32mOK\e[0m"
+                echo -e "\e[32mOK\e[0m (${_elapsed}s)"
                 if [[ "$mode" != "test" ]]; then
                     echo "   Success: ${PROG} completed successfully for $infile"
                 fi
                 exec_success_files+=("$infile")
+                # Append timing record
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
+                    "$(basename "$PROG")" "$(basename "$infile")" "PASS" "$_elapsed" \
+                    >> "$TIMING_LOG"
 
                 # Rename output files from nspe*.asc to basename_*.asc
                 echo "   Renaming output files..."
@@ -831,10 +851,15 @@ for infile in "${infiles[@]}"; do
                     echo "   Cleaned up $temp_files_cleaned temporary file(s)"
                 fi
             else
-                echo -e "\e[31mFAIL\e[0m"
+                echo -e "\e[31mFAIL\e[0m (${_elapsed}s)"
                 echo -e "   \e[31mError: ${PROG} failed with exit code $RETVAL for $infile\e[0m"
                 echo "   Error: ${PROG} failed with exit code $RETVAL for $infile" >> "$LOG_FILE"
                 exec_fail_files+=("$infile")
+                # Append timing record for failed execution
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
+                    "$(basename "$PROG")" "$(basename "$infile")" "FAIL" "$_elapsed" \
+                    >> "$TIMING_LOG"
 
                 # Clean up temporary input file and other temporary files after failed execution
                 for temp_file in "$input_filename" nspe.log nspe.prs nspe.pulse angles.asc ram.in; do
