@@ -30,6 +30,13 @@ FILE_UTILS_LIB_LOADED=1
 # OUTPUT PARSING UTILITIES
 #==============================================================================
 
+# Function: strip_ansi
+# Purpose: Remove ANSI escape sequences from a string
+# Usage: clean_val=$(strip_ansi "$raw_val")
+strip_ansi() {
+    printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g'
+}
+
 # Function: parse_diff_output
 # Purpose: Parse captured diff_files output to recover DIFF_METHOD and stats
 #          when diff_files ran in a subshell (e.g., piped through tee).
@@ -42,6 +49,7 @@ parse_diff_output() {
     DIFF_N_SIG=""
     DIFF_N_NZ=""
     DIFF_RMSE=""
+    DIFF_RMSE_MAX=""
 
     [[ ! -f "$output_file" ]] && return
 
@@ -51,10 +59,10 @@ parse_diff_output() {
             # Parse tldiff stats
             local max_err
             max_err=$(grep -m1 '^ maximum error :' "$output_file" | awk '{print $NF}')
-            [[ -n "$max_err" ]] && DIFF_MAX_ERROR="$max_err"
+            [[ -n "$max_err" ]] && DIFF_MAX_ERROR=$(strip_ansi "$max_err")
             local n_sig
             n_sig=$(grep -m1 'number of errors found' "$output_file" | awk '{print $NF}')
-            [[ -n "$n_sig" ]] && DIFF_N_SIG="$n_sig"
+            [[ -n "$n_sig" ]] && DIFF_N_SIG=$(strip_ansi "$n_sig")
         fi
         if grep -q "tl_diff OK\|tl_diff FAILED\|TL_DIFF_STATS" "$output_file"; then
             DIFF_METHOD="tl_diff"
@@ -64,7 +72,8 @@ parse_diff_output() {
                 DIFF_N_NZ=$(echo "$stats_line" | grep -oP 'n_nz=\K[0-9]+')
                 DIFF_N_SIG=$(echo "$stats_line" | grep -oP 'n_sig=\K[0-9]+')
                 DIFF_MAX_ERROR=$(echo "$stats_line" | grep -oP 'max_nz=\K[0-9.]+')
-                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.]+')
+                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.eE+-]+')
+                DIFF_RMSE_MAX=$(echo "$stats_line" | grep -oP 'rmse_max=\K[0-9.eE+-]+')
             fi
         fi
     fi
@@ -283,8 +292,8 @@ diff_files() {
             headtail_truncate "$tmpfile_tldiff" "$SHOW_LINES"
 
             # Parse tldiff stats from output before removing temp file
-            DIFF_MAX_ERROR=$(grep -m1 '^ maximum error :' "$tmpfile_tldiff" | awk '{print $NF}')
-            DIFF_N_SIG=$(grep -m1 '^  *number of errors found' "$tmpfile_tldiff" | awk '{print $NF}')
+            DIFF_MAX_ERROR=$(strip_ansi "$(grep -m1 '^ maximum error :' "$tmpfile_tldiff" | awk '{print $NF}')")
+            DIFF_N_SIG=$(strip_ansi "$(grep -m1 '^  *number of errors found' "$tmpfile_tldiff" | awk '{print $NF}')")
             rm "$tmpfile_tldiff"
 
             if [[ $tldiff_status -eq 0 ]]; then
@@ -335,7 +344,8 @@ diff_files() {
                 DIFF_N_NZ=$(echo "$stats_line" | grep -oP 'n_nz=\K[0-9]+')
                 DIFF_N_SIG=$(echo "$stats_line" | grep -oP 'n_sig=\K[0-9]+')
                 DIFF_MAX_ERROR=$(echo "$stats_line" | grep -oP 'max_nz=\K[0-9.]+')
-                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.]+')
+                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.eE+-]+')
+                DIFF_RMSE_MAX=$(echo "$stats_line" | grep -oP 'rmse_max=\K[0-9.eE+-]+')
             fi
             rm "$tmpfile_uband"
 
