@@ -358,7 +358,7 @@ diff → fail).
 
 **Source:** Session June 2026
 
-### Precision-Derived RMSE Threshold (Design Concept)
+### Precision-Derived RMSE Threshold (Design Concept → Implemented)
 
 For installation/translation verification (UC1), the maximum acceptable RMSE
 can be derived from the ASCII formatting precision rather than chosen ad hoc.
@@ -373,9 +373,26 @@ For F7.2 format (2 decimal places), the floor drops to ~0.003 dB. The
 threshold auto-adapts to detected precision — the same precision detection
 already implemented in tl_diff.
 
-This threshold belongs in `tl_analysis --verify`, not in tl_diff.
+**Implementation (June 2026):**
+- `tl_diff` (C++) now computes `rmse_max` per comparison:
+  - Accumulates `(lsb/2)²` for each TL element where `lsb = 10^(-min_dp)`
+  - `rmse_max = sqrt(sum_sq_half_lsb / n_tl_elements)`
+  - Emitted in `TL_DIFF_STATS` sentinel line as 9th field
+- Shell pipeline propagates `rmse_max` → `DIFF_RMSE_MAX` → `_diff.log` column 12
+- `diff_stats.sh` displays `RMSE_CHK` column: `OK` if `rmse <= rmse_max`, `FAIL` otherwise
+  - Green/red color coding in terminal output
+  - Available in per-file, per-basename, and CSV modes
 
-**Status:** Design concept — not yet implemented.
+**RMSE_CHK interpretation:**
+- `OK` — Observed RMSE is within the precision-derived ceiling. Differences are
+  consistent with formatting/rounding noise alone.
+- `FAIL` — Observed RMSE exceeds what formatting precision can explain. Real
+  differences exist beyond rounding.
+- The K=1 threshold (rmse <= rmse_max) is already conservative: the expected
+  RMSE from uniform rounding is rmse_max/√3 ≈ 58% of the ceiling.
+
+**Status:** Implemented in tl_diff and diff_stats.sh. Future `tl_analysis --verify`
+may add configurable safety factors (K=2-3×) for production use.
 
 **Source:** Session June 2026
 

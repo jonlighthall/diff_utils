@@ -126,8 +126,9 @@ practical threshold at 2–3× floor ≈ 0.06–0.09 dB. Threshold auto-adapts
 to detected precision.
 **Purpose:** Principled, reproducible pass/fail for installation and
 translation verification (UC1a/UC1b).
-**Status:** Design concept. See `.ai/CONTEXT.md` "Precision-Derived RMSE
-Threshold" for details.
+**Status:** Core implemented — `tl_diff` computes `rmse_max`, `diff_stats.sh`
+shows `RMSE_CHK` verdict. Future work: configurable safety factor (K=2–3×)
+in `tl_analysis --verify`. See `.ai/CONTEXT.md` for details.
 
 ### Consecutive Differences Counter
 **Concept:** Count maximum consecutive differences in a file comparison and report as a metric.
