@@ -16,7 +16,7 @@
 #   --host <name>      Filter by hostname
 #   --compare          Side-by-side comparison of two _timing.log files
 #   --csv              Output in CSV format instead of table
-#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio (compare mode)
+#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio, sigma (compare mode)
 #   --list-below <N>   Output only filenames where mean runtime < N seconds (one per line)
 #   --help             Show this help message
 #
@@ -121,6 +121,10 @@ case "$sort_col" in
     ratio)  sort_key="ratio"
             if ! $compare_mode; then
                 echo "Error: --sort ratio is only valid with --compare" >&2; exit 1
+            fi ;;
+    sigma)  sort_key="sigma"
+            if ! $compare_mode; then
+                echo "Error: --sort sigma is only valid with --compare" >&2; exit 1
             fi ;;
     *)      echo "Error: Unknown sort column: $sort_col" >&2; exit 1 ;;
 esac
@@ -315,6 +319,15 @@ paste <(echo "$stats_a") <(echo "$stats_b") | awk -F'\t' -v sort_key="$sort_key"
         r_ratio[nrows] = (mean_b + 0) / (mean_a + 0)
     else
         r_ratio[nrows] = 9999  # sort missing ratios to end
+
+    # Sigma: Welch t-statistic — how many std errors apart
+    se2 = 0
+    if (n_a + 0 > 1 && sd_a + 0 > 0) se2 += (sd_a * sd_a) / n_a
+    if (n_b + 0 > 1 && sd_b + 0 > 0) se2 += (sd_b * sd_b) / n_b
+    if (se2 > 0)
+        r_sigma[nrows] = (r_mean_b[nrows] - r_mean_a[nrows]) / sqrt(se2)
+    else
+        r_sigma[nrows] = 0
 }
 END {
     # Sort if requested
@@ -323,6 +336,7 @@ END {
         while (j > 1) {
             swap = 0
             if (sort_key == "ratio"  && r_ratio[j]  < r_ratio[j-1])  swap = 1
+            if (sort_key == "sigma"  && r_sigma[j]  < r_sigma[j-1])  swap = 1
             if (sort_key == "mean"   && r_mean_a[j]  < r_mean_a[j-1]) swap = 1
             if (sort_key == "name"   && r_name[j]   < r_name[j-1])   swap = 1
             if (!swap) break
@@ -335,15 +349,16 @@ END {
             tmp = r_mean_b[j]; r_mean_b[j] = r_mean_b[j-1]; r_mean_b[j-1] = tmp
             tmp = r_sd_b[j];   r_sd_b[j]   = r_sd_b[j-1];   r_sd_b[j-1]   = tmp
             tmp = r_ratio[j];  r_ratio[j]  = r_ratio[j-1];  r_ratio[j-1]  = tmp
+            tmp = r_sigma[j];  r_sigma[j]  = r_sigma[j-1];  r_sigma[j-1]  = tmp
             j--
         }
     }
 
     # Print header
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
-        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A"
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
-        "--------------------", "----", "----------", "----------", "----", "----------", "----------", "--------"
+    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n", \
+        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A", "sigma"
+    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n", \
+        "--------------------", "----", "----------", "----------", "----", "----------", "----------", "--------", "-------"
 
     # Print rows
     for (i = 1; i <= nrows; i++) {
@@ -359,7 +374,25 @@ END {
             ratio_str = sprintf("%8s", "-")
         }
 
-        printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %s\n", \
+        # Format sigma with color: >|2| yellow, >|3| red/green
+        if (r_sigma[i] != 0) {
+            sigma_s = sprintf("%.1f", r_sigma[i])
+            abs_sig = (r_sigma[i] < 0 ? -r_sigma[i] : r_sigma[i])
+            if (abs_sig >= 3.0) {
+                if (r_sigma[i] > 0)
+                    sigma_str = sprintf("\033[31m%7s\033[0m", sigma_s)
+                else
+                    sigma_str = sprintf("\033[32m%7s\033[0m", sigma_s)
+            } else if (abs_sig >= 2.0) {
+                sigma_str = sprintf("\033[33m%7s\033[0m", sigma_s)
+            } else {
+                sigma_str = sprintf("%7s", sigma_s)
+            }
+        } else {
+            sigma_str = sprintf("%7s", "-")
+        }
+
+        printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %s  %s\n", \
             r_name[i], \
             r_n_a[i], \
             (r_mean_a[i] > 0 ? sprintf("%.6f", r_mean_a[i]) : "-"), \
@@ -367,7 +400,8 @@ END {
             r_n_b[i], \
             (r_mean_b[i] > 0 ? sprintf("%.6f", r_mean_b[i]) : "-"), \
             (r_sd_b[i] > 0 ? sprintf("%.6f", r_sd_b[i]) : "-"), \
-            ratio_str
+            ratio_str, \
+            sigma_str
     }
 }
 '

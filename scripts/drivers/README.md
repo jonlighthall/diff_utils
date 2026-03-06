@@ -97,6 +97,9 @@ timing_stats.sh fortran/_timing.log cpp/_timing.log --compare --sort ratio
 
 # Sorted by mean runtime
 timing_stats.sh fortran/_timing.log cpp/_timing.log --compare --sort mean
+
+# Sorted by statistical significance of the timing difference
+timing_stats.sh fortran/_timing.log cpp/_timing.log --compare --sort sigma
 ```
 
 ### Sort options
@@ -110,6 +113,11 @@ timing_stats.sh fortran/_timing.log cpp/_timing.log --compare --sort mean
 | `min` | Minimum runtime | single |
 | `max` | Maximum runtime | single |
 | `ratio` | B/A ratio | compare only |
+| `sigma` | Welch t-statistic (σ) | compare only |
+
+The **sigma** column shows how many standard errors apart the two means are
+(Welch's t-statistic). Color coding: ≥|3|σ → red/green (highly significant),
+≥|2|σ → yellow (significant). Positive = B slower than A, negative = B faster.
 
 ### Filters
 
