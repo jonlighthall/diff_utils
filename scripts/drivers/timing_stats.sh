@@ -294,42 +294,52 @@ echo
 stats_a=$(compute_stats < "${log_files[0]}")
 stats_b=$(compute_stats < "${log_files[1]}")
 
-# Join on input_file and produce side-by-side comparison
-paste <(echo "$stats_a") <(echo "$stats_b") | awk -F'\t' -v sort_key="$sort_key" '
+# Key-based join on input_file name (handles mismatched test sets)
+awk -F'\t' -v sort_key="$sort_key" '
+NR == FNR {
+    # First input: file A stats
+    name = $1
+    if (name == "TOTAL") next
+    a_n[name] = $2 + 0; a_mean[name] = $3 + 0; a_sd[name] = $4 + 0
+    if (!(name in seen)) { seen[name] = 1; order[++nfiles] = name }
+    next
+}
 {
-    # From file A: $1=name, $2=count, $3=mean, $4=stddev, $5=min, $6=max
-    # From file B: $7=name, $8=count, $9=mean, $10=stddev, $11=min, $12=max
-    name_a = $1; n_a = $2; mean_a = $3; sd_a = $4
-    name_b = $7; n_b = $8; mean_b = $9; sd_b = $10
-
-    # Use whichever name is available
-    name = (name_a != "" ? name_a : name_b)
-    if (name == "TOTAL") next  # skip individual totals
-
-    nrows++
-    r_name[nrows]   = name
-    r_n_a[nrows]    = (n_a != "" ? n_a : "-")
-    r_mean_a[nrows] = (mean_a != "" ? mean_a + 0 : 0)
-    r_sd_a[nrows]   = (sd_a != "" ? sd_a + 0 : 0)
-    r_n_b[nrows]    = (n_b != "" ? n_b : "-")
-    r_mean_b[nrows] = (mean_b != "" ? mean_b + 0 : 0)
-    r_sd_b[nrows]   = (sd_b != "" ? sd_b + 0 : 0)
-
-    if (mean_a + 0 > 0 && mean_b + 0 > 0)
-        r_ratio[nrows] = (mean_b + 0) / (mean_a + 0)
-    else
-        r_ratio[nrows] = 9999  # sort missing ratios to end
-
-    # Sigma: Welch t-statistic — how many std errors apart
-    se2 = 0
-    if (n_a + 0 > 1 && sd_a + 0 > 0) se2 += (sd_a * sd_a) / n_a
-    if (n_b + 0 > 1 && sd_b + 0 > 0) se2 += (sd_b * sd_b) / n_b
-    if (se2 > 0)
-        r_sigma[nrows] = (r_mean_b[nrows] - r_mean_a[nrows]) / sqrt(se2)
-    else
-        r_sigma[nrows] = 0
+    # Second input: file B stats
+    name = $1
+    if (name == "TOTAL") next
+    b_n[name] = $2 + 0; b_mean[name] = $3 + 0; b_sd[name] = $4 + 0
+    if (!(name in seen)) { seen[name] = 1; order[++nfiles] = name }
 }
 END {
+    # Build result arrays from the union of all names
+    for (i = 1; i <= nfiles; i++) {
+        name = order[i]
+        nrows++
+        r_name[nrows]   = name
+        r_n_a[nrows]    = (a_n[name] > 0 ? a_n[name] + 0 : 0)
+        r_mean_a[nrows] = a_mean[name] + 0
+        r_sd_a[nrows]   = a_sd[name] + 0
+        r_n_b[nrows]    = (b_n[name] > 0 ? b_n[name] + 0 : 0)
+        r_mean_b[nrows] = b_mean[name] + 0
+        r_sd_b[nrows]   = b_sd[name] + 0
+
+        if (r_n_a[nrows] > 0 && r_n_b[nrows] > 0) {
+            r_ratio[nrows] = r_mean_b[nrows] / r_mean_a[nrows]
+            # Sigma: Welch t-statistic — how many std errors apart
+            se2 = 0
+            if (r_n_a[nrows] > 1 && r_sd_a[nrows] > 0) se2 += (r_sd_a[nrows] * r_sd_a[nrows]) / r_n_a[nrows]
+            if (r_n_b[nrows] > 1 && r_sd_b[nrows] > 0) se2 += (r_sd_b[nrows] * r_sd_b[nrows]) / r_n_b[nrows]
+            if (se2 > 0)
+                r_sigma[nrows] = (r_mean_b[nrows] - r_mean_a[nrows]) / sqrt(se2)
+            else
+                r_sigma[nrows] = 0
+        } else {
+            r_ratio[nrows] = 9999  # sort missing ratios to end
+            r_sigma[nrows] = 0
+        }
+    }
+
     # Sort if requested
     for (i = 2; i <= nrows; i++) {
         j = i
@@ -354,13 +364,23 @@ END {
         }
     }
 
+    # Auto-size the name column (minimum 20)
+    name_w = 20
+    for (i = 1; i <= nrows; i++)
+        if (length(r_name[i]) > name_w) name_w = length(r_name[i])
+
     # Print header
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n", \
+    hdr_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n"
+    printf hdr_fmt, \
         "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A", "sigma"
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n", \
-        "--------------------", "----", "----------", "----------", "----", "----------", "----------", "--------", "-------"
+    # Print separator matching name width
+    sep = ""
+    for (c = 1; c <= name_w; c++) sep = sep "-"
+    printf hdr_fmt, \
+        sep, "----", "----------", "----------", "----", "----------", "----------", "--------", "-------"
 
     # Print rows
+    row_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %s  %s\n"
     for (i = 1; i <= nrows; i++) {
         if (r_ratio[i] < 9999) {
             ratio_s = sprintf("%.3f", r_ratio[i])
@@ -392,16 +412,16 @@ END {
             sigma_str = sprintf("%7s", "-")
         }
 
-        printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %s  %s\n", \
+        printf row_fmt, \
             r_name[i], \
-            r_n_a[i], \
+            (r_n_a[i] > 0 ? sprintf("%d", r_n_a[i]) : "-"), \
             (r_mean_a[i] > 0 ? sprintf("%.6f", r_mean_a[i]) : "-"), \
             (r_sd_a[i] > 0 ? sprintf("%.6f", r_sd_a[i]) : "-"), \
-            r_n_b[i], \
+            (r_n_b[i] > 0 ? sprintf("%d", r_n_b[i]) : "-"), \
             (r_mean_b[i] > 0 ? sprintf("%.6f", r_mean_b[i]) : "-"), \
             (r_sd_b[i] > 0 ? sprintf("%.6f", r_sd_b[i]) : "-"), \
             ratio_str, \
             sigma_str
     }
 }
-'
+' <(echo "$stats_a") <(echo "$stats_b")
