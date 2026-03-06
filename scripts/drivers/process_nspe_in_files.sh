@@ -1063,7 +1063,7 @@ for infile in "${infiles[@]}"; do
             echo -n "   Running: $PROG $input_filename... "
             echo -en "${PROG_OUTPUT_COLOR}" # Set text color to highlight PROG output (light green)
             set +e  # Temporarily disable exit on error to handle executable failures gracefully
-            _t_start="$EPOCHREALTIME"
+            _t_start="${EPOCHREALTIME:-$(date +%s.%N)}"
             # Build timeout prefix if --timeout is set
             if [[ $(awk "BEGIN{print ($run_timeout > 0)}") -eq 1 ]]; then
                 timeout_cmd=(timeout "$run_timeout")
@@ -1081,7 +1081,7 @@ for infile in "${infiles[@]}"; do
                 RETVAL=$?
                 echo -n "   "
             fi
-            _t_end="$EPOCHREALTIME"
+            _t_end="${EPOCHREALTIME:-$(date +%s.%N)}"
             _elapsed=$(awk "BEGIN{printf \"%.6f\", $_t_end - $_t_start}")
             set -e  # Re-enable exit on error
             echo -en "\x1B[0m" # Reset text color
