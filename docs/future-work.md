@@ -118,6 +118,17 @@ These are fundamentally different questions. Fabre's method optimizes for one; t
 
 These are concrete features that have been considered but not yet implemented:
 
+### Precision-Derived RMSE Threshold for tl_analysis --verify
+**Concept:** Derive the maximum acceptable full-field RMSE from the ASCII
+formatting precision rather than choosing an ad hoc value. For F7.1 format
+(1 decimal place), uncorrelated rounding yields RMSE floor ≈ 0.029 dB;
+practical threshold at 2–3× floor ≈ 0.06–0.09 dB. Threshold auto-adapts
+to detected precision.
+**Purpose:** Principled, reproducible pass/fail for installation and
+translation verification (UC1a/UC1b).
+**Status:** Design concept. See `.ai/CONTEXT.md` "Precision-Derived RMSE
+Threshold" for details.
+
 ### Consecutive Differences Counter
 **Concept:** Count maximum consecutive differences in a file comparison and report as a metric.
 **Purpose:** Detect clustering of errors vs. random distribution.

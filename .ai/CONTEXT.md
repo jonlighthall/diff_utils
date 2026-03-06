@@ -16,7 +16,7 @@
 - [Key Components](#key-components)
 - [Data Flow](#data-flow)
 - [Key Decisions](#key-decisions)
-- [Critical Paradigm Question (PENDING)](#critical-paradigm-question-pending)
+- [Critical Paradigm Question (RESOLVED)](#critical-paradigm-question-resolved)
 - [Test Categories](#test-categories)
 - [Testing Infrastructure](#testing-infrastructure)
 - [Superseded Decisions](#superseded-decisions)
@@ -146,7 +146,10 @@ into tl_diff. Preserved as seed code for future tl_analysis program.
 - Accumulate differences across range
 - Diagnostic pattern analysis (run tests, autocorrelation, regression)
 - Phase error estimation (curve stretching)
-- 2% installation verification discriminator
+- RMSE-based systematic pass/fail for installation/translation verification
+  (using precision-derived threshold — see "Precision-Derived RMSE Threshold")
+- 2% installation verification discriminator (legacy concept, may be
+  superseded by precision-derived threshold)
 
 See `docs/future-work.md` for research roadmap.
 
@@ -303,15 +306,78 @@ improvement, not a compatibility bug.
 
 | ID | Use Case | Description | Program |
 |----|----------|-------------|---------|
-| UC1 | Same model, same input | Installation verification | tl_diff (+ tl_analysis --verify) |
+| UC1a | Same model, same input, different machine | Installation verification | tl_diff (+ tl_analysis --verify) |
+| UC1b | Same model, same input, different language | Translation verification | tl_diff (+ tl_analysis --verify) |
 | UC2 | Different models, same input | Model comparison | tl_metric (Fabre) |
 | UC3 | Same model, different inputs | Sensitivity analysis | tl_analysis |
 | Agnostic | Any two TL curves | Quantitative comparison | tl_metric (Fabre) |
 
+UC1a and UC1b are both "installation verification" in the broad sense — the
+question is the same ("is the difference computing noise or a real problem?"),
+but the sources of difference are distinct: platform/compiler artifacts (UC1a)
+vs. language reimplementation artifacts (UC1b, e.g. Fortran → C++).
+
 The 2% threshold belongs to UC1 (installation verification) and lives in
 tl_analysis, not tl_diff. The Fabre metric is agnostic of use case.
 
-**Source:** Session 2026-02-13
+**Source:** Session 2026-02-13, updated June 2026
+
+### tldiff → tl_diff Evolutionary Lineage (Clarification)
+
+tldiff (Fortran, v1.0.0) and tl_diff (C++, v2.0.0) are **the same program at
+different levels of maturity** — not different tiers or layers. tldiff was
+shipped with NSPE v6.2 as a specialized diff tool; tl_diff is the refined C++
+rewrite with formalized hierarchy, sub-LSB detection, and precision-aware
+thresholds.
+
+**Evolution:** tldiff → prsdiff → cpddiff → idiff → uband_diff → tl_diff
+
+The shell script hierarchy (diff → tldiff → tl_diff) runs both Fortran and
+C++ versions because they may disagree during the transition period, not
+because they answer different questions. When tl_diff is fully validated
+against all NSPE test cases, tldiff becomes redundant for new workflows.
+
+**Source:** Session June 2026
+
+### tl_diff Design Boundary (Decided)
+
+tl_diff performs **element-by-element threshold comparison only**. It does not
+do systematic or statistical evaluation. Specifically:
+
+- **In scope:** Point-by-point difference classification (6-level hierarchy),
+  precision-aware sub-LSB detection, pass/fail based on whether ANY significant
+  difference exceeds threshold.
+- **Out of scope:** Aggregate statistics for pass/fail decisions, RMSE-based
+  thresholds, pattern analysis, trend detection, curve-level metrics.
+
+The `TL_DIFF_STATS` sentinel line (emitted by file_comparator.cpp) reports RMSE
+as a **diagnostic convenience** for machine-parseable consumers. This does not
+violate the design boundary — tl_diff *emits* RMSE but does not *act* on it.
+The pass/fail decision is strictly `files_are_close_enough` (any significant
+diff → fail).
+
+**Source:** Session June 2026
+
+### Precision-Derived RMSE Threshold (Design Concept)
+
+For installation/translation verification (UC1), the maximum acceptable RMSE
+can be derived from the ASCII formatting precision rather than chosen ad hoc.
+
+**Derivation:** If output uses F7.1 format (1 decimal place), the maximum
+single-element formatting error is ±0.05 dB. For uncorrelated rounding errors
+uniformly distributed on [−0.05, +0.05]:
+- Expected RMSE = 0.05 / √3 ≈ 0.029 dB (theoretical floor)
+- Practical threshold: 2–3× floor ≈ 0.06–0.09 dB
+
+For F7.2 format (2 decimal places), the floor drops to ~0.003 dB. The
+threshold auto-adapts to detected precision — the same precision detection
+already implemented in tl_diff.
+
+This threshold belongs in `tl_analysis --verify`, not in tl_diff.
+
+**Status:** Design concept — not yet implemented.
+
+**Source:** Session June 2026
 
 ### Restructuring Plan (Planned)
 
@@ -321,14 +387,20 @@ Sequence for extracting the three-program architecture:
    threshold constants, calculate_tl_weight → shared linkable code
 2. **Scaffold tl_metric** — Fabre M1-M5 only, using shared library and
    `src/cpp/reference/tl_metrics.cpp` as seed
-3. **Scaffold tl_analysis** — ErrorAccumulationAnalyzer, 2% threshold
-   (--verify mode), RMSE, phase error estimation, using
+3. **Scaffold tl_analysis** — ErrorAccumulationAnalyzer, precision-derived
+   RMSE threshold (--verify mode), phase error estimation, using
    `src/cpp/reference/error_accumulation_analyzer.*` as seed
+
+**Architecture note:** tl_analysis should read TL files independently (same
+interface as tl_diff: `tl_analysis file1 file2`), not parse tl_diff output.
+This keeps the tools decoupled and allows tl_analysis to access individual
+differences for pattern analysis. The RMSE in tl_diff's TL_DIFF_STATS output
+serves as a diagnostic cross-check, not as the primary data path.
 
 Reference code is staged in `src/cpp/reference/`. No tl_metric or tl_analysis
 main programs exist yet.
 
-**Source:** Session 2026-02-13
+**Source:** Session 2026-02-13, updated June 2026
 
 ---
 
