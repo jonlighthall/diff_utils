@@ -322,7 +322,36 @@ def compute_complexity(r):
     r["grid_work"] = nr * nz  # total tridiagonal solves * grid size
 
 
-def format_table(results, show_grid=True):
+# ─── Runtime Prediction ─────────────────────────────────────────────────────
+# Power-law regression fitted to 195 Fortran (v6.2) timing records.
+# Model: log10(T) = a + b*log10(grid_work) + c*is_slow
+#   R² = 0.886, 95.9% of predictions within 5× of actual
+#
+# "Slow" bottom types: ABSORBING, GEOACOUSTIC, LVA, LFBL-10SCF, LFBL-1015LVA
+#   These require additional iterative computations (~2.9× slower per grid point).
+
+_PRED_A = -4.6786   # intercept
+_PRED_B = 0.8208    # grid_work exponent
+_PRED_C = 0.4642    # slow-type shift (10^0.4642 ≈ 2.91×)
+_SLOW_BOTTOM_TYPES = {
+    "ABSORBING", "GEOACOUSTIC", "LVA", "LFBL-10SCF", "LFBL-1015LVA",
+    # Normalized forms (no hyphens, uppercase)
+    "LFBL10SCF", "LFBL1015LVA",
+}
+
+
+def predict_runtime(r):
+    """Predict runtime in seconds from grid_work and bottom_type."""
+    gw = r.get("grid_work")
+    if not gw or gw <= 0:
+        return None
+    bt = r.get("bottom_type", "").upper().replace("-", "")
+    is_slow = 1.0 if bt in {s.upper().replace("-", "") for s in _SLOW_BOTTOM_TYPES} else 0.0
+    log_t = _PRED_A + _PRED_B * math.log10(gw) + _PRED_C * is_slow
+    return 10 ** log_t
+
+
+def format_table(results, show_grid=True, show_predict=False):
     """Format results as a human-readable table."""
     # Header
     cols = [
@@ -343,6 +372,11 @@ def format_table(results, show_grid=True):
             ("Nz", 8, "r"),
             ("Nr", 8, "r"),
             ("WORK", 12, "r"),
+        ]
+    if show_predict:
+        cols += [
+            ("T_pred", 10, "r"),
+            ("CAT", 6, "l"),
         ]
 
     # Build format strings
@@ -383,6 +417,22 @@ def format_table(results, show_grid=True):
                     parts.append(f"{work:>12}")
             else:
                 parts.append(f"{'-':>12}")
+
+        if show_predict:
+            pred = predict_runtime(r)
+            if pred is not None:
+                if pred >= 100:
+                    parts.append(f"{pred:>10.1f}")
+                elif pred >= 1:
+                    parts.append(f"{pred:>10.2f}")
+                else:
+                    parts.append(f"{pred:>10.3f}")
+                bt_upper = r.get("bottom_type", "").upper().replace("-", "")
+                is_slow = bt_upper in {s.upper().replace("-", "") for s in _SLOW_BOTTOM_TYPES}
+                parts.append(f"{'SLOW' if is_slow else 'FAST':<6}")
+            else:
+                parts.append(f"{'-':>10}")
+                parts.append(f"{'-':<6}")
 
         line = "  ".join(parts)
         lines.append(line)
@@ -456,7 +506,7 @@ def load_timing(timing_path):
     return timing
 
 
-def format_combined(results, timing):
+def format_combined(results, timing, show_predict=False):
     """Format results combined with timing data."""
     header = (
         f"{'FILE':<40}  {'SD':>4}  {'FREQ':>8}  {'RMAX_km':>8}  "
@@ -464,6 +514,8 @@ def format_combined(results, timing):
         f"{'WORK':>12}  {'T_mean':>8}  {'T_std':>8}  {'N':>3}  "
         f"{'WORK/T':>12}"
     )
+    if show_predict:
+        header += f"  {'T_pred':>8}  {'A/P':>6}"
     sep = "-" * len(header)
     lines = [header, sep]
 
@@ -496,6 +548,17 @@ def format_combined(results, timing):
             f"{work_s}  {t_mean_s:>8}  {t_std_s:>8}  {n_runs:>3}  "
             f"{work_per_t:>12}"
         )
+        if show_predict:
+            pred = predict_runtime(r)
+            if pred is not None:
+                pred_s = f"{pred:.3f}" if pred < 100 else f"{pred:.1f}"
+                if n_runs and t_mean > 0:
+                    ratio = t_mean / pred
+                    line += f"  {pred_s:>8}  {ratio:>6.2f}"
+                else:
+                    line += f"  {pred_s:>8}  {'-':>6}"
+            else:
+                line += f"  {'-':>8}  {'-':>6}"
         lines.append(line)
 
     return "\n".join(lines)
@@ -605,13 +668,18 @@ def main():
         "--sort",
         metavar="FIELD",
         default=None,
-        help="Sort by field (freq, rmax, bathy_max, work, file)",
+        help="Sort by field (freq, rmax, bathy_max, work, file, sd, time)",
     )
     parser.add_argument(
         "--no-grid", action="store_true", help="Omit grid/complexity columns"
     )
     parser.add_argument(
         "--summary", action="store_true", help="Print aggregate summary"
+    )
+    parser.add_argument(
+        "--predict",
+        action="store_true",
+        help="Show predicted runtime from regression model",
     )
 
     args = parser.parse_args()
@@ -649,6 +717,8 @@ def main():
         "file": lambda r: r["file"],
         "sd": lambda r: r["speeddial"] or 0,
         "speeddial": lambda r: r["speeddial"] or 0,
+        "time": lambda r: predict_runtime(r) or 0,
+        "predict": lambda r: predict_runtime(r) or 0,
     }
     if args.sort and args.sort in sort_keys:
         results.sort(key=sort_keys[args.sort])
@@ -662,12 +732,18 @@ def main():
         if args.tsv:
             print(format_combined_tsv(results, timing))
         else:
-            print(format_combined(results, timing))
+            print(format_combined(results, timing, show_predict=args.predict))
     else:
         if args.tsv:
             print(format_tsv(results))
         else:
-            print(format_table(results, show_grid=not args.no_grid))
+            print(
+                format_table(
+                    results,
+                    show_grid=not args.no_grid,
+                    show_predict=args.predict,
+                )
+            )
 
     if args.summary:
         print_summary(results)
