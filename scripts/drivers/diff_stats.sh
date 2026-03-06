@@ -22,7 +22,7 @@
 #   --all              Show all basenames regardless of status
 #   --host <name>      Filter by hostname
 #   --csv              Output in CSV format instead of table
-#   --sort <col>       Sort by: name (default), status, pass, fail, total
+#   --sort <col>       Sort by: name (default), status, pass, fail, total, rmse
 #   --files            Show per-file detail instead of per-basename summary
 #   --help             Show this help message
 #
@@ -100,8 +100,8 @@ done
 
 # Validate sort column
 case "$sort_col" in
-    name|status|pass|fail|total) ;;
-    *) echo "Error: Unknown sort column: $sort_col (valid: name, status, pass, fail, total)" >&2; exit 1 ;;
+    name|status|pass|fail|total|rmse) ;;
+    *) echo "Error: Unknown sort column: $sort_col (valid: name, status, pass, fail, total, rmse)" >&2; exit 1 ;;
 esac
 
 # Validate filter status
@@ -385,6 +385,10 @@ END {
             }
         } else if (sort_col == "total") {
             while (b > 0 && bn_total[bn_order[b]] + 0 < bn_total[key] + 0) {
+                bn_order[b + 1] = bn_order[b]; b--
+            }
+        } else if (sort_col == "rmse") {
+            while (b > 0 && (bn_max_rmse[bn_order[b]] + 0) < (bn_max_rmse[key] + 0)) {
                 bn_order[b + 1] = bn_order[b]; b--
             }
         } else {
