@@ -931,6 +931,124 @@ Two batch-processing drivers exist for running executables over collections of i
 
 ---
 
+## Timing and Complexity Estimation
+
+### Overview
+
+A suite of tools for measuring NSPE execution times, estimating computational
+complexity from input file parameters, and correlating the two. Primary use
+case: identifying outliers in batch processing runs. Future use case:
+predicting runtimes for unseen input files.
+
+### Architecture
+
+```
+ .in files ──► parse_nspe_input.py ──► grid_work estimate (Nr × Nz)
+                                            │
+ process_nspe_in_files.sh ──► _timing.log   │
+                                  │         │
+                                  ▼         ▼
+                          timing_stats.sh   parse_nspe_input.py --timing
+                                  │              │
+                                  ▼              ▼
+                          per-file stats    WORK/T ratio table
+                          (mean/std/min/max)
+```
+
+### `parse_nspe_input.py` — Input File Complexity Estimator
+
+**Location:** `scripts/drivers/parse_nspe_input.py` (677 lines)
+
+**Purpose:** Parse NSPE `.in` files, extract physics parameters, and estimate
+the PE computational grid size as a first-order complexity proxy.
+
+**Physics basis (RAM PE solver):**
+- `λ = c0 / freq` where `c0 = 1485 m/s`
+- `dz = λ × dzfact(SD)` — vertical grid spacing from SpeedDial
+- `dr = λ × drfact(SD)` — range step from SpeedDial
+- `Nz = bmax / dz` — vertical grid points in water column
+- `Nr = Rmax / dr` — range steps
+- `grid_work ≈ Nr × Nz` — proportional to total tridiagonal solves
+
+**SpeedDial grid factors** (from `setspeed.f`, piecewise-linear):
+- SD=1: `drfact=1.25, dzfact=1/20` (finest)
+- SD=5: `drfact=17.0, dzfact=1/3.5` (default breakpoint)
+- SD=10: `drfact=50.0, dzfact=1/3.0` (coarsest)
+- SD ≤ 0: manual mode (uses SD=5 nominal values)
+
+**Extracted parameters:** speeddial, freq, rmax, bathy_max, bathy_min,
+bottom_type, surface_type, source_type, n_tl_depths
+
+**Computed parameters:** wavelength, dz, dr, Nz, Nr, grid_work
+
+**Modes:**
+- `parse_nspe_input.py <dir>` — table of parameters + grid estimates
+- `parse_nspe_input.py <dir> --timing <_timing.log>` — join with actual
+  timing data, show `WORK/T` throughput ratio
+- `parse_nspe_input.py <dir> --tsv` — TSV output for spreadsheet/analysis
+- `parse_nspe_input.py <dir> --sort work` — sort by complexity
+- `parse_nspe_input.py <dir> --summary` — aggregate statistics
+
+**Key finding:** The `WORK/T` ratio varies by ~3 orders of magnitude across
+the standard test suite (5,000–5,800,000), indicating that `grid_work` alone
+is insufficient for runtime prediction. Bottom type, source configuration,
+and other factors contribute significant variance. A multivariate model
+(likely categorized by bottom_type and/or SpeedDial) would be needed for
+accurate predictions.
+
+### `timing_stats.sh` — Timing Log Analyzer
+
+**Location:** `scripts/drivers/timing_stats.sh` (332 lines)
+
+**Purpose:** Per-file statistics from `_timing.log` files: count, mean,
+std dev, min, max. Supports filtering and Fortran-vs-C++ comparison.
+
+**Key options:**
+- `--compare` — side-by-side comparison of two `_timing.log` files
+- `--sort mean` — sort by mean runtime
+- `--list-below N` — list filenames with mean runtime < N seconds
+- `--exe`, `--status`, `--host` — filtering
+
+### `timing_benchmark.sh` — Interleaved Benchmark Runner
+
+**Location:** `~/projects/nspe/repos/NSPE_v6.2_and_v7.0/timing_benchmark.sh`
+
+**Purpose:** Run `process_nspe_in_files.sh make` alternating between Fortran
+v6.2 and C++ v7.0 directories to minimize thermal/load bias in timing
+comparisons. Configurable iteration count (`N`, default 3).
+
+### `process_timed_subset.sh` — Timing-Filtered Runner
+
+**Location:** `scripts/drivers/process_timed_subset.sh`
+
+**Purpose:** Run `process_nspe_in_files.sh` only on input files whose
+mean runtime falls below a threshold. Uses `timing_stats.sh --list-below`
+to filter, then passes `--pattern` args to the driver.
+
+**Example:** `process_timed_subset.sh --timing-log std_new/_timing.log --max-time 5 make std_new`
+
+### `_timing.log` Format
+
+TSV format produced by `process_nspe_in_files.sh`:
+```
+hostname  date  time  executable  input_file  status  elapsed_s
+```
+
+### Current Data
+
+**Fortran v6.2:** 1,362 records in `nspe_v6.2_fortran/std_new/_timing.log`
+(195 input files, 5–10 runs each)
+
+**C++ v7.0:** 1,116 records in `nspe_v7.0_cpp/std_new/_timing.log`
+
+**Work range:** 243 — 559,254,560 (2.3 million-to-one ratio)
+
+**Runtime range:** ~0.02s (simplest) — ~930s (bermuda f=3000 Hz cases)
+
+**Source:** Sessions 2026-02/03
+
+---
+
 ## Acoustic Propagation Utilities
 
 ### earth_acoustic — Spherical Earth Ray Calculator

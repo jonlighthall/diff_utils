@@ -139,6 +139,17 @@ in `tl_analysis --verify`. See `.ai/CONTEXT.md` for details.
 **Concept:** When non-zero, non-trivial error is detected, print maximum percentage error and add to diff table.
 **Status:** Not implemented; would enhance summary output.
 
+### Runtime Prediction from Input Parameters
+**Concept:** Fit a regression model from the 195-file timing dataset to predict
+NSPE runtime from input parameters (freq, rmax, bmax, speeddial, bottom_type).
+The `grid_work = Nr × Nz` estimate spans 3 orders of magnitude in `WORK/T`
+ratio, so a multivariate model (likely categorized by bottom_type) is needed.
+**Purpose:** Outlier detection in batch runs (flag unexpectedly slow cases);
+eventual runtime prediction for scheduling.
+**Status:** Data collection complete (`_timing.log`, `parse_nspe_input.py`).
+Regression model not yet fitted. See `.ai/CONTEXT.md` "Timing and Complexity
+Estimation" for tool inventory.
+
 ### Test Mode Enhancements
 **Concept:** In test mode:
 - Include `-s` flag with diff command so identical files are noted in log
