@@ -15,6 +15,7 @@
 #   --all              Include all statuses (PASS, FAIL, TIMEOUT)
 #   --host <name>      Filter by hostname
 #   --compare          Side-by-side comparison of two _timing.log files
+#   --missing          In compare mode, include entries found in only one file
 #   --csv              Output in CSV format instead of table
 #   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio, sigma (compare mode)
 #   --list-below <N>   Output only filenames where mean runtime < N seconds (one per line)
@@ -42,6 +43,7 @@ filter_exe=""
 filter_status="PASS"
 filter_host=""
 compare_mode=false
+show_missing=false
 csv_mode=false
 sort_col="name"
 list_below=""
@@ -58,6 +60,7 @@ while [[ $# -gt 0 ]]; do
         --all)      filter_status="";   shift   ;;
         --host)     filter_host="${2:?Error: --host requires a value}";     shift 2 ;;
         --compare)   compare_mode=true;  shift   ;;
+        --missing)   show_missing=true;   shift   ;;
         --csv)       csv_mode=true;      shift   ;;
         --list-below) list_below="${2:?Error: --list-below requires a value}"; shift 2 ;;
         --sort)
@@ -295,7 +298,7 @@ stats_a=$(compute_stats < "${log_files[0]}")
 stats_b=$(compute_stats < "${log_files[1]}")
 
 # Key-based join on input_file name (handles mismatched test sets)
-awk -F'\t' -v sort_key="$sort_key" '
+awk -F'\t' -v sort_key="$sort_key" -v show_missing="$show_missing" '
 NR == FNR {
     # First input: file A stats
     name = $1
@@ -315,6 +318,8 @@ END {
     # Build result arrays from the union of all names
     for (i = 1; i <= nfiles; i++) {
         name = order[i]
+        # Skip entries in only one file unless --missing is set
+        if (show_missing != "true" && !(name in a_n && name in b_n)) continue
         nrows++
         r_name[nrows]   = name
         r_n_a[nrows]    = (a_n[name] > 0 ? a_n[name] + 0 : 0)
