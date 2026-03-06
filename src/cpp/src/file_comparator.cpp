@@ -764,6 +764,10 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
   if (column_index > 0) {
     differ.sum_sq_diff += diff_unrounded * diff_unrounded;
     differ.n_tl_elements++;
+    // Accumulate precision-derived half-LSB squared for RMSE ceiling
+    double lsb = std::pow(10.0, -column_data.min_dp);
+    double half_lsb = lsb / 2.0;
+    differ.sum_sq_half_lsb += half_lsb * half_lsb;
   }
 
   // Percent error relative to second file (file2) using raw difference.
@@ -2098,10 +2102,22 @@ void FileComparator::print_summary(const std::string& file1,
   // Always emitted. Prefixed with TL_DIFF_STATS sentinel for easy grepping.
   // Fields: n_total, n_nz (non-zero), n_sig (significant), n_crit (critical),
   //         max_nz (max non-zero diff), max_nt (max non-trivial diff),
-  //         max_sig (max significant diff), rmse (full-field RMSE over TL)
+  //         max_sig (max significant diff), rmse (full-field RMSE over TL),
+  //         rmse_max (precision-derived maximum acceptable RMSE)
   double rmse = (differ.n_tl_elements > 0)
                     ? std::sqrt(differ.sum_sq_diff / differ.n_tl_elements)
                     : 0.0;
+  // Precision-derived maximum acceptable RMSE: if every element differed
+  // by exactly half an LSB (the maximum rounding ambiguity), this is the
+  // RMSE you would observe. Actual RMSE exceeding this indicates real
+  // differences beyond formatting precision.
+  double rmse_max =
+      (differ.n_tl_elements > 0)
+          ? std::sqrt(differ.sum_sq_half_lsb / differ.n_tl_elements)
+          : 0.0;
+  // Reset stream format — earlier output sets std::fixed which would
+  // truncate very small values (e.g., 5e-12 → "0.00").
+  std::cout << std::defaultfloat << std::setprecision(6);
   std::cout << "TL_DIFF_STATS"
             << "\tn_total=" << counter.elem_number
             << "\tn_nz=" << counter.diff_non_zero
@@ -2110,7 +2126,7 @@ void FileComparator::print_summary(const std::string& file1,
             << "\tmax_nz=" << differ.max_non_zero
             << "\tmax_nt=" << differ.max_non_trivial
             << "\tmax_sig=" << differ.max_significant << "\trmse=" << rmse
-            << std::endl;
+            << "\trmse_max=" << rmse_max << std::endl;
 }
 
 void FileComparator::print_settings(const std::string& file1,

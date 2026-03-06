@@ -190,6 +190,11 @@ struct DiffStats {
   // Full-field RMSE accumulators (TL columns only, skip range column)
   double sum_sq_diff = 0.0;  // sum of (v1 - v2)^2 for all TL elements
   size_t n_tl_elements = 0;  // count of TL elements compared
+
+  // Precision-derived RMSE ceiling: sum of (half-LSB)^2 for each element.
+  // The maximum acceptable RMSE from formatting precision alone is
+  // sqrt(sum_sq_half_lsb / n_tl_elements).
+  double sum_sq_half_lsb = 0.0;
 };
 
 // NOTE: RMSEStats, TLMetrics, and ErrorAccumulationData have been moved to

@@ -6,9 +6,9 @@
 # A basename is MIXED if it has both PASS and FAIL entries across its files
 # (e.g., case1r_01.asc PASS + case1r_02.asc FAIL → case1r MIXED).
 #
-# Expected _diff.log columns (11-column format):
-#   hostname  date  time  test_file  ref_file  status  method  max_err  n_sig  n_nz  rmse
-# Backward-compatible with older 6/10-column formats (missing columns shown as "-").
+# Expected _diff.log columns (12-column format):
+#   hostname  date  time  test_file  ref_file  status  method  max_err  n_sig  n_nz  rmse  rmse_max
+# Backward-compatible with older 6/10/11-column formats (missing columns shown as "-").
 #
 # Usage:
 #   diff_stats.sh <_diff.log> [_diff.log ...]
@@ -18,6 +18,7 @@
 #
 # Options:
 #   --status <s>       Filter by derived status: PASS, FAIL, MIXED (default: show FAIL+MIXED)
+#   --method <m>       Filter by diff method: diff, tldiff, tl_diff (show only basenames using that method)
 #   --all              Show all basenames regardless of status
 #   --host <name>      Filter by hostname
 #   --csv              Output in CSV format instead of table
@@ -38,6 +39,9 @@
 #   # Show only FAILed basenames
 #   diff_stats.sh std_new/_diff.log --status FAIL
 #
+#   # Show basenames that needed tldiff (i.e., failed simple diff)
+#   diff_stats.sh std_new/_diff.log --method tldiff --all
+#
 #   # Per-file detail
 #   diff_stats.sh std_new/_diff.log --files --status FAIL
 
@@ -47,6 +51,7 @@ set -euo pipefail
 
 declare -a log_files=()
 filter_status=""
+filter_method=""
 filter_host=""
 csv_mode=false
 sort_col="name"
@@ -61,6 +66,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --status)   filter_status="${2:?Error: --status requires a value}"; shift 2 ;;
+        --method)   filter_method="${2:?Error: --method requires a value}"; shift 2 ;;
         --all)      show_all=true;      shift   ;;
         --host)     filter_host="${2:?Error: --host requires a value}";     shift 2 ;;
         --csv)      csv_mode=true;      shift   ;;
@@ -106,10 +112,19 @@ if [[ -n "$filter_status" ]]; then
     esac
 fi
 
+# Validate filter method
+if [[ -n "$filter_method" ]]; then
+    case "$filter_method" in
+        diff|tldiff|tl_diff) ;;
+        *) echo "Error: Unknown method filter: $filter_method (valid: diff, tldiff, tl_diff)" >&2; exit 1 ;;
+    esac
+fi
+
 # ─── AWK analysis engine ────────────────────────────────────────────────────
 
 awk -F'\t' \
     -v filter_status="$filter_status" \
+    -v filter_method="$filter_method" \
     -v filter_host="$filter_host" \
     -v csv_mode="$csv_mode" \
     -v sort_col="$sort_col" \
@@ -147,6 +162,7 @@ NR == 1 { next }  # skip header(s)
     n_sig   = ($9 != "" ? $9 : "-")
     n_nz    = ($10 != "" ? $10 : "-")
     rmse    = ($11 != "" ? $11 : "-")
+    rmse_max = ($12 != "" ? $12 : "-")
     total_records++
 
     if (status == "PASS") total_pass++
@@ -166,6 +182,17 @@ NR == 1 { next }  # skip header(s)
     file_method[test_file] = method
     file_max_err[test_file] = max_err
     file_rmse[test_file] = rmse
+    file_rmse_max[test_file] = rmse_max
+
+    # Compute per-file RMSE verdict
+    if (rmse != "-" && rmse_max != "-" && rmse_max + 0 > 0) {
+        file_rmse_chk[test_file] = (rmse + 0 <= rmse_max + 0) ? "OK" : "FAIL"
+    } else if (rmse != "-" && rmse_max != "-" && rmse_max + 0 == 0) {
+        # rmse_max is exactly 0 (no TL elements?) — cannot evaluate
+        file_rmse_chk[test_file] = "-"
+    } else {
+        file_rmse_chk[test_file] = "-"
+    }
 
     # Track per-basename
     bn = get_basename(test_file)
@@ -200,6 +227,23 @@ NR == 1 { next }  # skip header(s)
             bn_max_rmse[bn] = rmse
         }
     }
+
+    # Track per-basename max RMSE ceiling (keep the maximum)
+    if (rmse_max != "-" && rmse_max + 0 > 0) {
+        if (!(bn in bn_max_rmse_max) || rmse_max + 0 > bn_max_rmse_max[bn] + 0) {
+            bn_max_rmse_max[bn] = rmse_max
+        }
+    }
+
+    # Track per-basename RMSE verdict (FAIL wins over OK)
+    if (test_file in file_rmse_chk) {
+        chk = file_rmse_chk[test_file]
+        if (chk == "FAIL") {
+            bn_rmse_chk[bn] = "FAIL"
+        } else if (chk == "OK" && !(bn in bn_rmse_chk)) {
+            bn_rmse_chk[bn] = "OK"
+        }
+    }
 }
 
 # ─── Pass 2: compute derived status and output ──────────────────────────
@@ -230,10 +274,10 @@ END {
     # ─── Per-file mode ───────────────────────────────────────────────────
     if (show_files == "true") {
         if (csv_mode == "true") {
-            print "file,status,method,max_err,rmse"
+            print "file,status,method,max_err,rmse,rmse_max,rmse_chk"
         } else {
-            printf "%-60s %-6s %-8s %-10s %s\n", "FILE", "STATUS", "METHOD", "MAX_ERR", "RMSE"
-            for (j = 1; j <= 95; j++) printf "-"
+            printf "%-60s %-6s %-8s %-10s %-10s %-10s %s\n", "FILE", "STATUS", "METHOD", "MAX_ERR", "RMSE", "RMSE_MAX", "RMSE_CHK"
+            for (j = 1; j <= 120; j++) printf "-"
             print ""
         }
         # Sort file names
@@ -255,21 +299,28 @@ END {
             s = file_status[f]
             if (filter_status != "" && s != filter_status) continue
             m = file_method[f]
+            if (filter_method != "" && m != filter_method) continue
             e = file_max_err[f]
             r = (f in file_rmse ? file_rmse[f] : "-")
+            rmax = (f in file_rmse_max ? file_rmse_max[f] : "-")
+            rchk = (f in file_rmse_chk ? file_rmse_chk[f] : "-")
             if (csv_mode == "true") {
-                printf "%s,%s,%s,%s,%s\n", f, s, m, e, r
+                printf "%s,%s,%s,%s,%s,%s,%s\n", f, s, m, e, r, rmax, rchk
             } else {
+                # Color RMSE_CHK: green for OK, red for FAIL
+                if (rchk == "FAIL") rchk_fmt = "\033[1;31m" rchk "\033[0m"
+                else if (rchk == "OK") rchk_fmt = "\033[1;32m" rchk "\033[0m"
+                else rchk_fmt = rchk
                 if (s == "FAIL") {
-                    printf "%-60s \033[1;31m%-6s\033[0m %-8s %-10s %s\n", f, s, m, e, r
+                    printf "%-60s \033[1;31m%-6s\033[0m %-8s %-10s %-10s %-10s %s\n", f, s, m, e, r, rmax, rchk_fmt
                 } else {
-                    printf "%-60s \033[1;32m%-6s\033[0m %-8s %-10s %s\n", f, s, m, e, r
+                    printf "%-60s \033[1;32m%-6s\033[0m %-8s %-10s %-10s %-10s %s\n", f, s, m, e, r, rmax, rchk_fmt
                 }
             }
             count++
         }
         if (csv_mode != "true") {
-            for (j = 1; j <= 95; j++) printf "-"
+            for (j = 1; j <= 120; j++) printf "-"
             printf "\nShown: %d files\n", count
         }
         exit 0
@@ -350,6 +401,7 @@ END {
     for (i = 1; i <= n_basenames; i++) {
         bn = bn_order[i]
         s = bn_status[bn]
+        if (filter_method != "" && index(bn_methods_list[bn], filter_method) == 0) continue
         if (s == "PASS"  && show_pass)  show_count++
         if (s == "FAIL"  && show_fail)  show_count++
         if (s == "MIXED" && show_mixed) show_count++
@@ -364,21 +416,24 @@ END {
 
     # Print table
     if (csv_mode == "true") {
-        print "basename,status,pass,fail,total,method,max_err,rmse"
+        print "basename,status,pass,fail,total,method,max_err,rmse,rmse_max,rmse_chk"
         for (i = 1; i <= n_basenames; i++) {
             bn = bn_order[i]
             s = bn_status[bn]
             if (s == "PASS"  && !show_pass)  continue
             if (s == "FAIL"  && !show_fail)  continue
             if (s == "MIXED" && !show_mixed) continue
+            if (filter_method != "" && index(bn_methods_list[bn], filter_method) == 0) continue
             m = (bn in bn_methods_list ? bn_methods_list[bn] : "-")
             e = (bn in bn_max_err ? bn_max_err[bn] : "-")
             r = (bn in bn_max_rmse ? bn_max_rmse[bn] : "-")
-            printf "%s,%s,%d,%d,%d,\"%s\",%s,%s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r
+            rmax = (bn in bn_max_rmse_max ? bn_max_rmse_max[bn] : "-")
+            rchk = (bn in bn_rmse_chk ? bn_rmse_chk[bn] : "-")
+            printf "%s,%s,%d,%d,%d,\"%s\",%s,%s,%s,%s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r, rmax, rchk
         }
     } else {
-        printf "\n%-40s %6s %5s %5s %5s  %-12s %-10s %s\n", "BASENAME", "STATUS", "PASS", "FAIL", "TOTAL", "METHOD", "MAX_ERR", "RMSE"
-        for (j = 1; j <= 100; j++) printf "-"
+        printf "\n%-40s %6s %5s %5s %5s  %-12s %-10s %-10s %-10s %s\n", "BASENAME", "STATUS", "PASS", "FAIL", "TOTAL", "METHOD", "MAX_ERR", "RMSE", "RMSE_MAX", "RMSE_CHK"
+        for (j = 1; j <= 130; j++) printf "-"
         print ""
         for (i = 1; i <= n_basenames; i++) {
             bn = bn_order[i]
@@ -386,20 +441,28 @@ END {
             if (s == "PASS"  && !show_pass)  continue
             if (s == "FAIL"  && !show_fail)  continue
             if (s == "MIXED" && !show_mixed) continue
+            if (filter_method != "" && index(bn_methods_list[bn], filter_method) == 0) continue
 
             m = (bn in bn_methods_list ? bn_methods_list[bn] : "-")
             e = (bn in bn_max_err ? sprintf("%.4g", bn_max_err[bn]) : "-")
             r = (bn in bn_max_rmse ? sprintf("%.4g", bn_max_rmse[bn]) : "-")
+            rmax = (bn in bn_max_rmse_max ? sprintf("%.4g", bn_max_rmse_max[bn]) : "-")
+            rchk = (bn in bn_rmse_chk ? bn_rmse_chk[bn] : "-")
+
+            # Color RMSE_CHK
+            if (rchk == "FAIL") rchk_fmt = "\033[1;31m" rchk "\033[0m"
+            else if (rchk == "OK") rchk_fmt = "\033[1;32m" rchk "\033[0m"
+            else rchk_fmt = rchk
 
             if (s == "FAIL") {
-                printf "%-40s \033[1;31m%6s\033[0m %5d %5d %5d  %-12s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r
+                printf "%-40s \033[1;31m%6s\033[0m %5d %5d %5d  %-12s %-10s %-10s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r, rmax, rchk_fmt
             } else if (s == "MIXED") {
-                printf "%-40s \033[1;33m%6s\033[0m %5d %5d %5d  %-12s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r
+                printf "%-40s \033[1;33m%6s\033[0m %5d %5d %5d  %-12s %-10s %-10s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r, rmax, rchk_fmt
             } else {
-                printf "%-40s \033[1;32m%6s\033[0m %5d %5d %5d  %-12s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r
+                printf "%-40s \033[1;32m%6s\033[0m %5d %5d %5d  %-12s %-10s %-10s %-10s %s\n", bn, s, bn_pass[bn]+0, bn_fail[bn]+0, bn_total[bn], m, e, r, rmax, rchk_fmt
             }
         }
-        for (j = 1; j <= 100; j++) printf "-"
+        for (j = 1; j <= 130; j++) printf "-"
         printf "\nShown: %d basenames\n", show_count
     }
 }
