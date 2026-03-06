@@ -16,7 +16,7 @@
 #   --host <name>      Filter by hostname
 #   --compare          Side-by-side comparison of two _timing.log files
 #   --csv              Output in CSV format instead of table
-#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max
+#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio (compare mode)
 #   --list-below <N>   Output only filenames where mean runtime < N seconds (one per line)
 #   --help             Show this help message
 #
@@ -118,6 +118,10 @@ case "$sort_col" in
     stddev) sort_key="stddev" ;;
     min)    sort_key="min"    ;;
     max)    sort_key="max"    ;;
+    ratio)  sort_key="ratio"
+            if ! $compare_mode; then
+                echo "Error: --sort ratio is only valid with --compare" >&2; exit 1
+            fi ;;
     *)      echo "Error: Unknown sort column: $sort_col" >&2; exit 1 ;;
 esac
 
@@ -287,14 +291,7 @@ stats_a=$(compute_stats < "${log_files[0]}")
 stats_b=$(compute_stats < "${log_files[1]}")
 
 # Join on input_file and produce side-by-side comparison
-paste <(echo "$stats_a") <(echo "$stats_b") | awk -F'\t' '
-BEGIN {
-    OFS = "\t"
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
-        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A"
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
-        "--------------------", "----", "----------", "----------", "----", "----------", "----------", "--------"
-}
+paste <(echo "$stats_a") <(echo "$stats_b") | awk -F'\t' -v sort_key="$sort_key" '
 {
     # From file A: $1=name, $2=count, $3=mean, $4=stddev, $5=min, $6=max
     # From file B: $7=name, $8=count, $9=mean, $10=stddev, $11=min, $12=max
@@ -303,30 +300,74 @@ BEGIN {
 
     # Use whichever name is available
     name = (name_a != "" ? name_a : name_b)
-    if (name == "TOTAL") next  # skip individual totals, compute our own
+    if (name == "TOTAL") next  # skip individual totals
 
-    # Handle cases where one side has no data
-    if (mean_a + 0 > 0 && mean_b + 0 > 0) {
-        ratio = sprintf("%.3f", mean_b / mean_a)
-        # Color code: green if B is faster (<1), red if slower (>1)
-        if (mean_b < mean_a)
-            ratio_str = sprintf("\033[32m%8s\033[0m", ratio)
-        else if (mean_b > mean_a)
-            ratio_str = sprintf("\033[31m%8s\033[0m", ratio)
-        else
-            ratio_str = sprintf("%8s", ratio)
-    } else {
-        ratio_str = sprintf("%8s", "-")
+    nrows++
+    r_name[nrows]   = name
+    r_n_a[nrows]    = (n_a != "" ? n_a : "-")
+    r_mean_a[nrows] = (mean_a != "" ? mean_a + 0 : 0)
+    r_sd_a[nrows]   = (sd_a != "" ? sd_a + 0 : 0)
+    r_n_b[nrows]    = (n_b != "" ? n_b : "-")
+    r_mean_b[nrows] = (mean_b != "" ? mean_b + 0 : 0)
+    r_sd_b[nrows]   = (sd_b != "" ? sd_b + 0 : 0)
+
+    if (mean_a + 0 > 0 && mean_b + 0 > 0)
+        r_ratio[nrows] = (mean_b + 0) / (mean_a + 0)
+    else
+        r_ratio[nrows] = 9999  # sort missing ratios to end
+}
+END {
+    # Sort if requested
+    for (i = 2; i <= nrows; i++) {
+        j = i
+        while (j > 1) {
+            swap = 0
+            if (sort_key == "ratio"  && r_ratio[j]  < r_ratio[j-1])  swap = 1
+            if (sort_key == "mean"   && r_mean_a[j]  < r_mean_a[j-1]) swap = 1
+            if (sort_key == "name"   && r_name[j]   < r_name[j-1])   swap = 1
+            if (!swap) break
+            # Swap all arrays
+            tmp = r_name[j];   r_name[j]   = r_name[j-1];   r_name[j-1]   = tmp
+            tmp = r_n_a[j];    r_n_a[j]    = r_n_a[j-1];    r_n_a[j-1]    = tmp
+            tmp = r_mean_a[j]; r_mean_a[j] = r_mean_a[j-1]; r_mean_a[j-1] = tmp
+            tmp = r_sd_a[j];   r_sd_a[j]   = r_sd_a[j-1];   r_sd_a[j-1]   = tmp
+            tmp = r_n_b[j];    r_n_b[j]    = r_n_b[j-1];    r_n_b[j-1]    = tmp
+            tmp = r_mean_b[j]; r_mean_b[j] = r_mean_b[j-1]; r_mean_b[j-1] = tmp
+            tmp = r_sd_b[j];   r_sd_b[j]   = r_sd_b[j-1];   r_sd_b[j-1]   = tmp
+            tmp = r_ratio[j];  r_ratio[j]  = r_ratio[j-1];  r_ratio[j-1]  = tmp
+            j--
+        }
     }
 
-    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %s\n", \
-        name, \
-        (n_a != "" ? n_a : "-"), \
-        (mean_a != "" ? sprintf("%.6f", mean_a) : "-"), \
-        (sd_a != "" && sd_a != "0" ? sprintf("%.6f", sd_a) : "-"), \
-        (n_b != "" ? n_b : "-"), \
-        (mean_b != "" ? sprintf("%.6f", mean_b) : "-"), \
-        (sd_b != "" && sd_b != "0" ? sprintf("%.6f", sd_b) : "-"), \
-        ratio_str
+    # Print header
+    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
+        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A"
+    printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %8s\n", \
+        "--------------------", "----", "----------", "----------", "----", "----------", "----------", "--------"
+
+    # Print rows
+    for (i = 1; i <= nrows; i++) {
+        if (r_ratio[i] < 9999) {
+            ratio_s = sprintf("%.3f", r_ratio[i])
+            if (r_ratio[i] < 1.0)
+                ratio_str = sprintf("\033[32m%8s\033[0m", ratio_s)
+            else if (r_ratio[i] > 1.0)
+                ratio_str = sprintf("\033[31m%8s\033[0m", ratio_s)
+            else
+                ratio_str = sprintf("%8s", ratio_s)
+        } else {
+            ratio_str = sprintf("%8s", "-")
+        }
+
+        printf "%-20s  %4s  %10s %10s  %4s  %10s %10s  %s\n", \
+            r_name[i], \
+            r_n_a[i], \
+            (r_mean_a[i] > 0 ? sprintf("%.6f", r_mean_a[i]) : "-"), \
+            (r_sd_a[i] > 0 ? sprintf("%.6f", r_sd_a[i]) : "-"), \
+            r_n_b[i], \
+            (r_mean_b[i] > 0 ? sprintf("%.6f", r_mean_b[i]) : "-"), \
+            (r_sd_b[i] > 0 ? sprintf("%.6f", r_sd_b[i]) : "-"), \
+            ratio_str
+    }
 }
 '
