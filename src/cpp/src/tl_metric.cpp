@@ -356,3 +356,13 @@ void TLMetrics::printResults() const {
   }
   std::cout << "======================================\n\n";
 }
+
+void TLMetrics::printStats() const {
+  TLMetricResults r = computeAll();
+  std::cout << std::defaultfloat << std::setprecision(6);
+  std::cout << "TL_METRIC_STATS"
+            << "\ttl_diff_1=" << r.tl_diff_1 << "\ttl_diff_2=" << r.tl_diff_2
+            << "\tcorrelation=" << r.correlation << "\tm1=" << r.m1
+            << "\tm2=" << r.m2 << "\tm3=" << r.m3 << "\tm_curve=" << r.m_curve
+            << "\tn_points=" << r.n_points << std::endl;
+}

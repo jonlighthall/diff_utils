@@ -157,6 +157,7 @@ int main(int argc, char* argv[]) {
   try {
     TLMetrics metrics(curve1, curve2, args.fom);
     metrics.printResults();
+    metrics.printStats();
   } catch (const std::exception& e) {
     std::cerr << "\033[1;31mERROR:\033[0m " << e.what() << std::endl;
     return 1;

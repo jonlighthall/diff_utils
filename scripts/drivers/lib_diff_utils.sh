@@ -50,6 +50,7 @@ parse_diff_output() {
     DIFF_N_NZ=""
     DIFF_RMSE=""
     DIFF_RMSE_MAX=""
+    DIFF_M1=""
 
     [[ ! -f "$output_file" ]] && return
 
@@ -74,6 +75,14 @@ parse_diff_output() {
                 DIFF_MAX_ERROR=$(echo "$stats_line" | grep -oP 'max_nz=\K[0-9.]+')
                 DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.eE+-]+')
                 DIFF_RMSE_MAX=$(echo "$stats_line" | grep -oP 'rmse_max=\K[0-9.eE+-]+')
+            fi
+        fi
+        # Parse TL_METRIC_STATS for Fabre M1
+        if grep -q '^TL_METRIC_STATS' "$output_file"; then
+            local metric_line
+            metric_line=$(grep '^TL_METRIC_STATS' "$output_file")
+            if [[ -n "$metric_line" ]]; then
+                DIFF_M1=$(echo "$metric_line" | grep -oP 'm1=\K[0-9.eE+-]+')
             fi
         fi
     fi
@@ -242,6 +251,7 @@ diff_files() {
     DIFF_N_SIG=""        # number of significant differences (from tl_diff)
     DIFF_N_NZ=""         # number of non-zero differences (from tl_diff)
     DIFF_RMSE=""         # full-field RMSE (from tl_diff)
+    DIFF_M1=""           # Fabre M1 weighted mean absolute difference (from tl_metric)
 
     # Step 1: Try standard diff
     local tmpfile_diff=$(mktemp)
@@ -353,12 +363,34 @@ diff_files() {
                 echo -e "\e[32mtl_diff OK\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
                 DIFF_METHOD="tl_diff"
+                # Run tl_metric for Fabre M1 if available
+                if command -v tl_metric >/dev/null 2>&1; then
+                    local tmpfile_metric=$(mktemp)
+                    tl_metric "$test" "$ref" > "$tmpfile_metric" 2>&1
+                    local metric_stats
+                    metric_stats=$(grep '^TL_METRIC_STATS' "$tmpfile_metric" || true)
+                    if [[ -n "$metric_stats" ]]; then
+                        DIFF_M1=$(echo "$metric_stats" | grep -oP 'm1=\K[0-9.eE+-]+')
+                    fi
+                    rm "$tmpfile_metric"
+                fi
                 restore_errexit
                 return 0
             else
                 echo -e "\e[31mtl_diff FAILED\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
                 DIFF_METHOD="tl_diff"
+                # Run tl_metric for Fabre M1 even on failure if available
+                if command -v tl_metric >/dev/null 2>&1; then
+                    local tmpfile_metric=$(mktemp)
+                    tl_metric "$test" "$ref" > "$tmpfile_metric" 2>&1
+                    local metric_stats
+                    metric_stats=$(grep '^TL_METRIC_STATS' "$tmpfile_metric" || true)
+                    if [[ -n "$metric_stats" ]]; then
+                        DIFF_M1=$(echo "$metric_stats" | grep -oP 'm1=\K[0-9.eE+-]+')
+                    fi
+                    rm "$tmpfile_metric"
+                fi
                 restore_errexit
                 return 1
             fi
