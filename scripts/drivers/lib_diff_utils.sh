@@ -27,6 +27,50 @@ fi
 FILE_UTILS_LIB_LOADED=1
 
 #==============================================================================
+# OUTPUT PARSING UTILITIES
+#==============================================================================
+
+# Function: parse_diff_output
+# Purpose: Parse captured diff_files output to recover DIFF_METHOD and stats
+#          when diff_files ran in a subshell (e.g., piped through tee).
+# Usage: parse_diff_output <output_file>
+# Sets: DIFF_METHOD, DIFF_MAX_ERROR, DIFF_N_SIG, DIFF_N_NZ, DIFF_RMSE
+parse_diff_output() {
+    local output_file="$1"
+    DIFF_METHOD="diff"
+    DIFF_MAX_ERROR=""
+    DIFF_N_SIG=""
+    DIFF_N_NZ=""
+    DIFF_RMSE=""
+
+    [[ ! -f "$output_file" ]] && return
+
+    if grep -q "diff FAILED" "$output_file"; then
+        if grep -q "tldiff OK\|tldiff FAILED" "$output_file"; then
+            DIFF_METHOD="tldiff"
+            # Parse tldiff stats
+            local max_err
+            max_err=$(grep -m1 '^ maximum error :' "$output_file" | awk '{print $NF}')
+            [[ -n "$max_err" ]] && DIFF_MAX_ERROR="$max_err"
+            local n_sig
+            n_sig=$(grep -m1 'number of errors found' "$output_file" | awk '{print $NF}')
+            [[ -n "$n_sig" ]] && DIFF_N_SIG="$n_sig"
+        fi
+        if grep -q "tl_diff OK\|tl_diff FAILED\|TL_DIFF_STATS" "$output_file"; then
+            DIFF_METHOD="tl_diff"
+            local stats_line
+            stats_line=$(grep '^TL_DIFF_STATS' "$output_file")
+            if [[ -n "$stats_line" ]]; then
+                DIFF_N_NZ=$(echo "$stats_line" | grep -oP 'n_nz=\K[0-9]+')
+                DIFF_N_SIG=$(echo "$stats_line" | grep -oP 'n_sig=\K[0-9]+')
+                DIFF_MAX_ERROR=$(echo "$stats_line" | grep -oP 'max_nz=\K[0-9.]+')
+                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.]+')
+            fi
+        fi
+    fi
+}
+
+#==============================================================================
 # DISPLAY UTILITIES
 #==============================================================================
 
@@ -183,10 +227,18 @@ diff_files() {
         fi
     }
 
+    # Initialize DIFF_METHOD and DIFF_MAX_ERROR to track results
+    DIFF_METHOD=""
+    DIFF_MAX_ERROR=""    # overall max error (from tldiff or tl_diff)
+    DIFF_N_SIG=""        # number of significant differences (from tl_diff)
+    DIFF_N_NZ=""         # number of non-zero differences (from tl_diff)
+    DIFF_RMSE=""         # full-field RMSE (from tl_diff)
+
     # Step 1: Try standard diff
     local tmpfile_diff=$(mktemp)
     diff --color=always --suppress-common-lines -yiEZbwBs "$test" "$ref" > "$tmpfile_diff"
     local RETVAL=$?
+    local diff_passed=false
     echo "diff done with return code $RETVAL"
 
     if [ $RETVAL -eq 0 ]; then
@@ -195,8 +247,15 @@ diff_files() {
         rm "$tmpfile_diff"
         echo -e "\e[32mdiff OK\e[0m"
         printf '%*s\n' "$line_len" '' | tr ' ' '-'
-        restore_errexit
-        return 0
+        DIFF_METHOD="diff"
+        diff_passed=true
+
+        # Level 3: continue to tl_diff even when diff passes
+        if [[ $diff_level -ne 3 ]]; then
+            restore_errexit
+            return 0
+        fi
+        echo "Continuing to level 3 (force tl_diff) despite diff OK..."
     else
         # Files differ
         echo "Difference found between $test and $ref"
@@ -208,27 +267,33 @@ diff_files() {
         # If diff_level is 1, stop here (diff only mode)
         if [[ $diff_level -eq 1 ]]; then
             echo "Stopping at level 1 (diff only)"
+            DIFF_METHOD="diff"
             restore_errexit
             return 1
         fi
+    fi
 
-        # Step 2: Try tldiff if available
+    # Step 2: Try tldiff if available (skip for level 3 when diff passed)
+    if [[ "$diff_passed" != true ]]; then
         echo "Trying tldiff..."
         if command -v tldiff >/dev/null 2>&1; then
             local tmpfile_tldiff=$(mktemp)
             tldiff "$test" "$ref" $opt1 > "$tmpfile_tldiff" 2>&1
             local tldiff_status=$?
             headtail_truncate "$tmpfile_tldiff" "$SHOW_LINES"
+
+            # Parse tldiff stats from output before removing temp file
+            DIFF_MAX_ERROR=$(grep -m1 '^ maximum error :' "$tmpfile_tldiff" | awk '{print $NF}')
+            DIFF_N_SIG=$(grep -m1 '^  *number of errors found' "$tmpfile_tldiff" | awk '{print $NF}')
             rm "$tmpfile_tldiff"
 
             if [[ $tldiff_status -eq 0 ]]; then
                 echo -e "\e[32mtldiff OK\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                # If diff_level is 2, stop here even if tldiff passed
-                # If diff_level is 3, continue to tl_diff regardless
                 if [[ $diff_level -eq 3 ]]; then
                     echo "Continuing to level 3 (force tl_diff)..."
                 else
+                    DIFF_METHOD="tldiff"
                     restore_errexit
                     return 0
                 fi
@@ -236,49 +301,66 @@ diff_files() {
                 echo -e "\e[31mtldiff FAILED\e[0m"
                 printf '%*s\n' "$line_len" '' | tr ' ' '-'
 
-                # If diff_level is 2, stop here (max tldiff mode)
                 if [[ $diff_level -eq 2 ]]; then
                     echo "Stopping at level 2 (max tldiff)"
-                    restore_errexit
-                    return 1
-                fi
-            fi
-
-            # Step 3: Try tl_diff if available (only if not stopped by level 2)
-            if [[ $diff_level -ne 2 ]]; then
-                echo "Trying tl_diff..."
-                if command -v tl_diff >/dev/null 2>&1; then
-                    local tmpfile_uband=$(mktemp)
-                    tl_diff "$test" "$ref" $opt1 $opt2 > "$tmpfile_uband" 2>&1
-                    local uband_status=$?
-                    headtail_truncate "$tmpfile_uband" "$SHOW_LINES"
-                    rm "$tmpfile_uband"
-
-                    if [[ $uband_status -eq 0 ]]; then
-                        echo -e "\e[32mtl_diff OK\e[0m"
-                        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        restore_errexit
-                        return 0
-                    else
-                        echo -e "\e[31mtl_diff FAILED\e[0m"
-                        printf '%*s\n' "$line_len" '' | tr ' ' '-'
-                        restore_errexit
-                        return 1
-                    fi
-                else
-                    echo "Error: tl_diff not found and files differ." >&2
+                    DIFF_METHOD="tldiff"
                     restore_errexit
                     return 1
                 fi
             fi
         else
-            echo "Error: tldiff not found and files differ." >&2
+            if [[ $diff_level -ne 3 ]]; then
+                echo "Error: tldiff not found and files differ." >&2
+                DIFF_METHOD="diff"
+                restore_errexit
+                return 1
+            fi
+            echo "tldiff not found, skipping to tl_diff..."
+        fi
+    fi
+
+    # Step 3: Try tl_diff if available
+    if [[ $diff_level -ne 2 ]]; then
+        echo "Trying tl_diff..."
+        if command -v tl_diff >/dev/null 2>&1; then
+            local tmpfile_uband=$(mktemp)
+            tl_diff "$test" "$ref" $opt1 $opt2 > "$tmpfile_uband" 2>&1
+            local uband_status=$?
+            headtail_truncate "$tmpfile_uband" "$SHOW_LINES"
+
+            # Parse TL_DIFF_STATS from output before removing temp file
+            local stats_line
+            stats_line=$(grep '^TL_DIFF_STATS' "$tmpfile_uband" || true)
+            if [[ -n "$stats_line" ]]; then
+                DIFF_N_NZ=$(echo "$stats_line" | grep -oP 'n_nz=\K[0-9]+')
+                DIFF_N_SIG=$(echo "$stats_line" | grep -oP 'n_sig=\K[0-9]+')
+                DIFF_MAX_ERROR=$(echo "$stats_line" | grep -oP 'max_nz=\K[0-9.]+')
+                DIFF_RMSE=$(echo "$stats_line" | grep -oP 'rmse=\K[0-9.]+')
+            fi
+            rm "$tmpfile_uband"
+
+            if [[ $uband_status -eq 0 ]]; then
+                echo -e "\e[32mtl_diff OK\e[0m"
+                printf '%*s\n' "$line_len" '' | tr ' ' '-'
+                DIFF_METHOD="tl_diff"
+                restore_errexit
+                return 0
+            else
+                echo -e "\e[31mtl_diff FAILED\e[0m"
+                printf '%*s\n' "$line_len" '' | tr ' ' '-'
+                DIFF_METHOD="tl_diff"
+                restore_errexit
+                return 1
+            fi
+        else
+            echo "Error: tl_diff not found." >&2
             restore_errexit
             return 1
         fi
     fi
 
     echo "Files differ."
+    DIFF_METHOD="diff"
     restore_errexit
     return 1
 }

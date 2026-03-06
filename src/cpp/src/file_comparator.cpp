@@ -760,6 +760,12 @@ bool FileComparator::process_difference(const ColumnValues& column_data,
                                                           column_data.min_dp);
   double diff_rounded = std::abs(rounded1 - rounded2);
 
+  // Accumulate full-field RMSE for TL columns (skip range column 0)
+  if (column_index > 0) {
+    differ.sum_sq_diff += diff_unrounded * diff_unrounded;
+    differ.n_tl_elements++;
+  }
+
   // Percent error relative to second file (file2) using raw difference.
   double percent_error = 0.0;
   double ref = std::abs(column_data.value2);
@@ -2087,6 +2093,24 @@ void FileComparator::print_summary(const std::string& file1,
   print_additional_diff_info(params);
   print_critical_threshold_info();
   if (debug.enabled) print_consistency_checks();
+
+  // Machine-parseable summary line for scripted consumers.
+  // Always emitted. Prefixed with TL_DIFF_STATS sentinel for easy grepping.
+  // Fields: n_total, n_nz (non-zero), n_sig (significant), n_crit (critical),
+  //         max_nz (max non-zero diff), max_nt (max non-trivial diff),
+  //         max_sig (max significant diff), rmse (full-field RMSE over TL)
+  double rmse = (differ.n_tl_elements > 0)
+                    ? std::sqrt(differ.sum_sq_diff / differ.n_tl_elements)
+                    : 0.0;
+  std::cout << "TL_DIFF_STATS"
+            << "\tn_total=" << counter.elem_number
+            << "\tn_nz=" << counter.diff_non_zero
+            << "\tn_sig=" << counter.diff_significant
+            << "\tn_crit=" << counter.diff_critical
+            << "\tmax_nz=" << differ.max_non_zero
+            << "\tmax_nt=" << differ.max_non_trivial
+            << "\tmax_sig=" << differ.max_significant << "\trmse=" << rmse
+            << std::endl;
 }
 
 void FileComparator::print_settings(const std::string& file1,

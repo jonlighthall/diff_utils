@@ -186,6 +186,10 @@ struct DiffStats {
   int ndp_max = 0;          // number of decimal places for maximum difference
   const int ndp_single_precision =
       7;  // number of decimal places for single precision
+
+  // Full-field RMSE accumulators (TL columns only, skip range column)
+  double sum_sq_diff = 0.0;  // sum of (v1 - v2)^2 for all TL elements
+  size_t n_tl_elements = 0;  // count of TL elements compared
 };
 
 // NOTE: RMSEStats, TLMetrics, and ErrorAccumulationData have been moved to

@@ -283,8 +283,8 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
     # Diff log for two-directory mode — write to test dir
     DIFF_LOG="$test_dir/_diff.log"
     if [[ ! -f "$DIFF_LOG" ]]; then
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "hostname" "date" "time" "test_file" "ref_file" "status" \
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "hostname" "date" "time" "test_file" "ref_file" "status" "method" "max_err" "n_sig" "n_nz" "rmse" \
             > "$DIFF_LOG"
     fi
 
@@ -326,12 +326,11 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
     shopt -u nullglob
 
     # Sort basenames
-    mapfile -t basenames < <(printf '%s\n' "${!basenames_seen[@]}" | sort -V)
-
-    if [[ ${#basenames[@]} -eq 0 ]]; then
+    if [[ ${#basenames_seen[@]} -eq 0 ]]; then
         echo -e "\e[33mNo output files found in test directory: $test_dir\e[0m"
         exit 0
     fi
+    mapfile -t basenames < <(printf '%s\n' "${!basenames_seen[@]}" | sort -V)
 
     # Apply pattern filtering to basenames
     if [[ ${#patterns[@]} -gt 0 ]]; then
@@ -426,6 +425,7 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
             diff_output_file=$(mktemp)
             diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
             diff_exit_code=${PIPESTATUS[0]}
+            parse_diff_output "$diff_output_file"
 
             total_pairs=$((total_pairs + 1))
             local_label="${bn}_${suffix}.asc"
@@ -433,9 +433,10 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
                 echo -e "\e[32m[[PASS]]\e[0m"
                 pass_files+=("$local_label")
                 bn_has_pass["$bn"]=1
-                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                    "${bn}_${suffix}.asc" "${bn}_${suffix}.asc" "PASS" \
+                    "${bn}_${suffix}.asc" "${bn}_${suffix}.asc" "PASS" "${DIFF_METHOD:-diff}" \
+                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                     >> "$DIFF_LOG"
                 if grep -q "diff FAILED" "$diff_output_file"; then
                     if grep -q "tldiff OK" "$diff_output_file"; then
@@ -448,9 +449,10 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
                 echo -e "\e[31m[[FAIL]]\e[0m"
                 fail_files+=("$local_label")
                 bn_has_fail["$bn"]=1
-                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                    "${bn}_${suffix}.asc" "${bn}_${suffix}.asc" "FAIL" \
+                    "${bn}_${suffix}.asc" "${bn}_${suffix}.asc" "FAIL" "${DIFF_METHOD:-diff}" \
+                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                     >> "$DIFF_LOG"
                 if grep -q "diff FAILED" "$diff_output_file"; then
                     if grep -q "tldiff FAILED" "$diff_output_file"; then
@@ -490,23 +492,26 @@ if [[ -n "$test_dir" || -n "$ref_dir" ]]; then
             diff_output_file=$(mktemp)
             diff_files "$test_file" "$ref_file" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
             diff_exit_code=${PIPESTATUS[0]}
+            parse_diff_output "$diff_output_file"
             total_pairs=$((total_pairs + 1))
             local_label="${bn}.${ext}"
             if [[ $diff_exit_code -eq 0 ]]; then
                 echo -e "\e[32m[[PASS]]\e[0m"
                 pass_files+=("$local_label")
                 bn_has_pass["$bn"]=1
-                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                    "${bn}.${ext}" "${bn}.${ext}" "PASS" \
+                    "${bn}.${ext}" "${bn}.${ext}" "PASS" "${DIFF_METHOD:-diff}" \
+                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                     >> "$DIFF_LOG"
             else
                 echo -e "\e[31m[[FAIL]]\e[0m"
                 fail_files+=("$local_label")
                 bn_has_fail["$bn"]=1
-                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                    "${bn}.${ext}" "${bn}.${ext}" "FAIL" \
+                    "${bn}.${ext}" "${bn}.${ext}" "FAIL" "${DIFF_METHOD:-diff}" \
+                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                     >> "$DIFF_LOG"
             fi
             rm -f "$diff_output_file"
@@ -872,8 +877,8 @@ fi
 DIFF_LOG="$directory/_diff.log"
 if [[ "$mode" == "diff" || "$mode" == "test" ]]; then
     if [[ ! -f "$DIFF_LOG" ]]; then
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "hostname" "date" "time" "test_file" "ref_file" "status" \
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "hostname" "date" "time" "test_file" "ref_file" "status" "method" "max_err" "n_sig" "n_nz" "rmse" \
             > "$DIFF_LOG"
     fi
     echo "Diff log: $DIFF_LOG"
@@ -1431,9 +1436,10 @@ for infile in "${infiles[@]}"; do
                                 echo -e "\e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 echo -e "\e[32m[[PASS]]\e[0m" >> "$LOG_FILE"
                                 add_to_array_if_not_present "pass_files" "$infile"
-                                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                                    "$(basename "$test")" "$(basename "$ref")" "PASS" \
+                                    "$(basename "$test")" "$(basename "$ref")" "PASS" "${DIFF_METHOD:-diff}" \
+                                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                                     >> "$DIFF_LOG"
 
                                 # Even for passing files, track which intermediate diffs failed
@@ -1450,9 +1456,10 @@ for infile in "${infiles[@]}"; do
                                 echo -e "\e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                                 echo -e "\e[31m[[FAIL]]\e[0m" >> "$LOG_FILE"
                                 add_to_array_if_not_present "fail_files" "$infile"
-                                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                                    "$(basename "$test")" "$(basename "$ref")" "FAIL" \
+                                    "$(basename "$test")" "$(basename "$ref")" "FAIL" "${DIFF_METHOD:-diff}" \
+                                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                                     >> "$DIFF_LOG"
 
                                 # Determine which diff tool failed by checking the log
@@ -1482,12 +1489,14 @@ for infile in "${infiles[@]}"; do
                             diff_files "$test" "$ref" "" "" "$diff_level" 2>&1 | tee "$diff_output_file"
                             # Capture the exit code from diff_files (not from tee)
                             diff_exit_code=${PIPESTATUS[0]}
+                            parse_diff_output "$diff_output_file"
                             if [[ $diff_exit_code -eq 0 ]]; then
                                 echo -e "$infile \e[32m[[PASS]]\e[0m" # Print PASS to terminal
                                 add_to_array_if_not_present "pass_files" "$infile"
-                                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                                    "$(basename "$test")" "$(basename "$ref")" "PASS" \
+                                    "$(basename "$test")" "$(basename "$ref")" "PASS" "${DIFF_METHOD:-diff}" \
+                                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                                     >> "$DIFF_LOG"
 
                                 # Even for passing files, track which intermediate diffs failed
@@ -1503,9 +1512,10 @@ for infile in "${infiles[@]}"; do
                             else
                                 echo -e "$infile \e[31m[[FAIL]]\e[0m" # Print FAIL to terminal
                                 add_to_array_if_not_present "fail_files" "$infile"
-                                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                                     "$(hostname -s)" "$(date +%Y-%m-%d)" "$(date +%H:%M:%S)" \
-                                    "$(basename "$test")" "$(basename "$ref")" "FAIL" \
+                                    "$(basename "$test")" "$(basename "$ref")" "FAIL" "${DIFF_METHOD:-diff}" \
+                                    "${DIFF_MAX_ERROR:--}" "${DIFF_N_SIG:--}" "${DIFF_N_NZ:--}" "${DIFF_RMSE:--}" \
                                     >> "$DIFF_LOG"
 
                                 # Determine which diff tool failed by checking the output
