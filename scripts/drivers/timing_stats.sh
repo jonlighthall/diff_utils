@@ -17,7 +17,7 @@
 #   --compare          Side-by-side comparison of two _timing.log files
 #   --missing          In compare mode, include entries found in only one file
 #   --csv              Output in CSV format instead of table
-#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio, sigma (compare mode)
+#   --sort <col>       Sort by: name (default), mean, count, stddev, min, max, ratio, sigma, verdict (compare mode)
 #   --list-below <N>   Output only filenames where mean runtime < N seconds (one per line)
 #   --help             Show this help message
 #
@@ -128,6 +128,10 @@ case "$sort_col" in
     sigma)  sort_key="sigma"
             if ! $compare_mode; then
                 echo "Error: --sort sigma is only valid with --compare" >&2; exit 1
+            fi ;;
+    verdict) sort_key="verdict"
+            if ! $compare_mode; then
+                echo "Error: --sort verdict is only valid with --compare" >&2; exit 1
             fi ;;
     *)      echo "Error: Unknown sort column: $sort_col" >&2; exit 1 ;;
 esac
@@ -345,26 +349,54 @@ END {
         }
     }
 
+    # Determine verdict for each row (before sort so verdict sort works)
+    n_faster = 0; n_slower = 0; n_same = 0; n_nodata = 0
+    for (i = 1; i <= nrows; i++) {
+        if (r_ratio[i] >= 9999 || r_sigma[i] == 0) {
+            r_verdict[i] = ""
+            r_vrank[i] = 1
+            n_nodata++
+        } else {
+            abs_sig = (r_sigma[i] < 0 ? -r_sigma[i] : r_sigma[i])
+            if (abs_sig < 2.0) {
+                r_verdict[i] = "same"
+                r_vrank[i] = 2
+                n_same++
+            } else if (r_sigma[i] < 0) {
+                r_verdict[i] = "FASTER"
+                r_vrank[i] = 0
+                n_faster++
+            } else {
+                r_verdict[i] = "SLOWER"
+                r_vrank[i] = 3
+                n_slower++
+            }
+        }
+    }
+
     # Sort if requested
     for (i = 2; i <= nrows; i++) {
         j = i
         while (j > 1) {
             swap = 0
-            if (sort_key == "ratio"  && r_ratio[j]  < r_ratio[j-1])  swap = 1
-            if (sort_key == "sigma"  && r_sigma[j]  < r_sigma[j-1])  swap = 1
-            if (sort_key == "mean"   && r_mean_a[j]  < r_mean_a[j-1]) swap = 1
-            if (sort_key == "name"   && r_name[j]   < r_name[j-1])   swap = 1
+            if (sort_key == "ratio"   && r_ratio[j]  < r_ratio[j-1])  swap = 1
+            if (sort_key == "sigma"   && r_sigma[j]  < r_sigma[j-1])  swap = 1
+            if (sort_key == "verdict" && r_vrank[j]  < r_vrank[j-1])  swap = 1
+            if (sort_key == "mean"    && r_mean_a[j]  < r_mean_a[j-1]) swap = 1
+            if (sort_key == "name"    && r_name[j]   < r_name[j-1])   swap = 1
             if (!swap) break
             # Swap all arrays
-            tmp = r_name[j];   r_name[j]   = r_name[j-1];   r_name[j-1]   = tmp
-            tmp = r_n_a[j];    r_n_a[j]    = r_n_a[j-1];    r_n_a[j-1]    = tmp
-            tmp = r_mean_a[j]; r_mean_a[j] = r_mean_a[j-1]; r_mean_a[j-1] = tmp
-            tmp = r_sd_a[j];   r_sd_a[j]   = r_sd_a[j-1];   r_sd_a[j-1]   = tmp
-            tmp = r_n_b[j];    r_n_b[j]    = r_n_b[j-1];    r_n_b[j-1]    = tmp
-            tmp = r_mean_b[j]; r_mean_b[j] = r_mean_b[j-1]; r_mean_b[j-1] = tmp
-            tmp = r_sd_b[j];   r_sd_b[j]   = r_sd_b[j-1];   r_sd_b[j-1]   = tmp
-            tmp = r_ratio[j];  r_ratio[j]  = r_ratio[j-1];  r_ratio[j-1]  = tmp
-            tmp = r_sigma[j];  r_sigma[j]  = r_sigma[j-1];  r_sigma[j-1]  = tmp
+            tmp = r_name[j];    r_name[j]    = r_name[j-1];    r_name[j-1]    = tmp
+            tmp = r_n_a[j];     r_n_a[j]     = r_n_a[j-1];     r_n_a[j-1]     = tmp
+            tmp = r_mean_a[j];  r_mean_a[j]  = r_mean_a[j-1];  r_mean_a[j-1]  = tmp
+            tmp = r_sd_a[j];    r_sd_a[j]    = r_sd_a[j-1];    r_sd_a[j-1]    = tmp
+            tmp = r_n_b[j];     r_n_b[j]     = r_n_b[j-1];     r_n_b[j-1]     = tmp
+            tmp = r_mean_b[j];  r_mean_b[j]  = r_mean_b[j-1];  r_mean_b[j-1]  = tmp
+            tmp = r_sd_b[j];    r_sd_b[j]    = r_sd_b[j-1];    r_sd_b[j-1]    = tmp
+            tmp = r_ratio[j];   r_ratio[j]   = r_ratio[j-1];   r_ratio[j-1]   = tmp
+            tmp = r_sigma[j];   r_sigma[j]   = r_sigma[j-1];   r_sigma[j-1]   = tmp
+            tmp = r_verdict[j]; r_verdict[j] = r_verdict[j-1]; r_verdict[j-1] = tmp
+            tmp = r_vrank[j];   r_vrank[j]   = r_vrank[j-1];   r_vrank[j-1]   = tmp
             j--
         }
     }
@@ -375,17 +407,17 @@ END {
         if (length(r_name[i]) > name_w) name_w = length(r_name[i])
 
     # Print header
-    hdr_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s\n"
+    hdr_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %8s  %7s  %s\n"
     printf hdr_fmt, \
-        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A", "sigma"
+        "input_file", "n_A", "mean_A (s)", "stddev_A", "n_B", "mean_B (s)", "stddev_B", "ratio B/A", "sigma", "verdict"
     # Print separator matching name width
     sep = ""
     for (c = 1; c <= name_w; c++) sep = sep "-"
     printf hdr_fmt, \
-        sep, "----", "----------", "----------", "----", "----------", "----------", "--------", "-------"
+        sep, "----", "----------", "----------", "----", "----------", "----------", "--------", "-------", "------"
 
     # Print rows
-    row_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %s  %s\n"
+    row_fmt = "%-" name_w "s  %4s  %10s %10s  %4s  %10s %10s  %s  %s  %s\n"
     for (i = 1; i <= nrows; i++) {
         if (r_ratio[i] < 9999) {
             ratio_s = sprintf("%.3f", r_ratio[i])
@@ -417,6 +449,14 @@ END {
             sigma_str = sprintf("%7s", "-")
         }
 
+        # Format verdict with color
+        if (r_verdict[i] == "FASTER")
+            verdict_str = sprintf("\033[32m%s\033[0m", r_verdict[i])
+        else if (r_verdict[i] == "SLOWER")
+            verdict_str = sprintf("\033[31m%s\033[0m", r_verdict[i])
+        else
+            verdict_str = r_verdict[i]
+
         printf row_fmt, \
             r_name[i], \
             (r_n_a[i] > 0 ? sprintf("%d", r_n_a[i]) : "-"), \
@@ -426,7 +466,38 @@ END {
             (r_mean_b[i] > 0 ? sprintf("%.6f", r_mean_b[i]) : "-"), \
             (r_sd_b[i] > 0 ? sprintf("%.6f", r_sd_b[i]) : "-"), \
             ratio_str, \
-            sigma_str
+            sigma_str, \
+            verdict_str
+    }
+
+    # ─── Summary footer ─────────────────────────────────────────────
+    n_compared = n_faster + n_slower + n_same
+    printf "\n"
+    printf "Summary (|sigma| >= 2 = significant)\n"
+    printf "─────────────────────────────────────\n"
+    printf "  Compared : %d test cases\n", n_compared
+    if (n_nodata > 0)
+        printf "  No data  : %d (insufficient samples)\n", n_nodata
+
+    if (n_compared > 0) {
+        pct_faster = 100.0 * n_faster / n_compared
+        pct_slower = 100.0 * n_slower / n_compared
+        pct_same   = 100.0 * n_same   / n_compared
+
+        printf "  \033[32mFASTER\033[0m : %3d (%5.1f%%)\n", n_faster, pct_faster
+        printf "  \033[31mSLOWER\033[0m : %3d (%5.1f%%)\n", n_slower, pct_slower
+        printf "  same   : %3d (%5.1f%%)\n", n_same, pct_same
+
+        # Overall conclusion
+        printf "\n"
+        if (n_faster > 0 && n_slower == 0)
+            printf "  Conclusion: \033[32mB is faster than A\033[0m\n"
+        else if (n_slower > 0 && n_faster == 0)
+            printf "  Conclusion: \033[31mB is slower than A\033[0m\n"
+        else if (n_faster == 0 && n_slower == 0)
+            printf "  Conclusion: \033[32mA and B are the same speed\033[0m\n"
+        else
+            printf "  Conclusion: Mixed — B is faster in %d and slower in %d cases\n", n_faster, n_slower
     }
 }
 ' <(echo "$stats_a") <(echo "$stats_b")
